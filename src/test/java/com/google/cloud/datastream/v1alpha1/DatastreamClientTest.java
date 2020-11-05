@@ -55,6 +55,8 @@ public class DatastreamClientTest {
 
   @BeforeAll
   public static void setupTestClass() throws Exception {
+    // Certain properties need to be configured otherwise the whole tests will be skipped.
+    // Check README for how to configure the properties below.
     String project = System.getProperty("project.id");
     assumeFalse(project == null);
 

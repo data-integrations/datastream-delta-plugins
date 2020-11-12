@@ -128,14 +128,19 @@
           "widget-type": "textbox"
         },
         {
-          "name": "gcsPathPrefix",
-          "label": "Path Prefix",
-          "widget-type": "textbox"
-        },
-        {
           "name": "gcsServiceAccountKey",
           "label": "Service Account Key",
           "widget-type": "securekey-textarea"
+        }
+      ]
+    },
+    {
+      "label": "Advanced",
+      "properties": [
+        {
+          "name": "gcsPathPrefix",
+          "label": "Path Prefix",
+          "widget-type": "textbox"
         }
       ]
     }

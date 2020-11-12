@@ -29,13 +29,14 @@ import javax.annotation.Nullable;
 public class DatastreamConfig extends PluginConfig {
 
   public static final String DEFAULT_REGION = "us-central1";
-  public static final Integer DEFAULT_PORT = 1521;
-  public static final Integer DEFAULT_SSH_PORT = 22;
-  public static final String DEFAULT_SID = "OCRL";
   public static final String CONNECTIVITY_METHOD_IP_ALLOWLISTING = "ip-allowlisting";
   public static final String CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL = "forward-ssh-tunnel";
   public static final String AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY = "private-public-key";
   public static final String AUTHENTICATION_METHOD_PASSWORD = "password";
+  public static final String DEFAULT_SID = "ORCL";
+
+  public static final int DEFAULT_PORT = 1521;
+  public static final int DEFAULT_SSH_PORT = 22;
 
 
   @Description("Hostname of the Oracle server to read from.")
@@ -66,38 +67,46 @@ public class DatastreamConfig extends PluginConfig {
 
   @Nullable
   @Description("Hostname of the SSH Server to connect to.")
+  // only required when connectivity method is  "Forward SSH Tunnel"
   private String sshHost;
 
   @Nullable
   @Description("Port of the SSH Server to connect to.")
   // Cannot make sshPort an int, because UI will take this property as required and thus cannot hide
   // this property when IP allowlisting is selected as connectivity method
+  // only required when connectivity method is  "Forward SSH Tunnel"
   private Integer sshPort;
 
   @Nullable
   @Description("Username to login the SSH Server.")
+  // only required when connectivity method is  "Forward SSH Tunnel"
   private String sshUser;
 
   @Nullable
   @Description("How the SSH server authenticates the login.")
+  // only required when connectivity method is  "Forward SSH Tunnel"
   private String sshAuthenticationMethod;
 
   @Nullable
   @Description("Password of the login on the SSH Server.")
+  // only required when connectivity method is  "Forward SSH Tunnel" and authentication method is
+  // "Password"
   private String sshPassword;
 
   @Macro
   @Nullable
   @Description("Private key of the login on the SSH Server.")
+  // only required when connectivity method is  "Forward SSH Tunnel" and authentication method is
+  // "Private/Public Key Pair"
   private String sshPrivateKey;
 
   @Nullable
-  @Description("The GCS bucket that DataStream can write its output to. By default we will " +
-    "create one for you. See \"Documentation\" tab for details")
+  @Description("The GCS bucket that DataStream can write its output to. By default replicator " +
+    "application will create one for you. See \"Documentation\" tab for details")
   private String gcsBucket;
 
   @Nullable
-  @Description("The path prefix of the path where DataStream will write its output to.")
+  @Description("The optional path prefix of the path where DataStream will write its output to.")
   private String gcsPathPrefix;
 
 

@@ -42,6 +42,7 @@ public class DatastreamDeltaSource implements DeltaSource {
   private final DatastreamConfig conf;
 
   public DatastreamDeltaSource(DatastreamConfig conf) {
+    conf.validate();
     this.conf = conf;
   }
 

@@ -16,42 +16,203 @@
 
 package io.cdap.delta.datastream;
 
+import com.google.api.gax.core.CredentialsProvider;
+import com.google.auth.Credentials;
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.ServiceOptions;
+import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
+import com.google.cloud.datastream.v1alpha1.DatastreamClient;
+import com.google.cloud.datastream.v1alpha1.DatastreamSettings;
+import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileRequest;
+import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileResponse;
+import com.google.cloud.datastream.v1alpha1.ForwardSshTunnelConnectivity;
+import com.google.cloud.datastream.v1alpha1.OracleColumn;
+import com.google.cloud.datastream.v1alpha1.OracleProfile;
+import com.google.cloud.datastream.v1alpha1.OracleRdbms;
+import com.google.cloud.datastream.v1alpha1.OracleSchema;
+import com.google.cloud.datastream.v1alpha1.OracleTable;
+import com.google.cloud.datastream.v1alpha1.StaticServiceIpConnectivity;
+import com.google.common.collect.Iterables;
+import io.cdap.cdap.api.data.schema.Schema;
+import io.cdap.delta.api.assessment.ColumnDetail;
+import io.cdap.delta.api.assessment.ColumnSupport;
 import io.cdap.delta.api.assessment.StandardizedTableDetail;
 import io.cdap.delta.api.assessment.TableDetail;
 import io.cdap.delta.api.assessment.TableList;
 import io.cdap.delta.api.assessment.TableNotFoundException;
 import io.cdap.delta.api.assessment.TableRegistry;
+import io.cdap.delta.api.assessment.TableSummary;
+import io.cdap.delta.datastream.util.DatastreamUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
+
+import static io.cdap.delta.datastream.DatastreamConfig.AUTHENTICATION_METHOD_PASSWORD;
+import static io.cdap.delta.datastream.DatastreamConfig.AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY;
+import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL;
+import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING;
 
 /**
  * Lists and describes tables.
  */
 public class DatastreamTableRegistry implements TableRegistry {
+  private static final Logger LOG = LoggerFactory.getLogger(DatastreamTableRegistry.class);
   private final DatastreamConfig conf;
+  private final DatastreamClient datastreamClient;
+  // parent path of datastream resources in form of "projects/projectId/locations/region"
+  private final String parentPath;
+  private static final Set<String> SYSTEM_SCHEMA = new HashSet<>(Arrays.asList("SYS", "SYSTEM", "CTXSYS", "XDB",
+    "MDSYS", "FLOWS_FILES", "APEX_040000", "OUTLN"));
 
   public DatastreamTableRegistry(DatastreamConfig conf) {
+    this(conf, null);
+  }
+
+  public DatastreamTableRegistry(DatastreamConfig conf, @Nullable Credentials credentials) {
     this.conf = conf;
+    try {
+      this.datastreamClient = DatastreamClient
+        .create(DatastreamSettings.newBuilder().setCredentialsProvider(new CredentialsProvider() {
+          @Override
+          public Credentials getCredentials() throws IOException {
+            return credentials == null ? GoogleCredentials.getApplicationDefault() : credentials;
+          }
+        }).build());
+    } catch (IOException e) {
+      throw new IllegalArgumentException(
+        "Cannot create DatastreamSettings with Credentials: " + credentials, e);
+    }
+    //TODO validate whether the region is valid
+
+    this.parentPath = String
+      .format("projects/%s/locations/%s", ServiceOptions.getDefaultProjectId(), conf.getRegion());
   }
 
   @Override
   public TableList listTables() throws IOException {
-    return new TableList(Collections.emptyList());
+    LOG.debug(String.format("List tables..."));
+    List<TableSummary> tables = new ArrayList<>();
+
+    DiscoverConnectionProfileResponse response = discover();
+    for (OracleSchema schema : response.getOracleRdbms().getOracleSchemasList()) {
+      String schemaName = schema.getSchemaName();
+      if (SYSTEM_SCHEMA.contains(schemaName.toUpperCase())) {
+        //skip system tables
+        continue;
+      }
+      for (OracleTable table : schema.getOracleTablesList()) {
+        String tableName = table.getTableName();
+        tables.add(
+          new TableSummary(conf.getSid(), tableName, table.getOracleColumnsCount(), schemaName));
+      }
+    }
+    return new TableList(tables);
   }
 
   @Override
-  public TableDetail describeTable(String db, String table) throws TableNotFoundException,
-    IOException {
-    return new TableDetail.Builder(null, null, null).build();
+  public TableDetail describeTable(String db, String schema, String table) throws TableNotFoundException, IOException {
+    LOG.debug(String.format("Describe table, db: %s, table: %s, schema: %s", db, table, schema));
+    DiscoverConnectionProfileResponse discoverResponse = discover(schema, table);
+    //TODO handle schema/table doesn't exist case, currently datastream only throw a very generic
+    // exception : com.google.api.gax.rpc.UnknownException without signals indicating this error
+    // case
+
+    OracleSchema oracleSchema =
+      Iterables.getOnlyElement(discoverResponse.getOracleRdbms().getOracleSchemasList());
+    OracleTable oracleTable = Iterables.getOnlyElement(oracleSchema.getOracleTablesList());
+
+    List<ColumnDetail> columns = new ArrayList<>(oracleTable.getOracleColumnsCount());
+    List<String> primaryKeys = new ArrayList<>();
+    for (OracleColumn column : oracleTable.getOracleColumnsList()) {
+      Map<String, String> properties = new HashMap<>();
+      properties.put(DatastreamTableAssessor.PRECISION, Integer.toString(column.getPrecision()));
+      properties.put(DatastreamTableAssessor.SCALE,
+                     Integer.toString(column.getScale()));
+      columns.add(
+        new ColumnDetail(column.getColumnName(), DatastreamUtils.convertStringDataTypetoSQLType(column.getDataType()),
+          column.getNullable(), properties));
+      if (column.getPrimaryKey()) {
+        primaryKeys.add(column.getColumnName());
+      }
+    }
+    return new TableDetail.Builder(db, table, schema).setColumns(columns).setPrimaryKey(primaryKeys).build();
   }
 
   @Override
   public StandardizedTableDetail standardize(TableDetail tableDetail) {
-    return new StandardizedTableDetail(null, null, Collections.emptyList(), null);
+    List<Schema.Field> columnSchemas = new ArrayList<>();
+    for (ColumnDetail detail : tableDetail.getColumns()) {
+      ColumnEvaluation evaluation = DatastreamTableAssessor.evaluateColumn(detail);
+      if (evaluation.getAssessment().getSupport().equals(ColumnSupport.NO)) {
+        continue;
+      }
+      columnSchemas.add(evaluation.getField());
+    }
+    Schema schema = Schema.recordOf("outputSchema", columnSchemas);
+    return new StandardizedTableDetail(tableDetail.getDatabase(), tableDetail.getTable(),
+      tableDetail.getPrimaryKey(), schema);
   }
 
   @Override
   public void close() throws IOException {
+    this.datastreamClient.close();
+  }
+
+  private ConnectionProfile.Builder buildOracleConnectionProfile() {
+    ConnectionProfile.Builder profileBuilder = ConnectionProfile.newBuilder().setOracleProfile(
+      OracleProfile.newBuilder().setHostname(conf.getHost()).setUsername(conf.getUser())
+        .setPassword(conf.getPassword()).setDatabaseService(conf.getSid()).setPort(conf.getPort()));
+    switch (conf.getConnectivityMethod()) {
+      case CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL:
+        ForwardSshTunnelConnectivity.Builder forwardSSHTunnelConnectivityBuilder =
+          ForwardSshTunnelConnectivity.newBuilder().setHostname(conf.getSshHost())
+            .setPassword(conf.getSshPassword()).setPort(conf.getSshPort())
+            .setUsername(conf.getSshUser());
+        switch (conf.getSshAuthenticationMethod()) {
+          case AUTHENTICATION_METHOD_PASSWORD:
+            forwardSSHTunnelConnectivityBuilder.setPassword(conf.getSshPassword());
+            break;
+          case AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY:
+            forwardSSHTunnelConnectivityBuilder.setPrivateKey(conf.getSshPrivateKey());
+            break;
+          default:
+            throw new IllegalArgumentException(
+              "Unsupported authentication method: " + conf.getSshAuthenticationMethod());
+        }
+        return profileBuilder.setForwardSshConnectivity(forwardSSHTunnelConnectivityBuilder);
+      case CONNECTIVITY_METHOD_IP_ALLOWLISTING:
+        return profileBuilder
+          .setStaticServiceIpConnectivity(StaticServiceIpConnectivity.getDefaultInstance());
+      default:
+        throw new IllegalArgumentException(
+          "Unsupported connectivity method: " + conf.getConnectivityMethod());
+    }
+  }
+
+  private ConnectionProfile.Builder buildOracleConnectionProfile(String name) {
+    return buildOracleConnectionProfile().setDisplayName(name);
+  }
+
+  private DiscoverConnectionProfileResponse discover(String schema, String table) {
+    return datastreamClient.discoverConnectionProfile(
+      DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath)
+        .setConnectionProfile(buildOracleConnectionProfile()).setOracleRdbms(
+        OracleRdbms.newBuilder().addOracleSchemas(OracleSchema.newBuilder().setSchemaName(schema).addOracleTables(
+          OracleTable.newBuilder().setTableName(table)))).build());
+  }
+
+  private DiscoverConnectionProfileResponse discover() {
+    return datastreamClient.discoverConnectionProfile(
+      DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath)
+        .setConnectionProfile(buildOracleConnectionProfile()).setRecursive(true).build());
   }
 }

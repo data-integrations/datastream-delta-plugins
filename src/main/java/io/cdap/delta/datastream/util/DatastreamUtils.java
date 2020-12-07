@@ -17,9 +17,19 @@
 
 package io.cdap.delta.datastream.util;
 
+import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
+import com.google.cloud.datastream.v1alpha1.ForwardSshTunnelConnectivity;
+import com.google.cloud.datastream.v1alpha1.OracleProfile;
+import com.google.cloud.datastream.v1alpha1.StaticServiceIpConnectivity;
+import io.cdap.delta.datastream.DatastreamConfig;
 import io.cdap.delta.datastream.OracleDataType;
 
 import java.sql.SQLType;
+
+import static io.cdap.delta.datastream.DatastreamConfig.AUTHENTICATION_METHOD_PASSWORD;
+import static io.cdap.delta.datastream.DatastreamConfig.AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY;
+import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL;
+import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING;
 
 /**
  *  Common Utils for Datastream source plugins
@@ -103,4 +113,36 @@ public class DatastreamUtils {
     }
 
   }
+
+  public static ConnectionProfile.Builder buildOracleConnectionProfile(DatastreamConfig config) {
+    ConnectionProfile.Builder profileBuilder = ConnectionProfile.newBuilder().setOracleProfile(
+      OracleProfile.newBuilder().setHostname(config.getHost()).setUsername(config.getUser())
+        .setPassword(config.getPassword()).setDatabaseService(config.getSid()).setPort(config.getPort()));
+    switch (config.getConnectivityMethod()) {
+      case CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL:
+        ForwardSshTunnelConnectivity.Builder forwardSSHTunnelConnectivityBuilder =
+          ForwardSshTunnelConnectivity.newBuilder().setHostname(config.getSshHost())
+            .setPassword(config.getSshPassword()).setPort(config.getSshPort())
+            .setUsername(config.getSshUser());
+        switch (config.getSshAuthenticationMethod()) {
+          case AUTHENTICATION_METHOD_PASSWORD:
+            forwardSSHTunnelConnectivityBuilder.setPassword(config.getSshPassword());
+            break;
+          case AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY:
+            forwardSSHTunnelConnectivityBuilder.setPrivateKey(config.getSshPrivateKey());
+            break;
+          default:
+            throw new IllegalArgumentException(
+              "Unsupported authentication method: " + config.getSshAuthenticationMethod());
+        }
+        return profileBuilder.setForwardSshConnectivity(forwardSSHTunnelConnectivityBuilder);
+      case CONNECTIVITY_METHOD_IP_ALLOWLISTING:
+        return profileBuilder
+          .setStaticServiceIpConnectivity(StaticServiceIpConnectivity.getDefaultInstance());
+      default:
+        throw new IllegalArgumentException(
+          "Unsupported connectivity method: " + config.getConnectivityMethod());
+    }
+  }
+
 }

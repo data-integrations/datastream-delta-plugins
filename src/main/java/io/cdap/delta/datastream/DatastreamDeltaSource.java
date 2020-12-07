@@ -16,6 +16,7 @@
 
 package io.cdap.delta.datastream;
 
+import com.google.cloud.datastream.v1alpha1.DatastreamClient;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Name;
 import io.cdap.cdap.api.annotation.Plugin;
@@ -62,7 +63,7 @@ public class DatastreamDeltaSource implements DeltaSource {
 
   @Override
   public TableRegistry createTableRegistry(Configurer configurer) throws Exception {
-    return new DatastreamTableRegistry(conf);
+      return new DatastreamTableRegistry(conf, DatastreamClient.create());
   }
 
   @Override

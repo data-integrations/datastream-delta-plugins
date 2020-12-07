@@ -16,22 +16,15 @@
 
 package io.cdap.delta.datastream;
 
-import com.google.api.gax.core.CredentialsProvider;
-import com.google.auth.Credentials;
-import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.ServiceOptions;
 import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
 import com.google.cloud.datastream.v1alpha1.DatastreamClient;
-import com.google.cloud.datastream.v1alpha1.DatastreamSettings;
 import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileResponse;
-import com.google.cloud.datastream.v1alpha1.ForwardSshTunnelConnectivity;
 import com.google.cloud.datastream.v1alpha1.OracleColumn;
-import com.google.cloud.datastream.v1alpha1.OracleProfile;
 import com.google.cloud.datastream.v1alpha1.OracleRdbms;
 import com.google.cloud.datastream.v1alpha1.OracleSchema;
 import com.google.cloud.datastream.v1alpha1.OracleTable;
-import com.google.cloud.datastream.v1alpha1.StaticServiceIpConnectivity;
 import com.google.common.collect.Iterables;
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.delta.api.assessment.ColumnDetail;
@@ -54,47 +47,27 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
-
-import static io.cdap.delta.datastream.DatastreamConfig.AUTHENTICATION_METHOD_PASSWORD;
-import static io.cdap.delta.datastream.DatastreamConfig.AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY;
-import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL;
-import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING;
 
 /**
  * Lists and describes tables.
  */
 public class DatastreamTableRegistry implements TableRegistry {
   private static final Logger LOG = LoggerFactory.getLogger(DatastreamTableRegistry.class);
-  private final DatastreamConfig conf;
+  private final DatastreamConfig config;
   private final DatastreamClient datastreamClient;
   // parent path of datastream resources in form of "projects/projectId/locations/region"
   private final String parentPath;
   private static final Set<String> SYSTEM_SCHEMA = new HashSet<>(Arrays.asList("SYS", "SYSTEM", "CTXSYS", "XDB",
     "MDSYS", "FLOWS_FILES", "APEX_040000", "OUTLN"));
 
-  public DatastreamTableRegistry(DatastreamConfig conf) {
-    this(conf, null);
-  }
 
-  public DatastreamTableRegistry(DatastreamConfig conf, @Nullable Credentials credentials) {
-    this.conf = conf;
-    try {
-      this.datastreamClient = DatastreamClient
-        .create(DatastreamSettings.newBuilder().setCredentialsProvider(new CredentialsProvider() {
-          @Override
-          public Credentials getCredentials() throws IOException {
-            return credentials == null ? GoogleCredentials.getApplicationDefault() : credentials;
-          }
-        }).build());
-    } catch (IOException e) {
-      throw new IllegalArgumentException(
-        "Cannot create DatastreamSettings with Credentials: " + credentials, e);
-    }
+  public DatastreamTableRegistry(DatastreamConfig config, DatastreamClient datastreamClient) {
+    this.config = config;
+    this.datastreamClient = datastreamClient;
     //TODO validate whether the region is valid
 
     this.parentPath = String
-      .format("projects/%s/locations/%s", ServiceOptions.getDefaultProjectId(), conf.getRegion());
+      .format("projects/%s/locations/%s", ServiceOptions.getDefaultProjectId(), config.getRegion());
   }
 
   @Override
@@ -112,7 +85,7 @@ public class DatastreamTableRegistry implements TableRegistry {
       for (OracleTable table : schema.getOracleTablesList()) {
         String tableName = table.getTableName();
         tables.add(
-          new TableSummary(conf.getSid(), tableName, table.getOracleColumnsCount(), schemaName));
+          new TableSummary(config.getSid(), tableName, table.getOracleColumnsCount(), schemaName));
       }
     }
     return new TableList(tables);
@@ -164,48 +137,19 @@ public class DatastreamTableRegistry implements TableRegistry {
 
   @Override
   public void close() throws IOException {
-    this.datastreamClient.close();
+    datastreamClient.close();
   }
 
-  private ConnectionProfile.Builder buildOracleConnectionProfile() {
-    ConnectionProfile.Builder profileBuilder = ConnectionProfile.newBuilder().setOracleProfile(
-      OracleProfile.newBuilder().setHostname(conf.getHost()).setUsername(conf.getUser())
-        .setPassword(conf.getPassword()).setDatabaseService(conf.getSid()).setPort(conf.getPort()));
-    switch (conf.getConnectivityMethod()) {
-      case CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL:
-        ForwardSshTunnelConnectivity.Builder forwardSSHTunnelConnectivityBuilder =
-          ForwardSshTunnelConnectivity.newBuilder().setHostname(conf.getSshHost())
-            .setPassword(conf.getSshPassword()).setPort(conf.getSshPort())
-            .setUsername(conf.getSshUser());
-        switch (conf.getSshAuthenticationMethod()) {
-          case AUTHENTICATION_METHOD_PASSWORD:
-            forwardSSHTunnelConnectivityBuilder.setPassword(conf.getSshPassword());
-            break;
-          case AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY:
-            forwardSSHTunnelConnectivityBuilder.setPrivateKey(conf.getSshPrivateKey());
-            break;
-          default:
-            throw new IllegalArgumentException(
-              "Unsupported authentication method: " + conf.getSshAuthenticationMethod());
-        }
-        return profileBuilder.setForwardSshConnectivity(forwardSSHTunnelConnectivityBuilder);
-      case CONNECTIVITY_METHOD_IP_ALLOWLISTING:
-        return profileBuilder
-          .setStaticServiceIpConnectivity(StaticServiceIpConnectivity.getDefaultInstance());
-      default:
-        throw new IllegalArgumentException(
-          "Unsupported connectivity method: " + conf.getConnectivityMethod());
-    }
-  }
+
 
   private ConnectionProfile.Builder buildOracleConnectionProfile(String name) {
-    return buildOracleConnectionProfile().setDisplayName(name);
+    return DatastreamUtils.buildOracleConnectionProfile(config).setDisplayName(name);
   }
 
   private DiscoverConnectionProfileResponse discover(String schema, String table) {
     return datastreamClient.discoverConnectionProfile(
       DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath)
-        .setConnectionProfile(buildOracleConnectionProfile()).setOracleRdbms(
+        .setConnectionProfile(DatastreamUtils.buildOracleConnectionProfile(config)).setOracleRdbms(
         OracleRdbms.newBuilder().addOracleSchemas(OracleSchema.newBuilder().setSchemaName(schema).addOracleTables(
           OracleTable.newBuilder().setTableName(table)))).build());
   }
@@ -213,6 +157,6 @@ public class DatastreamTableRegistry implements TableRegistry {
   private DiscoverConnectionProfileResponse discover() {
     return datastreamClient.discoverConnectionProfile(
       DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath)
-        .setConnectionProfile(buildOracleConnectionProfile()).setRecursive(true).build());
+        .setConnectionProfile(DatastreamUtils.buildOracleConnectionProfile(config)).setRecursive(true).build());
   }
 }

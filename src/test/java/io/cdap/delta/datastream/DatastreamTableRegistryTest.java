@@ -17,7 +17,11 @@
 
 package io.cdap.delta.datastream;
 
+import com.google.api.gax.core.CredentialsProvider;
+import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.datastream.v1alpha1.DatastreamClient;
+import com.google.cloud.datastream.v1alpha1.DatastreamSettings;
 import io.cdap.delta.api.assessment.ColumnDetail;
 import io.cdap.delta.api.assessment.TableDetail;
 import io.cdap.delta.api.assessment.TableList;
@@ -104,7 +108,7 @@ class DatastreamTableRegistryTest {
     try (DatastreamTableRegistry registry = new DatastreamTableRegistry(
       new DatastreamConfig(oracleHost, oraclePort, oracleUser, oraclePassword, oracleDb, serviceLocation,
         DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null, null, null, null, null, null, null),
-      credentials)) {
+      createDatastreamClient())) {
       tableList = registry.listTables();
     }
     assertNotNull(tableList);
@@ -123,8 +127,8 @@ class DatastreamTableRegistryTest {
       try (DatastreamTableRegistry registry = new DatastreamTableRegistry(
         new DatastreamConfig(oracleHost, oraclePort, oracleUser, oraclePassword, oracleDb, serviceLocation,
           DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null, null, null, null, null, null, null),
-        credentials)) {
-        tableDetail = registry.describeTable(oracleDb, tableName, schema);
+        createDatastreamClient())) {
+        tableDetail = registry.describeTable(oracleDb, schema, tableName);
       }
       assertNotNull(tableDetail);
       List<ColumnDetail> columns = tableDetail.getColumns();
@@ -145,6 +149,21 @@ class DatastreamTableRegistryTest {
         assertNotNull(key);
         assertFalse(key.isEmpty());
       }
+    }
+  }
+
+  private DatastreamClient createDatastreamClient() {
+    try {
+      return DatastreamClient
+        .create(DatastreamSettings.newBuilder().setCredentialsProvider(new CredentialsProvider() {
+          @Override
+          public Credentials getCredentials() throws IOException {
+            return credentials;
+          }
+        }).build());
+    } catch (IOException e) {
+      throw new IllegalArgumentException(
+        "Cannot create DatastreamSettings with Credentials: " + credentials, e);
     }
   }
 

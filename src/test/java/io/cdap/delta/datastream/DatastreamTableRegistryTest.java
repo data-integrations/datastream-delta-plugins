@@ -67,7 +67,8 @@ class DatastreamTableRegistryTest {
       project = System.getProperty("GCLOUD_PROJECT");
     }
     assumeFalse(project == null, String.format(messageTemplate, "project id"));
-
+    System.setProperty("GCLOUD_PROJECT", project);
+    
     String serviceAccountFilePath = System.getProperty("service.account.file");
     assumeFalse(serviceAccountFilePath == null, String.format(messageTemplate, "service account key file"));
 
@@ -84,16 +85,16 @@ class DatastreamTableRegistryTest {
     }
 
     oracleHost = System.getProperty("oracle.host");
-    assumeFalse(oracleHost == null);
+    assumeFalse(oracleHost == null, String.format(messageTemplate, "oracle host"));
 
     oracleUser = System.getProperty("oracle.user");
-    assumeFalse(oracleUser == null);
+    assumeFalse(oracleUser == null, String.format(messageTemplate, "oracle user"));
 
-    oraclePassword = System.getProperty("oracle.password");
+    oraclePassword = System.getProperty("oracle.password", String.format(messageTemplate, "oracle password"));
     assumeFalse(oraclePassword == null);
 
     oracleDb = System.getProperty("oracle.database");
-    assumeFalse(oracleDb == null);
+    assumeFalse(oracleDb == null, String.format(messageTemplate, "oracle  sid"));
 
     File serviceAccountFile = new File(serviceAccountFilePath);
     try (InputStream is = new FileInputStream(serviceAccountFile)) {

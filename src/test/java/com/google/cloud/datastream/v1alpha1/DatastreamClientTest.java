@@ -212,6 +212,10 @@ public class DatastreamClientTest {
       .getConnectionProfile(buildConnectionProfilePath(destinationName)));
   }
 
+  @Test
+  public void testGetNonExistedStream() {
+    assertThrows(NotFoundException.class, () -> datastream.getStream(buildStreamPath("NonExisted")));
+  }
   private void waitUntilComplete(Future<?> future) throws InterruptedException {
     while (!future.isDone() && !future.isCancelled()) {
       TimeUnit.MILLISECONDS.sleep(200L);

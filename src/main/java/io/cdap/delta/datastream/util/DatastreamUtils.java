@@ -145,5 +145,4 @@ public final class DatastreamUtils {
           "Unsupported connectivity method: " + config.getConnectivityMethod());
     }
   }
-
 }

@@ -57,6 +57,7 @@
     <delta.version>0.2.0-SNAPSHOT</delta.version>
     <slf4j.version>1.7.25</slf4j.version>
     <google.cloud.version>1.78.0</google.cloud.version>
+    <gcs.version>1.78.0</gcs.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
@@ -99,6 +100,11 @@
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-core</artifactId>
       <version>${google.cloud.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-storage</artifactId>
+      <version>${gcs.version}</version>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>

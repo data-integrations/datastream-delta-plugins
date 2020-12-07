@@ -16,7 +16,10 @@
 
 package io.cdap.delta.datastream;
 
+import com.google.cloud.ServiceOptions;
 import com.google.cloud.datastream.v1alpha1.DatastreamClient;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Name;
 import io.cdap.cdap.api.annotation.Plugin;
@@ -24,13 +27,14 @@ import io.cdap.delta.api.Configurer;
 import io.cdap.delta.api.DeltaSource;
 import io.cdap.delta.api.DeltaSourceContext;
 import io.cdap.delta.api.EventEmitter;
-import io.cdap.delta.api.EventReader;
 import io.cdap.delta.api.EventReaderDefinition;
 import io.cdap.delta.api.SourceConfigurer;
 import io.cdap.delta.api.SourceProperties;
 import io.cdap.delta.api.assessment.TableAssessor;
 import io.cdap.delta.api.assessment.TableDetail;
 import io.cdap.delta.api.assessment.TableRegistry;
+
+import java.io.IOException;
 
 /**
  * Datastream origin.
@@ -51,13 +55,23 @@ public class DatastreamDeltaSource implements DeltaSource {
 
   @Override
   public void configure(SourceConfigurer configurer) {
-    configurer.setProperties(new SourceProperties.Builder().setOrdering(SourceProperties.Ordering.UN_ORDERED).build());
+    configurer.setProperties(new SourceProperties.Builder().setRowIdSupported(true).build());
   }
 
   @Override
-  public EventReader createReader(EventReaderDefinition definition, DeltaSourceContext context,
+  public DatastreamEventReader createReader(EventReaderDefinition definition, DeltaSourceContext context,
                                   EventEmitter eventEmitter) {
-    return new DatastreamEventReader(conf);
+    Storage storage = StorageOptions.newBuilder()
+      .setCredentials(conf.getGcsCredentials())
+      .setProjectId(ServiceOptions.getDefaultProjectId())
+      .build()
+      .getService();
+
+    try {
+      return new DatastreamEventReader(conf, definition, context, eventEmitter, DatastreamClient.create(), storage);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to create Datastream client!", e);
+    }
   }
 
   @Override

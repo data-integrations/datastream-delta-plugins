@@ -16,10 +16,17 @@
 
 package io.cdap.delta.datastream;
 
+import com.google.auth.Credentials;
+import com.google.auth.oauth2.GoogleCredentials;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Macro;
 import io.cdap.cdap.api.plugin.PluginConfig;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import javax.annotation.Nullable;
 
 
@@ -182,19 +189,32 @@ public class DatastreamConfig extends PluginConfig {
     return sshPrivateKey;
   }
 
-  @Nullable
   public String getGcsBucket() {
-    return gcsBucket;
+    return gcsBucket == null ? "cdf-cdc" : gcsBucket.toLowerCase();
   }
 
-  @Nullable
   public String getGcsPathPrefix() {
-    return gcsPathPrefix;
+    if (gcsPathPrefix == null) {
+      return "/";
+    }
+    return gcsPathPrefix.startsWith("/") ? gcsPathPrefix : "/" + gcsPathPrefix;
   }
 
-  @Nullable
-  public String getGcsServiceAccountKey() {
-    return gcsServiceAccountKey;
+  public Credentials getGcsCredentials() {
+    if (gcsServiceAccountKey == null || "auto-detect".equalsIgnoreCase(gcsServiceAccountKey)) {
+      try {
+        return GoogleCredentials.getApplicationDefault();
+      } catch (IOException e) {
+        throw new RuntimeException("Fail to get application default credentials!", e);
+      }
+    }
+
+    try (InputStream is = new ByteArrayInputStream(gcsServiceAccountKey.getBytes(StandardCharsets.UTF_8))) {
+      return GoogleCredentials.fromStream(is)
+        .createScoped(Collections.singleton("https://www.googleapis.com/auth/cloud-platform"));
+    } catch (IOException e) {
+      throw new RuntimeException("Fail to read GCS service account key!", e);
+    }
   }
 
   public DatastreamConfig(String host, @Nullable Integer port, String user, String password,

@@ -1,13 +1,13 @@
 /*
  *
  * Copyright © 2020 Cask Data, Inc.
- *
+ *  
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- *
+ *  
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ *  
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -45,7 +45,6 @@ import io.cdap.cdap.api.metrics.Metrics;
 import io.cdap.cdap.api.plugin.PluginProperties;
 import io.cdap.delta.api.DeltaPipelineId;
 import io.cdap.delta.api.DeltaSourceContext;
-import io.cdap.delta.api.EventReaderDefinition;
 import io.cdap.delta.api.ReplicationError;
 import io.cdap.delta.api.SourceTable;
 import org.junit.jupiter.api.BeforeAll;
@@ -55,8 +54,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -68,7 +72,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
-class DatastreamEventReaderTest {
+class DatastreamDeltaSourceTest {
   private static String serviceLocation;
   private static String oracleHost;
   private static String oracleUser;
@@ -80,6 +84,8 @@ class DatastreamEventReaderTest {
   private static DatastreamClient datastreamClient;
   private static String parentPath;
   private static String gcsBucket;
+  private static Storage storage;
+  private static String servcieAccountKey;
 
   @BeforeAll
   public static void setupTestClass() throws Exception {
@@ -134,28 +140,34 @@ class DatastreamEventReaderTest {
       credentials = GoogleCredentials.fromStream(is).createScoped("https://www.googleapis.com/auth/cloud-platform");
     }
     datastreamClient = createDatastreamClient();
+    storage = StorageOptions.newBuilder().setCredentials(credentials).setProjectId(ServiceOptions.getDefaultProjectId())
+      .build().getService();
+
+    setEnv("GOOGLE_APPLICATION_CREDENTIALS", serviceAccountFilePath);
+    servcieAccountKey = new String(Files.readAllBytes(Paths.get(new File(serviceAccountFilePath).getAbsolutePath())),
+      StandardCharsets.UTF_8);
 
     gcsBucket = System.getProperty("gcs.bucket");
-
     parentPath = String.format("projects/%s/locations/%s", project, serviceLocation);
 
   }
 
   @Test
-  public void testCreateStreamIfNotExisted() throws InterruptedException {
+  public void testInitialize() throws Exception {
     String namspace = "default";
     String appName = "datastream-ut";
     long generation = 0;
-    DatastreamEventReader eventReader = new DatastreamEventReader(buildDatastreamConfig(), buildDefinition(),
-      createContext(namspace, appName, generation), null, datastreamClient, createStorage());
-    eventReader.createStreamIfNotExisted();
+    DatastreamConfig config = buildDatastreamConfig();
+    DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
+    DeltaSourceContext context = createContext(namspace, appName, generation);
+    deltaSource.initialize(context);
     String replicatorId = String.format("%s-%s-%d", namspace, appName, generation);
     checkStream(replicatorId);
     // call twice should not have impact
-    eventReader.createStreamIfNotExisted();
+    deltaSource.initialize(context);
     checkStream(replicatorId);
     clearStream(replicatorId);
-    eventReader.createStreamIfNotExisted();
+    deltaSource.initialize(context);
     checkStream(replicatorId);
     clearStream(replicatorId);
   }
@@ -181,6 +193,8 @@ class DatastreamEventReaderTest {
     //  created. So far this method call (getting the long running operation) has some issue for
     //  java client.
     waitUntilComplete(response);
+
+    storage.delete(gcsBucket);
   }
 
 
@@ -239,7 +253,7 @@ class DatastreamEventReaderTest {
     GcsDestinationConfig gcsConfig = tgtConfig.getGcsDestinationConfig();
     assertEquals(GcsFileFormat.AVRO, gcsConfig.getGcsFileFormat());
     assertEquals(Duration.newBuilder().setSeconds(15).build(), gcsConfig.getFileRotationInterval());
-    assertEquals(5, gcsConfig.getFileRotationMb());
+    assertEquals(1, gcsConfig.getFileRotationMb());
     assertEquals("/" + streamName, gcsConfig.getPath());
   }
 
@@ -301,6 +315,13 @@ class DatastreamEventReaderTest {
       }
 
       @Override
+      public Set<SourceTable> getAllTables() {
+        return oracleTables.stream().map(table -> new SourceTable(oracleDb, table.substring(table.indexOf(".") + 1),
+          table.substring(0, table.indexOf(".")), Collections.emptySet(), Collections.emptySet(),
+          Collections.emptySet())).collect(Collectors.toSet());
+      }
+
+      @Override
       public PluginProperties getPluginProperties(String s) {
         return null;
       }
@@ -334,11 +355,6 @@ class DatastreamEventReaderTest {
     };
   }
 
-  private Storage createStorage() {
-    return StorageOptions.newBuilder().setCredentials(credentials).setProjectId(ServiceOptions.getDefaultProjectId())
-      .build().getService();
-  }
-
   private static DatastreamClient createDatastreamClient() {
     try {
       return DatastreamClient.create(DatastreamSettings.newBuilder().setCredentialsProvider(new CredentialsProvider() {
@@ -352,17 +368,39 @@ class DatastreamEventReaderTest {
     }
   }
 
-  private EventReaderDefinition buildDefinition() {
-    Set<SourceTable> tables = oracleTables.stream().map(
-      table -> new SourceTable(oracleDb, table.substring(table.indexOf(".") + 1),
-        table.substring(0, table.indexOf(".")), Collections.emptySet(), Collections.emptySet(), Collections.emptySet()))
-      .collect(Collectors.toSet());
-    return new EventReaderDefinition(tables, tables, Collections.emptySet(), Collections.emptySet());
-  }
-
   private DatastreamConfig buildDatastreamConfig() {
     return new DatastreamConfig(oracleHost, oraclePort, oracleUser, oraclePassword, oracleDb, serviceLocation,
       DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null, null, null, null, gcsBucket, null, null);
+  }
+
+  private static void setEnv(String key, String value) throws Exception {
+    Map<String, String> newEnv = new HashMap<>(System.getenv());
+    newEnv.put(key, value);
+    try {
+      Class<?> processEnvironmentClass = Class.forName("java.lang.ProcessEnvironment");
+      Field theEnvironmentField = processEnvironmentClass.getDeclaredField("theEnvironment");
+      theEnvironmentField.setAccessible(true);
+      Map<String, String> env = (Map<String, String>) theEnvironmentField.get(null);
+      env.putAll(newEnv);
+      Field theCaseInsensitiveEnvironmentField =
+        processEnvironmentClass.getDeclaredField("theCaseInsensitiveEnvironment");
+      theCaseInsensitiveEnvironmentField.setAccessible(true);
+      Map<String, String> cienv = (Map<String, String>) theCaseInsensitiveEnvironmentField.get(null);
+      cienv.putAll(newEnv);
+    } catch (NoSuchFieldException e) {
+      Class[] classes = Collections.class.getDeclaredClasses();
+      Map<String, String> env = System.getenv();
+      for (Class cl : classes) {
+        if ("java.util.Collections$UnmodifiableMap".equals(cl.getName())) {
+          Field field = cl.getDeclaredField("m");
+          field.setAccessible(true);
+          Object obj = field.get(env);
+          Map<String, String> map = (Map<String, String>) obj;
+          map.clear();
+          map.putAll(newEnv);
+        }
+      }
+    }
   }
 
 }

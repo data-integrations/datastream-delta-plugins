@@ -17,7 +17,6 @@
 package io.cdap.delta.datastream;
 
 import com.google.cloud.ServiceOptions;
-import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
 import com.google.cloud.datastream.v1alpha1.DatastreamClient;
 import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileResponse;
@@ -116,7 +115,7 @@ public class DatastreamTableRegistry implements TableRegistry {
       properties.put(DatastreamTableAssessor.SCALE,
                      Integer.toString(column.getScale()));
       columns.add(
-        new ColumnDetail(column.getColumnName(), DatastreamUtils.convertStringDataTypetoSQLType(column.getDataType()),
+        new ColumnDetail(column.getColumnName(), DatastreamUtils.convertStringDataTypeToSQLType(column.getDataType()),
           column.getNullable(), properties));
       if (column.getPrimaryKey()) {
         primaryKeys.add(column.getColumnName());
@@ -136,19 +135,13 @@ public class DatastreamTableRegistry implements TableRegistry {
       columnSchemas.add(evaluation.getField());
     }
     Schema schema = Schema.recordOf("outputSchema", columnSchemas);
-    return new StandardizedTableDetail(tableDetail.getDatabase(), tableDetail.getTable(),
+    return new StandardizedTableDetail(tableDetail.getDatabase(), tableDetail.getSchema(), tableDetail.getTable(),
       tableDetail.getPrimaryKey(), schema);
   }
 
   @Override
   public void close() throws IOException {
     datastreamClient.close();
-  }
-
-
-
-  private ConnectionProfile.Builder buildOracleConnectionProfile(String name) {
-    return DatastreamUtils.buildOracleConnectionProfile(config).setDisplayName(name);
   }
 
   private DiscoverConnectionProfileResponse discover(String schema, String table) {

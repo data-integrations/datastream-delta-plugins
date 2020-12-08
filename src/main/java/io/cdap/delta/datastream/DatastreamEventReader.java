@@ -33,7 +33,9 @@ import com.google.cloud.datastream.v1alpha1.OracleRdbms;
 import com.google.cloud.datastream.v1alpha1.OracleSchema;
 import com.google.cloud.datastream.v1alpha1.OracleSourceConfig;
 import com.google.cloud.datastream.v1alpha1.OracleTable;
+import com.google.cloud.datastream.v1alpha1.ResumeStreamRequest;
 import com.google.cloud.datastream.v1alpha1.SourceConfig;
+import com.google.cloud.datastream.v1alpha1.StartStreamRequest;
 import com.google.cloud.datastream.v1alpha1.Stream;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
@@ -70,6 +72,13 @@ public class DatastreamEventReader implements EventReader {
   private final String parentPath;
   private final Storage storage;
 
+  private static final long FILE_ROTATION_INTERVAL_IN_SECONDS = 15L;
+  private static final int FILE_ROTATIONS_SIZE_IN_MB = 5;
+  private static final String SOURCE_PROFILE_NAME_PREFIX = "CDF-Src-";
+  private static final String TARGET_PROFILE_NAME_PREFIX = "CDF-Tgt-";
+  private static final String STREAM_NAME_PREFIX = "CDF-Stream-";
+
+
   public DatastreamEventReader(DatastreamConfig config, EventReaderDefinition definition, DeltaSourceContext context,
     EventEmitter emitter, DatastreamClient datastreamClient, Storage storage) {
     this.context = context;
@@ -89,6 +98,22 @@ public class DatastreamEventReader implements EventReader {
       createStreamIfNotExisted();
     }
 
+    String streamPath = buildStreamPath(buildStreamName());
+    Stream stream = datastreamClient.getStream(streamPath);
+    OperationFuture<Stream, OperationMetadata> response = null;
+    if (stream.getState() == Stream.State.PAUSED) {
+      response = datastreamClient.resumeStreamAsync(ResumeStreamRequest.newBuilder().setName(streamPath).build());
+    } else if (stream.getState() == Stream.State.CREATED) {
+      response = datastreamClient.startStreamAsync(StartStreamRequest.newBuilder().setName(streamPath).build());
+    }
+    if (response != null) {
+      // TODO call response.get() and handle errors once Datastream supports long running jobs
+      // Currently Datastream java client has issue with it
+      waitUntilComplete(response);
+    }
+
+
+
   }
 
   @VisibleForTesting
@@ -105,8 +130,8 @@ public class DatastreamEventReader implements EventReader {
       } catch (NotFoundException es) {
         OperationFuture<ConnectionProfile, OperationMetadata> response =
           datastreamClient.createConnectionProfileAsync(buildSourceProfileCreationRequest(sourceProfileName));
-        // TODO call response.get()
-        // Currently Datastream java client doesn't support long running task well
+        // TODO call response.get() and handle errors once Datastream supports long running jobs
+        // Currently Datastream java client has issue with it
         waitUntilComplete(response);
       }
       String targetProfileName = buildTargetProfileName();
@@ -121,14 +146,14 @@ public class DatastreamEventReader implements EventReader {
         }
         OperationFuture<ConnectionProfile, OperationMetadata> response =
           datastreamClient.createConnectionProfileAsync(buildTargetProfileCreationRequest(targetProfileName));
-        // TODO call response.get()
-        // Currently Datastream java client doesn't support long running task well
+        // TODO call response.get() and handle errors once Datastream supports long running jobs
+        // Currently Datastream java client has issue with it
         waitUntilComplete(response);
       }
       OperationFuture<Stream, OperationMetadata> response = datastreamClient
         .createStreamAsync(buildStreamCreationRequest(streamName, sourceProfilePath, targetProfilePath));
-      // TODO call response.get()
-      // Currently Datastream java client doesn't support long running task well
+      // TODO call response.get() and handle errors once Datastream supports long running jobs
+      // Currently Datastream java client has issue with it
       waitUntilComplete(response);
     }
   }
@@ -138,9 +163,10 @@ public class DatastreamEventReader implements EventReader {
       Stream.newBuilder().setDisplayName(name).setDestinationConfig(
         DestinationConfig.newBuilder().setDestinationConnectionProfileName(targetPath).setGcsDestinationConfig(
           GcsDestinationConfig.newBuilder().setGcsFileFormat(GcsFileFormat.AVRO).setPath("/" + name)
-            .setFileRotationMb(5).setFileRotationInterval(Duration.newBuilder().setSeconds(15)))).setSourceConfig(
-        SourceConfig.newBuilder().setSourceConnectionProfileName(sourcePath).setOracleSourceConfig(
-          OracleSourceConfig.newBuilder().setAllowlist(buildAllowlist())))).build();
+            .setFileRotationMb(FILE_ROTATIONS_SIZE_IN_MB)
+            .setFileRotationInterval(Duration.newBuilder().setSeconds(FILE_ROTATION_INTERVAL_IN_SECONDS))))
+        .setSourceConfig(SourceConfig.newBuilder().setSourceConnectionProfileName(sourcePath)
+          .setOracleSourceConfig(OracleSourceConfig.newBuilder().setAllowlist(buildAllowlist())))).build();
   }
 
   private OracleRdbms buildAllowlist() {
@@ -180,11 +206,11 @@ public class DatastreamEventReader implements EventReader {
   }
 
   private String buildSourceProfileName() {
-    return "CDF-Src-" + buildReplicatorId();
+    return SOURCE_PROFILE_NAME_PREFIX + buildReplicatorId();
   }
 
   private String buildTargetProfileName() {
-    return "CDF-Tgt-" + buildReplicatorId();
+    return TARGET_PROFILE_NAME_PREFIX + buildReplicatorId();
   }
 
   private String buildStreamPath(String name) {
@@ -192,7 +218,7 @@ public class DatastreamEventReader implements EventReader {
   }
 
   private String buildStreamName() {
-    return "CDF-Stream-" + buildReplicatorId();
+    return STREAM_NAME_PREFIX + buildReplicatorId();
   }
 
   private String buildReplicatorId() {

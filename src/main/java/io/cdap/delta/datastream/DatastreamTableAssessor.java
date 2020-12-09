@@ -58,14 +58,11 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
     switch (oracleDataType) {
       case BFILE:
       case CHAR:
-      case CLOB:
       case NCHAR:
-      case NCLOB:
       case NVARCHAR2:
       case ROWID:
       case VARCHAR:
       case VARCHAR2:
-      case XMLTYPE:
         schema = Schema.of(Type.STRING);
         break;
       case BINARY_DOUBLE:
@@ -73,19 +70,21 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         schema = Schema.of(Type.DOUBLE);
         break;
       case REAL:
-      case BINARY_FLOAT:
-      case FLOAT:
-        //TODO based on value of precision map FLOAT and BINARY_FLOAT to DOUBLE
         schema = Schema.of(Type.FLOAT);
         break;
-      case BLOB:
-      case LONG_RAW:
+      case FLOAT:
+      case BINARY_FLOAT:
+        if (Integer.parseInt(precision) <= 23) {
+          schema = Schema.of(Type.FLOAT);
+        } else {
+          schema = Schema.of(Type.DOUBLE);
+        }
+        break;
       case RAW:
         schema = Schema.of(Type.BYTES);
         break;
       case DATE:
       case TIMESTAMP:
-        //TODO determine when to map to LogicalType.TIMESTAMP_MILLIS
         schema = Schema.of(LogicalType.TIMESTAMP_MICROS);
         break;
       case DECIMAL:

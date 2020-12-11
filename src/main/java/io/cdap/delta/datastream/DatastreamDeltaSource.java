@@ -16,6 +16,7 @@
 
 package io.cdap.delta.datastream;
 
+import com.google.cloud.datastream.v1alpha1.DatastreamClient;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Name;
 import io.cdap.cdap.api.annotation.Plugin;
@@ -25,6 +26,8 @@ import io.cdap.delta.api.DeltaSourceContext;
 import io.cdap.delta.api.EventEmitter;
 import io.cdap.delta.api.EventReader;
 import io.cdap.delta.api.EventReaderDefinition;
+import io.cdap.delta.api.SourceConfigurer;
+import io.cdap.delta.api.SourceProperties;
 import io.cdap.delta.api.assessment.TableAssessor;
 import io.cdap.delta.api.assessment.TableDetail;
 import io.cdap.delta.api.assessment.TableRegistry;
@@ -47,7 +50,8 @@ public class DatastreamDeltaSource implements DeltaSource {
   }
 
   @Override
-  public void configure(Configurer configurer) {
+  public void configure(SourceConfigurer configurer) {
+    configurer.setProperties(new SourceProperties.Builder().setOrdering(SourceProperties.Ordering.UN_ORDERED).build());
   }
 
   @Override
@@ -58,7 +62,7 @@ public class DatastreamDeltaSource implements DeltaSource {
 
   @Override
   public TableRegistry createTableRegistry(Configurer configurer) throws Exception {
-    return new DatastreamTableRegistry(conf);
+      return new DatastreamTableRegistry(conf, DatastreamClient.create());
   }
 
   @Override

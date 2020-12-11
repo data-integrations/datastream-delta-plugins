@@ -56,6 +56,7 @@
   <properties>
     <delta.version>0.2.0-SNAPSHOT</delta.version>
     <slf4j.version>1.7.25</slf4j.version>
+    <google.cloud.version>1.78.0</google.cloud.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
@@ -93,6 +94,11 @@
       <version>0.0.0-SNAPSHOT</version>
       <scope>system</scope>
       <systemPath>${project.basedir}/src/main/resources/lib/gapic-google-cloud-datastream-v1alpha1-java-0.0.0-SNAPSHOT-all.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-core</artifactId>
+      <version>${google.cloud.version}</version>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>

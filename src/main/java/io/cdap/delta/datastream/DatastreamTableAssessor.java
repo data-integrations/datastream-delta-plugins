@@ -46,7 +46,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
     this.conf = conf;
   }
 
-  static ColumnEvaluation evaluateColumn(ColumnDetail detail) throws IllegalArgumentException {
+  static ColumnEvaluation evaluateColumn(ColumnDetail detail) {
     Schema schema;
     OracleDataType oracleDataType = (OracleDataType) detail.getType();
     ColumnSupport support = ColumnSupport.YES;
@@ -74,7 +74,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         break;
       case FLOAT:
       case BINARY_FLOAT:
-        if (Integer.parseInt(precision) <= 23) {
+        if (parseInt(oracleDataType, "precision", precision) <= 23) {
           schema = Schema.of(Type.FLOAT);
         } else {
           schema = Schema.of(Type.DOUBLE);
@@ -88,7 +88,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         schema = Schema.of(LogicalType.TIMESTAMP_MICROS);
         break;
       case DECIMAL:
-        schema = Schema.decimalOf(Integer.parseInt(precision), Integer.parseInt(scale));
+        schema = Schema.decimalOf(parseInt(oracleDataType, "precision", precision), parseInt(oracleDataType,
+          "scale", scale));
         break;
       case INTEGER:
       case SMALLINT:
@@ -98,17 +99,17 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         if (precision == null || precision.isEmpty() || scale == null || scale.isEmpty()) {
           schema = Schema.of(Type.STRING);
         } else {
-          if (Integer.parseInt(scale) == 0) {
+          if (parseInt(oracleDataType, "scale", scale) == 0) {
             schema = Schema.of(Type.LONG);
           } else {
-            schema = Schema.decimalOf(Integer.parseInt(precision), Integer.parseInt(scale));
+            schema = Schema.decimalOf(parseInt(oracleDataType, "precision", precision), parseInt(oracleDataType,
+             "scale", scale));
           }
         }
         break;
       case TIMESTAMP_WITH_TIME_ZONE:
-        schema = Schema.recordOf("timestampTz", Schema.Field.of("timestampTz",
-          Schema.of(LogicalType.TIMESTAMP_MICROS)), Schema.Field.of("offset",
-          Schema.of(LogicalType.TIMESTAMP_MILLIS)));
+        schema = Schema.recordOf("timestampTz", Schema.Field.of("timestampTz", Schema.of(LogicalType.TIMESTAMP_MICROS)),
+          Schema.Field.of("offset", Schema.of(LogicalType.TIMESTAMP_MILLIS)));
         break;
       default:
         support = ColumnSupport.NO;
@@ -124,6 +125,15 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
       .setSuggestion(suggestion)
       .build();
     return new ColumnEvaluation(field, assessment);
+  }
+
+  private static int parseInt(OracleDataType type, String property, String value) {
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(String.format("Oracle datatype % should have %s as number , but got %s",
+        type.getName(), property, value), e);
+    }
   }
 
   @Override

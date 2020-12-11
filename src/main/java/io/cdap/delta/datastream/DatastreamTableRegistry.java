@@ -57,6 +57,11 @@ public class DatastreamTableRegistry implements TableRegistry {
   private final DatastreamClient datastreamClient;
   // parent path of datastream resources in form of "projects/projectId/locations/region"
   private final String parentPath;
+  // TODO find a better way to get system schemas for different version of Oracle.
+  //  May need additional support from datasteam for :
+  //  1. get the version of oracle and we map it to system schemas
+  //  or
+  //  2. get information about whether the schema is a system schema
   private static final Set<String> SYSTEM_SCHEMA = new HashSet<>(Arrays.asList("SYS", "SYSTEM", "CTXSYS", "XDB",
     "MDSYS", "FLOWS_FILES", "APEX_040000", "OUTLN"));
 
@@ -66,13 +71,13 @@ public class DatastreamTableRegistry implements TableRegistry {
     this.datastreamClient = datastreamClient;
     //TODO validate whether the region is valid
 
-    this.parentPath = String
-      .format("projects/%s/locations/%s", ServiceOptions.getDefaultProjectId(), config.getRegion());
+    this.parentPath =
+      String.format("projects/%s/locations/%s", ServiceOptions.getDefaultProjectId(), config.getRegion());
   }
 
   @Override
   public TableList listTables() throws IOException {
-    LOG.debug(String.format("List tables..."));
+    LOG.debug("List tables...");
     List<TableSummary> tables = new ArrayList<>();
 
     DiscoverConnectionProfileResponse response = discover();

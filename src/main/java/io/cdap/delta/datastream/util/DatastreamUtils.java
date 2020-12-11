@@ -34,8 +34,9 @@ import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_IP_A
 /**
  *  Common Utils for Datastream source plugins
  */
-public class DatastreamUtils {
+public final class DatastreamUtils {
 
+  private DatastreamUtils() { };
   /**
    * Convert the string oracle data type returned by Datastream to SQLType
    *

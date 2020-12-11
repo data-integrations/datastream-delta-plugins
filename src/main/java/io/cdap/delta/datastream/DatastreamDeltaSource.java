@@ -52,7 +52,6 @@ public class DatastreamDeltaSource implements DeltaSource {
   @Override
   public void configure(SourceConfigurer configurer) {
     configurer.setProperties(new SourceProperties.Builder().setOrdering(SourceProperties.Ordering.UN_ORDERED).build());
-
   }
 
   @Override

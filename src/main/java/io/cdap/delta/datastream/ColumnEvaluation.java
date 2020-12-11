@@ -24,6 +24,9 @@ import javax.annotation.Nullable;
 
 /**
  * This class represents evaluation for column.
+ * It contains the information of :
+ * 1. The mapped CDAP schema for the column
+ * 2. The assessment of the column
  */
 public class ColumnEvaluation {
   private final Schema.Field field;
@@ -38,7 +41,7 @@ public class ColumnEvaluation {
     return assessment;
   }
 
-  public Schema.Field getField() {
+  public @Nullable Schema.Field getField() {
     return field;
   }
 }

@@ -17,27 +17,22 @@
 
 package io.cdap.delta.datastream.util;
 
-import com.google.api.gax.longrunning.OperationFuture;
 import com.google.cloud.ServiceOptions;
 import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
 import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
-import com.google.cloud.datastream.v1alpha1.DatastreamClient;
 import com.google.cloud.datastream.v1alpha1.DestinationConfig;
 import com.google.cloud.datastream.v1alpha1.ForwardSshTunnelConnectivity;
 import com.google.cloud.datastream.v1alpha1.GcsDestinationConfig;
 import com.google.cloud.datastream.v1alpha1.GcsFileFormat;
 import com.google.cloud.datastream.v1alpha1.GcsProfile;
 import com.google.cloud.datastream.v1alpha1.NoConnectivitySettings;
-import com.google.cloud.datastream.v1alpha1.OperationMetadata;
 import com.google.cloud.datastream.v1alpha1.OracleProfile;
 import com.google.cloud.datastream.v1alpha1.OracleRdbms;
 import com.google.cloud.datastream.v1alpha1.OracleSchema;
 import com.google.cloud.datastream.v1alpha1.OracleSourceConfig;
 import com.google.cloud.datastream.v1alpha1.OracleTable;
-import com.google.cloud.datastream.v1alpha1.ResumeStreamRequest;
 import com.google.cloud.datastream.v1alpha1.SourceConfig;
-import com.google.cloud.datastream.v1alpha1.StartStreamRequest;
 import com.google.cloud.datastream.v1alpha1.StaticServiceIpConnectivity;
 import com.google.cloud.datastream.v1alpha1.Stream;
 import com.google.protobuf.Duration;
@@ -68,7 +63,7 @@ import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_IP_A
 public final class DatastreamUtils {
 
   private static final long FILE_ROTATION_INTERVAL_IN_SECONDS = 15L;
-  private static final int FILE_ROTATIONS_SIZE_IN_MB = 5;
+  private static final int FILE_ROTATIONS_SIZE_IN_MB = 1;
   private static final String SOURCE_PROFILE_NAME_PREFIX = "CDF-Src-";
   private static final String TARGET_PROFILE_NAME_PREFIX = "CDF-Tgt-";
   private static final String STREAM_NAME_PREFIX = "CDF-Stream-";
@@ -330,5 +325,50 @@ public final class DatastreamUtils {
   public static String buildReplicatorId(DeltaSourceContext context) {
     DeltaPipelineId pipelineId = context.getPipelineId();
     return pipelineId.getNamespace() + "-" + pipelineId.getApp() + "-" + pipelineId.getGeneration();
+  }
+
+  /**
+   * Log the error with corresponding error message and construct the corresponding runtime exception with this message
+   * @param logger the logger to log the error
+   * @param context the Delta source context
+   * @param errorMessage the error message
+   * @return the runtime exception constructed from the error message
+   */
+  public static RuntimeException handleError(Logger logger, DeltaSourceContext context, String errorMessage) {
+    RuntimeException e = new RuntimeException(errorMessage);
+    logger.error(errorMessage);
+    setError(logger, context, e);
+    return e;
+  }
+
+  /**
+   * Log the error with corresponding error message and the exception of the cause of the error and construct the
+   * runtime exception with this message and cause
+   * @param logger the logger to log the error
+   * @param context the Delta source context
+   * @param errorMessage the error message
+   * @param cause the exception for the cause of error
+   * @return the runtime exception constructed from the error message and the casue
+   */
+  public static RuntimeException handleError(Logger logger, DeltaSourceContext context, String errorMessage,
+    Exception cause) {
+    logger.error(errorMessage, cause);
+    setError(logger, context, cause);
+    return new RuntimeException(errorMessage, cause);
+  }
+
+  /**
+   * Set the error in the Delta source context
+   * @param logger the logger to log the error
+   * @param context the Delta source context
+   * @param cause the exception for the cause
+   */
+  public static void setError(Logger logger, DeltaSourceContext context, Exception cause) {
+    try {
+      context.setError(new ReplicationError(cause));
+    } catch (IOException ioException) {
+      logger.error("Error setting error in context!", cause);
+      throw new RuntimeException(ioException);
+    }
   }
 }

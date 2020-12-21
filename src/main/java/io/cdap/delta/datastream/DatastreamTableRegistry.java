@@ -17,7 +17,6 @@
 package io.cdap.delta.datastream;
 
 import com.google.cloud.ServiceOptions;
-import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
 import com.google.cloud.datastream.v1alpha1.DatastreamClient;
 import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileResponse;
@@ -35,7 +34,7 @@ import io.cdap.delta.api.assessment.TableList;
 import io.cdap.delta.api.assessment.TableNotFoundException;
 import io.cdap.delta.api.assessment.TableRegistry;
 import io.cdap.delta.api.assessment.TableSummary;
-import io.cdap.delta.datastream.util.DatastreamUtils;
+import io.cdap.delta.datastream.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,7 +115,7 @@ public class DatastreamTableRegistry implements TableRegistry {
       properties.put(DatastreamTableAssessor.SCALE,
                      Integer.toString(column.getScale()));
       columns.add(
-        new ColumnDetail(column.getColumnName(), DatastreamUtils.convertStringDataTypetoSQLType(column.getDataType()),
+        new ColumnDetail(column.getColumnName(), Utils.convertStringDataTypeToSQLType(column.getDataType()),
           column.getNullable(), properties));
       if (column.getPrimaryKey()) {
         primaryKeys.add(column.getColumnName());
@@ -136,7 +135,7 @@ public class DatastreamTableRegistry implements TableRegistry {
       columnSchemas.add(evaluation.getField());
     }
     Schema schema = Schema.recordOf("outputSchema", columnSchemas);
-    return new StandardizedTableDetail(tableDetail.getDatabase(), tableDetail.getTable(),
+    return new StandardizedTableDetail(tableDetail.getDatabase(), tableDetail.getSchema(), tableDetail.getTable(),
       tableDetail.getPrimaryKey(), schema);
   }
 
@@ -145,16 +144,10 @@ public class DatastreamTableRegistry implements TableRegistry {
     datastreamClient.close();
   }
 
-
-
-  private ConnectionProfile.Builder buildOracleConnectionProfile(String name) {
-    return DatastreamUtils.buildOracleConnectionProfile(config).setDisplayName(name);
-  }
-
   private DiscoverConnectionProfileResponse discover(String schema, String table) {
     return datastreamClient.discoverConnectionProfile(
       DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath)
-        .setConnectionProfile(DatastreamUtils.buildOracleConnectionProfile(config)).setOracleRdbms(
+        .setConnectionProfile(Utils.buildOracleConnectionProfile(config)).setOracleRdbms(
         OracleRdbms.newBuilder().addOracleSchemas(OracleSchema.newBuilder().setSchemaName(schema).addOracleTables(
           OracleTable.newBuilder().setTableName(table)))).build());
   }
@@ -162,6 +155,6 @@ public class DatastreamTableRegistry implements TableRegistry {
   private DiscoverConnectionProfileResponse discover() {
     return datastreamClient.discoverConnectionProfile(
       DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath)
-        .setConnectionProfile(DatastreamUtils.buildOracleConnectionProfile(config)).setRecursive(true).build());
+        .setConnectionProfile(Utils.buildOracleConnectionProfile(config)).setRecursive(true).build());
   }
 }

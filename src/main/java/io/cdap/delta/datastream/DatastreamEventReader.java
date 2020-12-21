@@ -70,6 +70,7 @@ public class DatastreamEventReader implements EventReader {
   private void startStreamIfNot() {
     String parentPath = DatastreamUtils.buildParentPath(config.getRegion());
     String replicatorId = DatastreamUtils.buildReplicatorId(context);
+    //TODO if the stream is resued, the stream name should be from config
     String streamName = DatastreamUtils.buildStreamName(replicatorId);
     String streamPath = DatastreamUtils.buildStreamPath(parentPath, streamName);
     Stream stream = datastreamClient.getStream(streamPath);

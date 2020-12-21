@@ -72,6 +72,7 @@ public class DatastreamDeltaSource implements DeltaSource {
     storage = StorageOptions.newBuilder().setCredentials(config.getGcsCredentials())
       .setProjectId(ServiceOptions.getDefaultProjectId()).build().getService();
     datastreamClient = DatastreamClient.create();
+    // TODO reuse an existing datastream provided by user
     createStreamIfNotExisted(context);
   }
 
@@ -131,15 +132,20 @@ public class DatastreamDeltaSource implements DeltaSource {
       } catch (NotFoundException es) {
         // target connection profile does not exist
         // check whether GCS Bucket exists first
-        Bucket bucket = storage.get(config.getGcsBucket());
+        String bucketName = config.getGcsBucket();
+        // If user doesn't provide bucketName, we assign one based on run id
+        if (bucketName == null) {
+          bucketName = "df-cdc-ds-" + context.getRunId();
+        }
+        Bucket bucket = storage.get(bucketName);
         if (bucket == null) {
           // create corresponding GCS bucket
-          storage.create(BucketInfo.newBuilder(config.getGcsBucket()).build());
+          storage.create(BucketInfo.newBuilder(bucketName).build());
         }
 
         // crete the target connection profile
         OperationFuture<ConnectionProfile, OperationMetadata> response = datastreamClient.createConnectionProfileAsync(
-          DatastreamUtils.buildTargetProfileCreationRequest(parentPath, targetProfileName, config.getGcsBucket(),
+          DatastreamUtils.buildTargetProfileCreationRequest(parentPath, targetProfileName, bucketName,
             config.getGcsPathPrefix()));
 
         // TODO call response.get() and handle errors once Datastream supports long running jobs

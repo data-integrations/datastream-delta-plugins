@@ -17,39 +17,31 @@
 
 package io.cdap.delta.datastream.util;
 
-import com.google.api.gax.longrunning.OperationFuture;
 import com.google.cloud.ServiceOptions;
 import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
 import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
-import com.google.cloud.datastream.v1alpha1.DatastreamClient;
 import com.google.cloud.datastream.v1alpha1.DestinationConfig;
 import com.google.cloud.datastream.v1alpha1.ForwardSshTunnelConnectivity;
 import com.google.cloud.datastream.v1alpha1.GcsDestinationConfig;
 import com.google.cloud.datastream.v1alpha1.GcsFileFormat;
 import com.google.cloud.datastream.v1alpha1.GcsProfile;
 import com.google.cloud.datastream.v1alpha1.NoConnectivitySettings;
-import com.google.cloud.datastream.v1alpha1.OperationMetadata;
 import com.google.cloud.datastream.v1alpha1.OracleProfile;
 import com.google.cloud.datastream.v1alpha1.OracleRdbms;
 import com.google.cloud.datastream.v1alpha1.OracleSchema;
 import com.google.cloud.datastream.v1alpha1.OracleSourceConfig;
 import com.google.cloud.datastream.v1alpha1.OracleTable;
-import com.google.cloud.datastream.v1alpha1.ResumeStreamRequest;
 import com.google.cloud.datastream.v1alpha1.SourceConfig;
-import com.google.cloud.datastream.v1alpha1.StartStreamRequest;
 import com.google.cloud.datastream.v1alpha1.StaticServiceIpConnectivity;
 import com.google.cloud.datastream.v1alpha1.Stream;
 import com.google.protobuf.Duration;
 import io.cdap.delta.api.DeltaPipelineId;
 import io.cdap.delta.api.DeltaSourceContext;
-import io.cdap.delta.api.ReplicationError;
 import io.cdap.delta.api.SourceTable;
 import io.cdap.delta.datastream.DatastreamConfig;
 import io.cdap.delta.datastream.OracleDataType;
-import org.slf4j.Logger;
 
-import java.io.IOException;
 import java.sql.SQLType;
 import java.util.HashMap;
 import java.util.Map;
@@ -68,7 +60,7 @@ import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_IP_A
 public final class DatastreamUtils {
 
   private static final long FILE_ROTATION_INTERVAL_IN_SECONDS = 15L;
-  private static final int FILE_ROTATIONS_SIZE_IN_MB = 5;
+  private static final int FILE_ROTATIONS_SIZE_IN_MB = 1;
   private static final String SOURCE_PROFILE_NAME_PREFIX = "CDF-Src-";
   private static final String TARGET_PROFILE_NAME_PREFIX = "CDF-Tgt-";
   private static final String STREAM_NAME_PREFIX = "CDF-Stream-";

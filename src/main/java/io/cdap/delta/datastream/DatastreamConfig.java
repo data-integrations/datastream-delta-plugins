@@ -190,7 +190,7 @@ public class DatastreamConfig extends PluginConfig {
   }
 
   public String getGcsBucket() {
-    return gcsBucket == null ? "cdf-cdc" : gcsBucket.toLowerCase();
+    return gcsBucket == null ? null : gcsBucket.toLowerCase();
   }
 
   public String getGcsPathPrefix() {

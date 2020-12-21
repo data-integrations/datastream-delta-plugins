@@ -156,10 +156,15 @@ class DatastreamDeltaSourceTest {
   public void testInitialize() throws Exception {
     String namspace = "default";
     String appName = "datastream-ut";
+    String runId = "run-id";
     long generation = 0;
+
     DatastreamConfig config = buildDatastreamConfig();
     DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
-    DeltaSourceContext context = createContext(namspace, appName, generation);
+    DeltaSourceContext context = createContext(namspace, appName, generation, runId);
+    if (gcsBucket == null) {
+      gcsBucket = "df-cdc-ds-" + runId;
+    }
     deltaSource.initialize(context);
     String replicatorId = String.format("%s-%s-%d", namspace, appName, generation);
     checkStream(replicatorId);
@@ -226,7 +231,7 @@ class DatastreamDeltaSourceTest {
     assertEquals(tgtProfileName, tgtProfile.getDisplayName());
     assertEquals(tgtProfilePath, tgtProfile.getName());
     GcsProfile gcsProfile = tgtProfile.getGcsProfile();
-    assertEquals(gcsBucket == null ? "cdf-cdc" : gcsBucket, gcsProfile.getBucketName());
+    assertEquals(gcsBucket, gcsProfile.getBucketName());
     assertEquals("/", gcsProfile.getRootPath());
 
     // Check stream
@@ -257,7 +262,7 @@ class DatastreamDeltaSourceTest {
     assertEquals("/" + streamName, gcsConfig.getPath());
   }
 
-  private DeltaSourceContext createContext(String namespace, String appName, long generation) {
+  private DeltaSourceContext createContext(String namespace, String appName, long generation, String runId) {
     return new DeltaSourceContext() {
       @Override
       public void setError(ReplicationError replicationError) throws IOException {
@@ -276,7 +281,7 @@ class DatastreamDeltaSourceTest {
 
       @Override
       public String getRunId() {
-        return null;
+        return runId;
       }
 
       @Override

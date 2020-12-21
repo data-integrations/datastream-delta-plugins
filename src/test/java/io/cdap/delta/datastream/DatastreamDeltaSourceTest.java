@@ -64,6 +64,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -156,7 +157,7 @@ class DatastreamDeltaSourceTest {
   public void testInitialize() throws Exception {
     String namspace = "default";
     String appName = "datastream-ut";
-    String runId = "run-id";
+    String runId = UUID.randomUUID().toString();
     long generation = 0;
 
     DatastreamConfig config = buildDatastreamConfig();

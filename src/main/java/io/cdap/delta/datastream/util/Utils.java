@@ -57,7 +57,7 @@ import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_IP_A
 /**
  *  Common Utils for Datastream source plugins
  */
-public final class DatastreamUtils {
+public final class Utils {
 
   private static final long FILE_ROTATION_INTERVAL_IN_SECONDS = 15L;
   private static final int FILE_ROTATIONS_SIZE_IN_MB = 1;
@@ -65,7 +65,7 @@ public final class DatastreamUtils {
   private static final String TARGET_PROFILE_NAME_PREFIX = "CDF-Tgt-";
   private static final String STREAM_NAME_PREFIX = "CDF-Stream-";
 
-  private DatastreamUtils() { };
+  private Utils() { };
 
   /**
    * Convert the string oracle data type returned by Datastream to SQLType

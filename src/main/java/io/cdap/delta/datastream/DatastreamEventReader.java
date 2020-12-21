@@ -29,7 +29,7 @@ import io.cdap.delta.api.EventEmitter;
 import io.cdap.delta.api.EventReader;
 import io.cdap.delta.api.EventReaderDefinition;
 import io.cdap.delta.api.Offset;
-import io.cdap.delta.datastream.util.DatastreamUtils;
+import io.cdap.delta.datastream.util.Utils;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -68,11 +68,11 @@ public class DatastreamEventReader implements EventReader {
   }
 
   private void startStreamIfNot() {
-    String parentPath = DatastreamUtils.buildParentPath(config.getRegion());
-    String replicatorId = DatastreamUtils.buildReplicatorId(context);
+    String parentPath = Utils.buildParentPath(config.getRegion());
+    String replicatorId = Utils.buildReplicatorId(context);
     //TODO if the stream is resued, the stream name should be from config
-    String streamName = DatastreamUtils.buildStreamName(replicatorId);
-    String streamPath = DatastreamUtils.buildStreamPath(parentPath, streamName);
+    String streamName = Utils.buildStreamName(replicatorId);
+    String streamPath = Utils.buildStreamPath(parentPath, streamName);
     Stream stream = datastreamClient.getStream(streamPath);
 
     OperationFuture<Stream, OperationMetadata> response = null;
@@ -84,7 +84,7 @@ public class DatastreamEventReader implements EventReader {
     if (response != null) {
       // TODO call response.get() and handle errors once Datastream supports long running jobs
       // Currently Datastream java client has issue with it
-      DatastreamUtils.waitUntilComplete(response);
+      Utils.waitUntilComplete(response);
     }
   }
 }

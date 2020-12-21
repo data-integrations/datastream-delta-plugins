@@ -34,7 +34,7 @@ import io.cdap.delta.api.assessment.TableList;
 import io.cdap.delta.api.assessment.TableNotFoundException;
 import io.cdap.delta.api.assessment.TableRegistry;
 import io.cdap.delta.api.assessment.TableSummary;
-import io.cdap.delta.datastream.util.DatastreamUtils;
+import io.cdap.delta.datastream.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,7 +115,7 @@ public class DatastreamTableRegistry implements TableRegistry {
       properties.put(DatastreamTableAssessor.SCALE,
                      Integer.toString(column.getScale()));
       columns.add(
-        new ColumnDetail(column.getColumnName(), DatastreamUtils.convertStringDataTypeToSQLType(column.getDataType()),
+        new ColumnDetail(column.getColumnName(), Utils.convertStringDataTypeToSQLType(column.getDataType()),
           column.getNullable(), properties));
       if (column.getPrimaryKey()) {
         primaryKeys.add(column.getColumnName());
@@ -147,7 +147,7 @@ public class DatastreamTableRegistry implements TableRegistry {
   private DiscoverConnectionProfileResponse discover(String schema, String table) {
     return datastreamClient.discoverConnectionProfile(
       DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath)
-        .setConnectionProfile(DatastreamUtils.buildOracleConnectionProfile(config)).setOracleRdbms(
+        .setConnectionProfile(Utils.buildOracleConnectionProfile(config)).setOracleRdbms(
         OracleRdbms.newBuilder().addOracleSchemas(OracleSchema.newBuilder().setSchemaName(schema).addOracleTables(
           OracleTable.newBuilder().setTableName(table)))).build());
   }
@@ -155,6 +155,6 @@ public class DatastreamTableRegistry implements TableRegistry {
   private DiscoverConnectionProfileResponse discover() {
     return datastreamClient.discoverConnectionProfile(
       DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath)
-        .setConnectionProfile(DatastreamUtils.buildOracleConnectionProfile(config)).setRecursive(true).build());
+        .setConnectionProfile(Utils.buildOracleConnectionProfile(config)).setRecursive(true).build());
   }
 }

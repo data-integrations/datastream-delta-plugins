@@ -189,6 +189,7 @@ public class DatastreamConfig extends PluginConfig {
     return sshPrivateKey;
   }
 
+  @Nullable
   public String getGcsBucket() {
     return gcsBucket == null ? null : gcsBucket.toLowerCase();
   }

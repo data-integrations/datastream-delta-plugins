@@ -40,10 +40,10 @@ import io.cdap.delta.api.SourceProperties;
 import io.cdap.delta.api.assessment.TableAssessor;
 import io.cdap.delta.api.assessment.TableDetail;
 import io.cdap.delta.api.assessment.TableRegistry;
-import io.cdap.delta.datastream.util.DatastreamUtils;
+import io.cdap.delta.datastream.util.Utils;
 
-import static io.cdap.delta.datastream.util.DatastreamUtils.buildOracleConnectionProfile;
-import static io.cdap.delta.datastream.util.DatastreamUtils.waitUntilComplete;
+import static io.cdap.delta.datastream.util.Utils.buildOracleConnectionProfile;
+import static io.cdap.delta.datastream.util.Utils.waitUntilComplete;
 
 /**
  * Datastream origin.
@@ -98,17 +98,17 @@ public class DatastreamDeltaSource implements DeltaSource {
   }
 
   private void createStreamIfNotExisted(DeltaSourceContext context) {
-    String parentPath = DatastreamUtils.buildParentPath(config.getRegion());
-    String replicatorId = DatastreamUtils.buildReplicatorId(context);
-    String streamName = DatastreamUtils.buildStreamName(replicatorId);
-    String streamPath = DatastreamUtils.buildStreamPath(parentPath, streamName);
+    String parentPath = Utils.buildParentPath(config.getRegion());
+    String replicatorId = Utils.buildReplicatorId(context);
+    String streamName = Utils.buildStreamName(replicatorId);
+    String streamPath = Utils.buildStreamPath(parentPath, streamName);
     try {
       // try to see whether the stream was already created
       datastreamClient.getStream(streamPath);
     } catch (NotFoundException e) {
       // stream does not exist
-      String sourceProfileName = DatastreamUtils.buildSourceProfileName(replicatorId);
-      String sourceProfilePath = DatastreamUtils.buildConnectionProfilePath(parentPath, sourceProfileName);
+      String sourceProfileName = Utils.buildSourceProfileName(replicatorId);
+      String sourceProfilePath = Utils.buildConnectionProfilePath(parentPath, sourceProfileName);
       try {
         // try to check whether the source connection profile was already created
         datastreamClient.getConnectionProfile(sourceProfilePath);
@@ -116,7 +116,7 @@ public class DatastreamDeltaSource implements DeltaSource {
         // source connection profile does not exist
         // crete the source connection profile
         OperationFuture<ConnectionProfile, OperationMetadata> response = datastreamClient.createConnectionProfileAsync(
-          DatastreamUtils.buildSourceProfileCreationRequest(parentPath, sourceProfileName,
+          Utils.buildSourceProfileCreationRequest(parentPath, sourceProfileName,
             buildOracleConnectionProfile(config)));
         // TODO call response.get() and handle errors once Datastream supports long running jobs
         // Currently Datastream java client has issue with it
@@ -124,8 +124,8 @@ public class DatastreamDeltaSource implements DeltaSource {
       }
 
 
-      String targetProfileName = DatastreamUtils.buildTargetProfileName(replicatorId);
-      String targetProfilePath = DatastreamUtils.buildConnectionProfilePath(parentPath, targetProfileName);
+      String targetProfileName = Utils.buildTargetProfileName(replicatorId);
+      String targetProfilePath = Utils.buildConnectionProfilePath(parentPath, targetProfileName);
       try {
         // try to check whether the target connection profile was already created
         datastreamClient.getConnectionProfile(targetProfilePath);
@@ -145,7 +145,7 @@ public class DatastreamDeltaSource implements DeltaSource {
 
         // crete the target connection profile
         OperationFuture<ConnectionProfile, OperationMetadata> response = datastreamClient.createConnectionProfileAsync(
-          DatastreamUtils.buildTargetProfileCreationRequest(parentPath, targetProfileName, bucketName,
+          Utils.buildTargetProfileCreationRequest(parentPath, targetProfileName, bucketName,
             config.getGcsPathPrefix()));
 
         // TODO call response.get() and handle errors once Datastream supports long running jobs
@@ -155,7 +155,7 @@ public class DatastreamDeltaSource implements DeltaSource {
 
       // Create the stream
       OperationFuture<Stream, OperationMetadata> response = datastreamClient.createStreamAsync(
-        DatastreamUtils.buildStreamCreationRequest(parentPath, streamName, sourceProfilePath, targetProfilePath,
+        Utils.buildStreamCreationRequest(parentPath, streamName, sourceProfilePath, targetProfilePath,
           context.getAllTables()));
       // TODO call response.get() and handle errors once Datastream supports long running jobs
       // Currently Datastream java client has issue with it

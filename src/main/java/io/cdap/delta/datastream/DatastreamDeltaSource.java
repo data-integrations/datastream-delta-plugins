@@ -16,13 +16,14 @@
 
 package io.cdap.delta.datastream;
 
-import com.google.api.gax.longrunning.OperationFuture;
-import com.google.api.gax.rpc.NotFoundException;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.services.datastream.v1alpha1.DataStream;
+import com.google.api.services.datastream.v1alpha1.model.Operation;
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.ServiceOptions;
-import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
-import com.google.cloud.datastream.v1alpha1.DatastreamClient;
-import com.google.cloud.datastream.v1alpha1.OperationMetadata;
-import com.google.cloud.datastream.v1alpha1.Stream;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
@@ -41,6 +42,10 @@ import io.cdap.delta.api.assessment.TableAssessor;
 import io.cdap.delta.api.assessment.TableDetail;
 import io.cdap.delta.api.assessment.TableRegistry;
 import io.cdap.delta.datastream.util.Utils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 
 import static io.cdap.delta.datastream.util.Utils.buildOracleConnectionProfile;
 import static io.cdap.delta.datastream.util.Utils.waitUntilComplete;
@@ -54,11 +59,12 @@ import static io.cdap.delta.datastream.util.Utils.waitUntilComplete;
 public class DatastreamDeltaSource implements DeltaSource {
 
   public static final String NAME = "datastream";
-
+  private static final Logger LOGGER = LoggerFactory.getLogger(DatastreamDeltaSource.class);
+  private static final String GCS_BUCKET_NAME_PREFIX = "df-rds-";
 
   private final DatastreamConfig config;
   private Storage storage;
-  private DatastreamClient datastreamClient;
+  private DataStream datastream;
   private String parentPath;
 
 
@@ -71,9 +77,15 @@ public class DatastreamDeltaSource implements DeltaSource {
   public void initialize(DeltaSourceContext context) throws Exception {
     storage = StorageOptions.newBuilder().setCredentials(config.getGcsCredentials())
       .setProjectId(ServiceOptions.getDefaultProjectId()).build().getService();
-    datastreamClient = DatastreamClient.create();
+    datastream = createDatastreamClient();
     // TODO reuse an existing datastream provided by user
     createStreamIfNotExisted(context);
+  }
+
+  private DataStream createDatastreamClient() throws IOException {
+    return new DataStream(new NetHttpTransport(), new JacksonFactory(), new HttpCredentialsAdapter(
+      ServiceAccountCredentials.getApplicationDefault()
+        .createScoped("https://www.googleapis.com/auth/cloud-platform")));
   }
 
   @Override
@@ -84,12 +96,12 @@ public class DatastreamDeltaSource implements DeltaSource {
   @Override
   public DatastreamEventReader createReader(EventReaderDefinition definition, DeltaSourceContext context,
     EventEmitter eventEmitter) {
-    return new DatastreamEventReader(config, definition, context, eventEmitter, datastreamClient, storage);
+    return new DatastreamEventReader(config, definition, context, eventEmitter, datastream, storage);
   }
 
   @Override
   public TableRegistry createTableRegistry(Configurer configurer) throws Exception {
-    return new DatastreamTableRegistry(config, DatastreamClient.create());
+    return new DatastreamTableRegistry(config, createDatastreamClient());
   }
 
   @Override
@@ -97,45 +109,52 @@ public class DatastreamDeltaSource implements DeltaSource {
     return new DatastreamTableAssessor(config);
   }
 
-  private void createStreamIfNotExisted(DeltaSourceContext context) {
+  private void createStreamIfNotExisted(DeltaSourceContext context) throws IOException {
     String parentPath = Utils.buildParentPath(config.getRegion());
     String replicatorId = Utils.buildReplicatorId(context);
     String streamName = Utils.buildStreamName(replicatorId);
     String streamPath = Utils.buildStreamPath(parentPath, streamName);
     try {
       // try to see whether the stream was already created
-      datastreamClient.getStream(streamPath);
-    } catch (NotFoundException e) {
+      datastream.projects().locations().streams().get(streamPath).execute();
+    } catch (GoogleJsonResponseException e) {
+      if (404 != e.getStatusCode()) {
+        throw e;
+      }
       // stream does not exist
-      String sourceProfileName = Utils.buildSourceProfileName(replicatorId);
-      String sourceProfilePath = Utils.buildConnectionProfilePath(parentPath, sourceProfileName);
+      String oracleProfileName = Utils.buildOracleProfileName(replicatorId);
+      String oracleProfilePath = Utils.buildConnectionProfilePath(parentPath, oracleProfileName);
       try {
-        // try to check whether the source connection profile was already created
-        datastreamClient.getConnectionProfile(sourceProfilePath);
-      } catch (NotFoundException es) {
-        // source connection profile does not exist
-        // crete the source connection profile
-        OperationFuture<ConnectionProfile, OperationMetadata> response = datastreamClient.createConnectionProfileAsync(
-          Utils.buildSourceProfileCreationRequest(parentPath, sourceProfileName,
-            buildOracleConnectionProfile(config)));
-        // TODO call response.get() and handle errors once Datastream supports long running jobs
-        // Currently Datastream java client has issue with it
-        waitUntilComplete(response);
+        // try to check whether the oracle connection profile was already created
+        datastream.projects().locations().connectionProfiles().get(oracleProfilePath).execute();
+      } catch (GoogleJsonResponseException ex) {
+        if (404 != ex.getStatusCode()) {
+          throw ex;
+        }
+        // oracle connection profile does not exist
+        // crete the oracle connection profile
+        Operation operation = datastream.projects().locations().connectionProfiles()
+          .create(parentPath, buildOracleConnectionProfile(oracleProfileName, config))
+          .setConnectionProfileId(oracleProfileName).execute();
+        waitUntilComplete(datastream, operation, LOGGER);
       }
 
 
-      String targetProfileName = Utils.buildTargetProfileName(replicatorId);
-      String targetProfilePath = Utils.buildConnectionProfilePath(parentPath, targetProfileName);
+      String gcsProfileName = Utils.buildGcsProfileName(replicatorId);
+      String gcsProfilePath = Utils.buildConnectionProfilePath(parentPath, gcsProfileName);
       try {
-        // try to check whether the target connection profile was already created
-        datastreamClient.getConnectionProfile(targetProfilePath);
-      } catch (NotFoundException es) {
-        // target connection profile does not exist
+        // try to check whether the gcs connection profile was already created
+        datastream.projects().locations().connectionProfiles().get(gcsProfilePath).execute();
+      } catch (GoogleJsonResponseException ex) {
+        if (404 != ex.getStatusCode()) {
+          throw ex;
+        }
+        // gcs connection profile does not exist
         // check whether GCS Bucket exists first
         String bucketName = config.getGcsBucket();
         // If user doesn't provide bucketName, we assign one based on run id
         if (bucketName == null) {
-          bucketName = "df-cdc-ds-" + context.getRunId();
+          bucketName = GCS_BUCKET_NAME_PREFIX + context.getRunId();
         }
         Bucket bucket = storage.get(bucketName);
         if (bucket == null) {
@@ -143,23 +162,19 @@ public class DatastreamDeltaSource implements DeltaSource {
           storage.create(BucketInfo.newBuilder(bucketName).build());
         }
 
-        // crete the target connection profile
-        OperationFuture<ConnectionProfile, OperationMetadata> response = datastreamClient.createConnectionProfileAsync(
-          Utils.buildTargetProfileCreationRequest(parentPath, targetProfileName, bucketName,
-            config.getGcsPathPrefix()));
+        // crete the gcs connection profile
+        Operation operation = datastream.projects().locations().connectionProfiles().create(parentPath,
+          Utils.buildGcsConnectionProfile(parentPath, gcsProfileName, bucketName, config.getGcsPathPrefix()))
+          .setConnectionProfileId(gcsProfileName).execute();
 
-        // TODO call response.get() and handle errors once Datastream supports long running jobs
-        // Currently Datastream java client has issue with it
-        waitUntilComplete(response);
+        waitUntilComplete(datastream, operation, LOGGER);
       }
 
       // Create the stream
-      OperationFuture<Stream, OperationMetadata> response = datastreamClient.createStreamAsync(
-        Utils.buildStreamCreationRequest(parentPath, streamName, sourceProfilePath, targetProfilePath,
-          context.getAllTables()));
-      // TODO call response.get() and handle errors once Datastream supports long running jobs
-      // Currently Datastream java client has issue with it
-      waitUntilComplete(response);
+      Operation operation = datastream.projects().locations().streams().create(parentPath,
+        Utils.buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, context.getAllTables()))
+        .setStreamId(streamName).execute();
+      waitUntilComplete(datastream, operation, LOGGER);
     }
   }
 

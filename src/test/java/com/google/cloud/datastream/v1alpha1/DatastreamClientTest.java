@@ -17,13 +17,31 @@
 
 package com.google.cloud.datastream.v1alpha1;
 
-import com.google.api.gax.core.CredentialsProvider;
-import com.google.api.gax.longrunning.OperationFuture;
-import com.google.api.gax.rpc.NotFoundException;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.services.datastream.v1alpha1.DataStream;
+import com.google.api.services.datastream.v1alpha1.model.AvroFileFormat;
+import com.google.api.services.datastream.v1alpha1.model.ConnectionProfile;
+import com.google.api.services.datastream.v1alpha1.model.DestinationConfig;
+import com.google.api.services.datastream.v1alpha1.model.DiscoverConnectionProfileRequest;
+import com.google.api.services.datastream.v1alpha1.model.DiscoverConnectionProfileResponse;
+import com.google.api.services.datastream.v1alpha1.model.GcsDestinationConfig;
+import com.google.api.services.datastream.v1alpha1.model.GcsProfile;
+import com.google.api.services.datastream.v1alpha1.model.NoConnectivitySettings;
+import com.google.api.services.datastream.v1alpha1.model.Operation;
+import com.google.api.services.datastream.v1alpha1.model.OracleColumn;
+import com.google.api.services.datastream.v1alpha1.model.OracleProfile;
+import com.google.api.services.datastream.v1alpha1.model.OracleRdbms;
+import com.google.api.services.datastream.v1alpha1.model.OracleSchema;
+import com.google.api.services.datastream.v1alpha1.model.OracleSourceConfig;
+import com.google.api.services.datastream.v1alpha1.model.OracleTable;
+import com.google.api.services.datastream.v1alpha1.model.SourceConfig;
+import com.google.api.services.datastream.v1alpha1.model.StaticServiceIpConnectivity;
+import com.google.api.services.datastream.v1alpha1.model.Stream;
 import com.google.auth.Credentials;
+import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
-import com.google.protobuf.Duration;
-import com.google.protobuf.Empty;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -33,10 +51,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
@@ -51,7 +70,7 @@ public class DatastreamClientTest {
   private static String oraclePassword;
   private static String oracleDb;
   private static String gcsBucket;
-  private static DatastreamClient datastream;
+  private static DataStream datastream;
 
   @BeforeAll
   public static void setupTestClass() throws Exception {
@@ -106,32 +125,29 @@ public class DatastreamClientTest {
         .createScoped("https://www.googleapis.com/auth/cloud-platform");
     }
 
-    datastream = DatastreamClient
-      .create(DatastreamSettings.newBuilder().setCredentialsProvider(new CredentialsProvider() {
-        @Override
-        public Credentials getCredentials() throws IOException {
-          return credentials;
-        }
-      }).build());
-
-
+    datastream = new DataStream(new NetHttpTransport(), new JacksonFactory(),
+      new HttpCredentialsAdapter(credentials));
   }
 
   @Test
   public void testDiscoverConnectionProfiles() throws IOException {
 
     DiscoverConnectionProfileRequest request =
-      DiscoverConnectionProfileRequest.newBuilder().setParent(parent).setRecursive(true)
-        .setConnectionProfile(buildOracleConnectionProfile("discover-test")).build();
+      new DiscoverConnectionProfileRequest().setRecursive(true)
+        .setConnectionProfile(buildOracleConnectionProfile("discover-test"));
 
-    DiscoverConnectionProfileResponse response = datastream.discoverConnectionProfile(request);
+    DiscoverConnectionProfileResponse response =
+      datastream.projects().locations().connectionProfiles().discover(parent, request).execute();
     OracleRdbms rdbms = response.getOracleRdbms();
     assertNotNull(rdbms);
-    for (OracleSchema schema : rdbms.getOracleSchemasList()) {
+    for (OracleSchema schema : rdbms.getOracleSchemas()) {
       assertNotNull(schema.getSchemaName());
-      for (OracleTable table : schema.getOracleTablesList()) {
+      if (schema.getOracleTables() == null) {
+        continue;
+      }
+      for (OracleTable table : schema.getOracleTables()) {
         assertNotNull(table.getTableName());
-        for (OracleColumn column : table.getOracleColumnsList()) {
+        for (OracleColumn column : table.getOracleColumns()) {
           assertNotNull(column.getColumnName());
           assertNotNull(column.getDataType());
         }
@@ -143,98 +159,92 @@ public class DatastreamClientTest {
   public void testStreams() throws IOException, ExecutionException, InterruptedException {
 
     String sourceName = "Datafusion-Oracle-" + UUID.randomUUID();
-    OperationFuture<ConnectionProfile, OperationMetadata> sourceProfileResponse =
-      createOracleConnectionProfile(sourceName);
+    Operation sourceProfileCreationOperation = createOracleConnectionProfile(sourceName);
 
     String destinationName = "Datafusion-GCS-" + UUID.randomUUID();
-    OperationFuture<ConnectionProfile, OperationMetadata> destinationProfileResponse =
-      createGcsConnectionProfile(destinationName);
+    Operation destinationProfileCreationOperation = createGcsConnectionProfile(destinationName);
 
-    // TODO Replace below with sourceProfileResponse.get() and destinationProfileResponse.get() to
-    //  block until source and destination connection profiles are successfully created. So far this
-    //  method call (getting the long running operation) has some issue for java client.
-    waitUntilComplete(sourceProfileResponse);
-    waitUntilComplete(destinationProfileResponse);
+    // TODO check with Datastream whether there is better way to query the status
+    sourceProfileCreationOperation = waitUntilComplete(sourceProfileCreationOperation);
+    assertNull(sourceProfileCreationOperation.getError());
+    assertNotNull(datastream.projects().locations().connectionProfiles().get(buildConnectionProfilePath(sourceName)));
+
+    destinationProfileCreationOperation = waitUntilComplete(destinationProfileCreationOperation);
+    assertNull(destinationProfileCreationOperation.getError());
+    assertNotNull(
+      datastream.projects().locations().connectionProfiles().get(buildConnectionProfilePath(destinationName)));
 
     String streamName = "Datafusion-DS-" + UUID.randomUUID();
-    CreateStreamRequest createStreamRequest =
-      CreateStreamRequest.newBuilder().setParent(parent).setStreamId(streamName).setStream(
-        Stream.newBuilder().setDisplayName(streamName).setDestinationConfig(
-          DestinationConfig.newBuilder()
-            .setDestinationConnectionProfileName(buildConnectionProfilePath(destinationName))
-            .setGcsDestinationConfig(
-              GcsDestinationConfig.newBuilder().setGcsFileFormat(GcsFileFormat.AVRO)
-                .setFileRotationMb(5)
-                .setFileRotationInterval(Duration.newBuilder().setSeconds(15)))).setSourceConfig(
-          SourceConfig.newBuilder()
-            .setSourceConnectionProfileName(buildConnectionProfilePath(sourceName))
-            .setOracleSourceConfig(
-              OracleSourceConfig.newBuilder().setAllowlist(OracleRdbms.getDefaultInstance())
-                .setRejectlist(OracleRdbms.getDefaultInstance())))).build();
-    OperationFuture<Stream, OperationMetadata> createStreamResponse =
-      datastream.createStreamAsync(createStreamRequest);
+    Operation streamCreationOperation =
+      datastream.projects().locations().streams().create(parent,
+        new Stream().setDisplayName(streamName).setDestinationConfig(
+        new DestinationConfig()
+          .setDestinationConnectionProfileName(buildConnectionProfilePath(destinationName))
+          .setGcsDestinationConfig(
+            new GcsDestinationConfig().setAvroFileFormat(new AvroFileFormat())
+              .setFileRotationMb(5)
+              .setFileRotationInterval("15s"))).setSourceConfig(
+        new SourceConfig()
+          .setSourceConnectionProfileName(buildConnectionProfilePath(sourceName))
+          .setOracleSourceConfig(
+            new OracleSourceConfig().setAllowlist(new OracleRdbms())
+              .setRejectlist(new OracleRdbms())))).setStreamId(streamName).execute();
 
-    // TODO Replace below with createStreamResponse.get() to block until stream is successfully
-    //  created. So far this method call (getting the long running operation) has some issue for
-    //  java client.
-    waitUntilComplete(createStreamResponse);
+    streamCreationOperation = waitUntilComplete(streamCreationOperation);
+    assertNull(streamCreationOperation.getError());
 
-    Stream stream = datastream.getStream(buildStreamPath(streamName));
-    assertNotNull(stream);
+    assertNotNull(datastream.projects().locations().streams().get(buildStreamPath(streamName)).execute());
 
-    // TODO check whether the source and destination in the stream matches the one from
-    //  sourceProfileResponse.get() and destinationProfileResponse.get() So far this method call
-    //  (getting the long running operation) has some issue for java client.
+    Operation streamDeletionOperation =
+      datastream.projects().locations().streams().delete(buildStreamPath(streamName)).execute();
 
-    OperationFuture<Empty, OperationMetadata> deleteStreamResponse =
-      datastream.deleteStreamAsync(buildStreamPath(streamName));
+    streamDeletionOperation = waitUntilComplete(streamDeletionOperation);
+    assertNull(streamDeletionOperation.getError());
+    GoogleJsonResponseException exception = assertThrows(GoogleJsonResponseException.class,
+      () -> datastream.projects().locations().streams().get(buildStreamPath(streamName)).execute());
+    assertEquals(404, exception.getStatusCode());
 
-    //TODO Replace below with deleteStreamResponse.get() to block until stream is successfully
-    // deleted. So far this method call (getting the long running operation) has some issue for java
-    // client.
-    waitUntilComplete(deleteStreamResponse);
-    assertThrows(NotFoundException.class, () -> datastream.getStream(buildStreamPath(streamName)));
+    Operation sourceProfileDeletionOperation =
+      datastream.projects().locations().connectionProfiles().delete(buildConnectionProfilePath(sourceName)).execute();
 
-    OperationFuture<Empty, OperationMetadata> deleteSourceResponse =
-      datastream.deleteConnectionProfileAsync(buildConnectionProfilePath(sourceName));
+    Operation destinationProfileDeletionOperation =
+      datastream.projects().locations().connectionProfiles().delete(buildConnectionProfilePath(destinationName))
+        .execute();
 
-    OperationFuture<Empty, OperationMetadata> deleteDestinationResponse =
-      datastream.deleteConnectionProfileAsync(buildConnectionProfilePath(destinationName));
 
-    //TODO Replace below with deleteSourceResponse.get() and deleteDestinationResponse.get()
-    // to block until source and  destination connection profiles are successfully deleted. So far
-    // this method call (getting the long running operation) has some issue for java client.
-    waitUntilComplete(deleteSourceResponse);
-    waitUntilComplete(deleteDestinationResponse);
-    assertThrows(NotFoundException.class,
-                 () -> datastream.getConnectionProfile(buildConnectionProfilePath(sourceName)));
-    assertThrows(NotFoundException.class, () -> datastream
-      .getConnectionProfile(buildConnectionProfilePath(destinationName)));
+    sourceProfileDeletionOperation = waitUntilComplete(sourceProfileDeletionOperation);
+    assertNull(sourceProfileDeletionOperation.getError());
+
+    destinationProfileDeletionOperation = waitUntilComplete(destinationProfileDeletionOperation);
+    assertNull(destinationProfileDeletionOperation.getError());
+
+    exception = assertThrows(GoogleJsonResponseException.class, () -> {
+      datastream.projects().locations().connectionProfiles().get(buildConnectionProfilePath(sourceName)).execute();
+    });
+    assertEquals(404, exception.getStatusCode());
+
+    exception = assertThrows(GoogleJsonResponseException.class,
+      () -> datastream.projects().locations().connectionProfiles().get(buildConnectionProfilePath(destinationName))
+        .execute());
+    assertEquals(404, exception.getStatusCode());
   }
 
-  @Test
-  public void testGetNonExistedStream() {
-    assertThrows(NotFoundException.class, () -> datastream.getStream(buildStreamPath("NonExisted")));
-  }
-  private void waitUntilComplete(Future<?> future) throws InterruptedException {
-    while (!future.isDone() && !future.isCancelled()) {
+  private Operation waitUntilComplete(Operation operation) throws InterruptedException, IOException {
+    while (!operation.getDone()) {
       TimeUnit.MILLISECONDS.sleep(200L);
+      operation = datastream.projects().locations().operations().get(operation.getName()).execute();
     }
+    return operation;
   }
 
-  private OperationFuture<ConnectionProfile, OperationMetadata> createGcsConnectionProfile(String destinationName) {
-    CreateConnectionProfileRequest destinationProfileRequest =
-      CreateConnectionProfileRequest.newBuilder().setParent(parent)
-        .setConnectionProfileId(destinationName)
-        .setConnectionProfile(buildGCSConnectionProfile(destinationName)).build();
-    return datastream.createConnectionProfileAsync(destinationProfileRequest);
+  private Operation createGcsConnectionProfile(String name) throws IOException {
+    return datastream.projects().locations().connectionProfiles().create(parent, buildGCSConnectionProfile(name))
+      .setConnectionProfileId(name).execute();
   }
 
-  private OperationFuture<ConnectionProfile, OperationMetadata> createOracleConnectionProfile(String name) {
-    CreateConnectionProfileRequest sourceProfileRequest =
-      CreateConnectionProfileRequest.newBuilder().setParent(parent).setConnectionProfileId(name)
-        .setConnectionProfile(buildOracleConnectionProfile(name)).build();
-    return datastream.createConnectionProfileAsync(sourceProfileRequest);
+  private Operation createOracleConnectionProfile(String name) throws IOException {
+    return datastream.projects().locations().connectionProfiles().create(parent, buildOracleConnectionProfile(name))
+      .setConnectionProfileId(name).execute();
   }
 
   private String buildConnectionProfilePath(String resourceName) {
@@ -245,18 +255,16 @@ public class DatastreamClientTest {
     return parent + "/streams/" + resourceName;
   }
 
-  private ConnectionProfile.Builder buildOracleConnectionProfile(String name) {
-    return ConnectionProfile.newBuilder().setDisplayName(name)
-      .setStaticServiceIpConnectivity(StaticServiceIpConnectivity.getDefaultInstance())
-      .setOracleProfile(OracleProfile.newBuilder().setHostname(oracleHost).setUsername(oracleUser)
-                          .setPassword(oraclePassword).setDatabaseService(oracleDb)
-                          .setPort(oraclePort));
+  private ConnectionProfile buildOracleConnectionProfile(String name) {
+    return new ConnectionProfile().setDisplayName(name)
+      .setStaticServiceIpConnectivity(new StaticServiceIpConnectivity()).setOracleProfile(
+        new OracleProfile().setHostname(oracleHost).setUsername(oracleUser).setPassword(oraclePassword)
+          .setDatabaseService(oracleDb).setPort(oraclePort));
   }
 
-  private ConnectionProfile.Builder buildGCSConnectionProfile(String name) {
-    return ConnectionProfile.newBuilder().setDisplayName(name)
-      .setNoConnectivity(NoConnectivitySettings.getDefaultInstance())
-      .setGcsProfile(GcsProfile.newBuilder().setBucketName(gcsBucket).setRootPath("/" + name));
+  private ConnectionProfile buildGCSConnectionProfile(String name) {
+    return new ConnectionProfile().setDisplayName(name).setNoConnectivity(new NoConnectivitySettings())
+      .setGcsProfile(new GcsProfile().setBucketName(gcsBucket).setRootPath("/" + name));
   }
 
 }

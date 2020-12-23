@@ -145,7 +145,6 @@ public final class Utils {
       case "XMLTYPE":
         return OracleDataType.XMLTYPE;
       default:
-        System.out.println("########SEAN######## unsupported type" + oracleDataType);
         return OracleDataType.OTHER;
     }
   }

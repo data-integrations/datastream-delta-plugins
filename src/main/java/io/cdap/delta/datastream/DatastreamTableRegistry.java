@@ -16,14 +16,15 @@
 
 package io.cdap.delta.datastream;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.services.datastream.v1alpha1.DataStream;
+import com.google.api.services.datastream.v1alpha1.model.DiscoverConnectionProfileRequest;
+import com.google.api.services.datastream.v1alpha1.model.DiscoverConnectionProfileResponse;
+import com.google.api.services.datastream.v1alpha1.model.OracleColumn;
+import com.google.api.services.datastream.v1alpha1.model.OracleRdbms;
+import com.google.api.services.datastream.v1alpha1.model.OracleSchema;
+import com.google.api.services.datastream.v1alpha1.model.OracleTable;
 import com.google.cloud.ServiceOptions;
-import com.google.cloud.datastream.v1alpha1.DatastreamClient;
-import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileRequest;
-import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileResponse;
-import com.google.cloud.datastream.v1alpha1.OracleColumn;
-import com.google.cloud.datastream.v1alpha1.OracleRdbms;
-import com.google.cloud.datastream.v1alpha1.OracleSchema;
-import com.google.cloud.datastream.v1alpha1.OracleTable;
 import com.google.common.collect.Iterables;
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.delta.api.assessment.ColumnDetail;
@@ -51,9 +52,9 @@ import java.util.Set;
  * Lists and describes tables.
  */
 public class DatastreamTableRegistry implements TableRegistry {
-  private static final Logger LOG = LoggerFactory.getLogger(DatastreamTableRegistry.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DatastreamTableRegistry.class);
   private final DatastreamConfig config;
-  private final DatastreamClient datastreamClient;
+  private final DataStream datastream;
   // parent path of datastream resources in form of "projects/projectId/locations/region"
   private final String parentPath;
   // TODO find a better way to get system schemas for different version of Oracle.
@@ -65,9 +66,9 @@ public class DatastreamTableRegistry implements TableRegistry {
     "MDSYS", "FLOWS_FILES", "APEX_040000", "OUTLN"));
 
 
-  public DatastreamTableRegistry(DatastreamConfig config, DatastreamClient datastreamClient) {
+  public DatastreamTableRegistry(DatastreamConfig config, DataStream datastream) {
     this.config = config;
-    this.datastreamClient = datastreamClient;
+    this.datastream = datastream;
     //TODO validate whether the region is valid
 
     this.parentPath =
@@ -76,20 +77,27 @@ public class DatastreamTableRegistry implements TableRegistry {
 
   @Override
   public TableList listTables() throws IOException {
-    LOG.debug("List tables...");
+    LOGGER.debug("List tables...");
     List<TableSummary> tables = new ArrayList<>();
 
     DiscoverConnectionProfileResponse response = discover();
-    for (OracleSchema schema : response.getOracleRdbms().getOracleSchemasList()) {
+    if (response.getOracleRdbms().getOracleSchemas() == null) {
+      return new TableList(tables);
+    }
+
+    for (OracleSchema schema : response.getOracleRdbms().getOracleSchemas()) {
       String schemaName = schema.getSchemaName();
       if (SYSTEM_SCHEMA.contains(schemaName.toUpperCase())) {
         //skip system tables
         continue;
       }
-      for (OracleTable table : schema.getOracleTablesList()) {
+      if (schema.getOracleTables() == null) {
+        continue;
+      }
+      for (OracleTable table : schema.getOracleTables()) {
         String tableName = table.getTableName();
-        tables.add(
-          new TableSummary(config.getSid(), tableName, table.getOracleColumnsCount(), schemaName));
+        tables.add(new TableSummary(config.getSid(), tableName,
+          table.getOracleColumns() == null ? 0 : table.getOracleColumns().size(), schemaName));
       }
     }
     return new TableList(tables);
@@ -97,27 +105,35 @@ public class DatastreamTableRegistry implements TableRegistry {
 
   @Override
   public TableDetail describeTable(String db, String schema, String table) throws TableNotFoundException, IOException {
-    LOG.debug(String.format("Describe table, db: %s, table: %s, schema: %s", db, table, schema));
-    DiscoverConnectionProfileResponse discoverResponse = discover(schema, table);
-    //TODO handle schema/table doesn't exist case, currently datastream only throw a very generic
-    // exception : com.google.api.gax.rpc.UnknownException without signals indicating this error
-    // case
+    LOGGER.debug(String.format("Describe table, db: %s, table: %s, schema: %s", db, table, schema));
+    DiscoverConnectionProfileResponse discoverResponse;
+    try {
+      discoverResponse = discover(schema, table);
+    } catch (GoogleJsonResponseException e) {
+      if (e.getStatusCode() == 404) {
+        throw new TableNotFoundException(db, schema, table, e.getMessage(), e);
+      }
+      throw e;
+    }
 
     OracleSchema oracleSchema =
-      Iterables.getOnlyElement(discoverResponse.getOracleRdbms().getOracleSchemasList());
-    OracleTable oracleTable = Iterables.getOnlyElement(oracleSchema.getOracleTablesList());
+      Iterables.getOnlyElement(discoverResponse.getOracleRdbms().getOracleSchemas());
+    OracleTable oracleTable = Iterables.getOnlyElement(oracleSchema.getOracleTables());
 
-    List<ColumnDetail> columns = new ArrayList<>(oracleTable.getOracleColumnsCount());
+    List<ColumnDetail> columns = new ArrayList<>(oracleTable.getOracleColumns().size());
     List<String> primaryKeys = new ArrayList<>();
-    for (OracleColumn column : oracleTable.getOracleColumnsList()) {
+    for (OracleColumn column : oracleTable.getOracleColumns()) {
       Map<String, String> properties = new HashMap<>();
-      properties.put(DatastreamTableAssessor.PRECISION, Integer.toString(column.getPrecision()));
-      properties.put(DatastreamTableAssessor.SCALE,
-                     Integer.toString(column.getScale()));
+      if (column.getPrecision() != null) {
+        properties.put(DatastreamTableAssessor.PRECISION, Integer.toString(column.getPrecision()));
+      }
+      if (column.getScale() != null) {
+        properties.put(DatastreamTableAssessor.SCALE, Integer.toString(column.getScale()));
+      }
       columns.add(
         new ColumnDetail(column.getColumnName(), Utils.convertStringDataTypeToSQLType(column.getDataType()),
-          column.getNullable(), properties));
-      if (column.getPrimaryKey()) {
+          Boolean.TRUE.equals(column.getNullable()), properties));
+      if (Boolean.TRUE.equals(column.getPrimaryKey())) {
         primaryKeys.add(column.getColumnName());
       }
     }
@@ -141,20 +157,20 @@ public class DatastreamTableRegistry implements TableRegistry {
 
   @Override
   public void close() throws IOException {
-    datastreamClient.close();
   }
 
-  private DiscoverConnectionProfileResponse discover(String schema, String table) {
-    return datastreamClient.discoverConnectionProfile(
-      DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath)
-        .setConnectionProfile(Utils.buildOracleConnectionProfile(config)).setOracleRdbms(
-        OracleRdbms.newBuilder().addOracleSchemas(OracleSchema.newBuilder().setSchemaName(schema).addOracleTables(
-          OracleTable.newBuilder().setTableName(table)))).build());
+  private DiscoverConnectionProfileResponse discover(String schema, String table) throws IOException {
+    DiscoverConnectionProfileRequest request =
+      new DiscoverConnectionProfileRequest().setConnectionProfile(Utils.buildOracleConnectionProfile(null, config))
+        .setOracleRdbms(new OracleRdbms().setOracleSchemas(Arrays.asList(new OracleSchema().setSchemaName(schema)
+          .setOracleTables(Arrays.asList(new OracleTable().setTableName(table))))));
+    return datastream.projects().locations().connectionProfiles().discover(parentPath, request).execute();
   }
 
-  private DiscoverConnectionProfileResponse discover() {
-    return datastreamClient.discoverConnectionProfile(
-      DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath)
-        .setConnectionProfile(Utils.buildOracleConnectionProfile(config)).setRecursive(true).build());
+  private DiscoverConnectionProfileResponse discover() throws IOException {
+    DiscoverConnectionProfileRequest request =
+      new DiscoverConnectionProfileRequest().setConnectionProfile(Utils.buildOracleConnectionProfile(null, config))
+        .setRecursive(true);
+    return datastream.projects().locations().connectionProfiles().discover(parentPath, request).execute();
   }
 }

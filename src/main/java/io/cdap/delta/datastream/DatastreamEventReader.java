@@ -17,12 +17,11 @@
 
 package io.cdap.delta.datastream;
 
-import com.google.api.gax.longrunning.OperationFuture;
-import com.google.cloud.datastream.v1alpha1.DatastreamClient;
-import com.google.cloud.datastream.v1alpha1.OperationMetadata;
-import com.google.cloud.datastream.v1alpha1.ResumeStreamRequest;
-import com.google.cloud.datastream.v1alpha1.StartStreamRequest;
-import com.google.cloud.datastream.v1alpha1.Stream;
+import com.google.api.services.datastream.v1alpha1.DataStream;
+import com.google.api.services.datastream.v1alpha1.model.Operation;
+import com.google.api.services.datastream.v1alpha1.model.ResumeStreamRequest;
+import com.google.api.services.datastream.v1alpha1.model.StartStreamRequest;
+import com.google.api.services.datastream.v1alpha1.model.Stream;
 import com.google.cloud.storage.Storage;
 import io.cdap.delta.api.DeltaSourceContext;
 import io.cdap.delta.api.EventEmitter;
@@ -30,7 +29,10 @@ import io.cdap.delta.api.EventReader;
 import io.cdap.delta.api.EventReaderDefinition;
 import io.cdap.delta.api.Offset;
 import io.cdap.delta.datastream.util.Utils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -39,7 +41,10 @@ import java.util.concurrent.ScheduledExecutorService;
  */
 public class DatastreamEventReader implements EventReader {
 
-  private final DatastreamClient datastreamClient;
+  private static final Logger LOGGER = LoggerFactory.getLogger(DatastreamEventReader.class);
+  private static final String STREAM_STATE_PAUSED = "PAUSED";
+  private static final String STREAM_STATE_CREATED = "CREATED";
+  private final DataStream datastream;
   private final DatastreamConfig config;
   private final DeltaSourceContext context;
   private final EventReaderDefinition definition;
@@ -48,13 +53,13 @@ public class DatastreamEventReader implements EventReader {
   private final ScheduledExecutorService executorService;
 
   public DatastreamEventReader(DatastreamConfig config, EventReaderDefinition definition, DeltaSourceContext context,
-    EventEmitter emitter, DatastreamClient datastreamClient, Storage storage) {
+    EventEmitter emitter, DataStream datastream, Storage storage) {
     this.context = context;
     this.config = config;
     this.definition = definition;
     this.emitter = emitter;
     this.executorService = Executors.newSingleThreadScheduledExecutor();
-    this.datastreamClient = datastreamClient;
+    this.datastream = datastream;
     this.storage = storage;
   }
 
@@ -73,18 +78,28 @@ public class DatastreamEventReader implements EventReader {
     //TODO if the stream is resued, the stream name should be from config
     String streamName = Utils.buildStreamName(replicatorId);
     String streamPath = Utils.buildStreamPath(parentPath, streamName);
-    Stream stream = datastreamClient.getStream(streamPath);
+    Stream stream = null;
+    try {
+      stream = datastream.projects().locations().streams().get(streamPath).execute();
+    } catch (IOException e) {
+      throw Utils.handleError(LOGGER, String.format("Failed to get stream: %s", streamPath), e);
+    }
 
-    OperationFuture<Stream, OperationMetadata> response = null;
-    if (stream.getState() == Stream.State.PAUSED) {
-      response = datastreamClient.resumeStreamAsync(ResumeStreamRequest.newBuilder().setName(streamPath).build());
-    } else if (stream.getState() == Stream.State.CREATED) {
-      response = datastreamClient.startStreamAsync(StartStreamRequest.newBuilder().setName(streamPath).build());
+    Operation operation = null;
+    if (STREAM_STATE_PAUSED.equals(stream.getState())) {
+      try {
+        operation = datastream.projects().locations().streams().resume(streamPath, new ResumeStreamRequest()).execute();
+      } catch (IOException e) {
+        throw Utils.handleError(LOGGER, String.format("Failed to resume stream: %s", streamPath), e);
+      }
+    } else if (STREAM_STATE_CREATED.equals(stream.getState())) {
+      try {
+        operation = datastream.projects().locations().streams().start(streamPath, new StartStreamRequest()).execute();
+      } catch (IOException e) {
+        throw Utils.handleError(LOGGER, String.format("Failed to start stream: %s", streamPath), e);
+      }
     }
-    if (response != null) {
-      // TODO call response.get() and handle errors once Datastream supports long running jobs
-      // Currently Datastream java client has issue with it
-      Utils.waitUntilComplete(response);
-    }
+
+    Utils.waitUntilComplete(datastream, operation, LOGGER);
   }
 }

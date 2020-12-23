@@ -17,11 +17,11 @@
 
 package io.cdap.delta.datastream;
 
-import com.google.api.gax.core.CredentialsProvider;
-import com.google.auth.Credentials;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.services.datastream.v1alpha1.DataStream;
+import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.datastream.v1alpha1.DatastreamClient;
-import com.google.cloud.datastream.v1alpha1.DatastreamSettings;
 import io.cdap.delta.api.assessment.ColumnDetail;
 import io.cdap.delta.api.assessment.TableDetail;
 import io.cdap.delta.api.assessment.TableList;
@@ -140,8 +140,6 @@ class DatastreamTableRegistryTest {
         assertNotNull(column.getName());
         Map<String, String> properties = column.getProperties();
         assertNotNull(properties);
-        assertNotNull(properties.get(DatastreamTableAssessor.PRECISION));
-        assertNotNull(properties.get(DatastreamTableAssessor.SCALE));
         assertNotNull(column.getType());
       }
       List<String> primaryKeys = tableDetail.getPrimaryKey();
@@ -153,19 +151,9 @@ class DatastreamTableRegistryTest {
     }
   }
 
-  private DatastreamClient createDatastreamClient() {
-    try {
-      return DatastreamClient
-        .create(DatastreamSettings.newBuilder().setCredentialsProvider(new CredentialsProvider() {
-          @Override
-          public Credentials getCredentials() throws IOException {
-            return credentials;
-          }
-        }).build());
-    } catch (IOException e) {
-      throw new IllegalArgumentException(
-        "Cannot create DatastreamSettings with Credentials: " + credentials, e);
-    }
+  private DataStream createDatastreamClient() {
+    return new DataStream(new NetHttpTransport(), new JacksonFactory(),
+      new HttpCredentialsAdapter(credentials));
   }
 
 }

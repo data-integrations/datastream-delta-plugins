@@ -17,28 +17,24 @@
 
 package io.cdap.delta.datastream;
 
-import com.google.api.gax.core.CredentialsProvider;
-import com.google.api.gax.longrunning.OperationFuture;
-import com.google.auth.Credentials;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.services.datastream.v1alpha1.DataStream;
+import com.google.api.services.datastream.v1alpha1.model.ConnectionProfile;
+import com.google.api.services.datastream.v1alpha1.model.DestinationConfig;
+import com.google.api.services.datastream.v1alpha1.model.GcsDestinationConfig;
+import com.google.api.services.datastream.v1alpha1.model.GcsProfile;
+import com.google.api.services.datastream.v1alpha1.model.Operation;
+import com.google.api.services.datastream.v1alpha1.model.OracleProfile;
+import com.google.api.services.datastream.v1alpha1.model.OracleRdbms;
+import com.google.api.services.datastream.v1alpha1.model.OracleSourceConfig;
+import com.google.api.services.datastream.v1alpha1.model.SourceConfig;
+import com.google.api.services.datastream.v1alpha1.model.Stream;
+import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.ServiceOptions;
-import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
-import com.google.cloud.datastream.v1alpha1.DatastreamClient;
-import com.google.cloud.datastream.v1alpha1.DatastreamSettings;
-import com.google.cloud.datastream.v1alpha1.DestinationConfig;
-import com.google.cloud.datastream.v1alpha1.GcsDestinationConfig;
-import com.google.cloud.datastream.v1alpha1.GcsFileFormat;
-import com.google.cloud.datastream.v1alpha1.GcsProfile;
-import com.google.cloud.datastream.v1alpha1.OperationMetadata;
-import com.google.cloud.datastream.v1alpha1.OracleProfile;
-import com.google.cloud.datastream.v1alpha1.OracleRdbms;
-import com.google.cloud.datastream.v1alpha1.OracleSourceConfig;
-import com.google.cloud.datastream.v1alpha1.SourceConfig;
-import com.google.cloud.datastream.v1alpha1.Stream;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
-import com.google.protobuf.Duration;
-import com.google.protobuf.Empty;
 import io.cdap.cdap.api.macro.InvalidMacroException;
 import io.cdap.cdap.api.macro.MacroEvaluator;
 import io.cdap.cdap.api.metrics.Metrics;
@@ -64,12 +60,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
@@ -82,7 +78,7 @@ class DatastreamDeltaSourceTest {
   private static Set<String> oracleTables;
   private static int oraclePort;
   private static GoogleCredentials credentials;
-  private static DatastreamClient datastreamClient;
+  private static DataStream datastream;
   private static String parentPath;
   private static String gcsBucket;
   private static Storage storage;
@@ -140,7 +136,7 @@ class DatastreamDeltaSourceTest {
     try (InputStream is = new FileInputStream(serviceAccountFile)) {
       credentials = GoogleCredentials.fromStream(is).createScoped("https://www.googleapis.com/auth/cloud-platform");
     }
-    datastreamClient = createDatastreamClient();
+    datastream = createDatastreamClient();
     storage = StorageOptions.newBuilder().setCredentials(credentials).setProjectId(ServiceOptions.getDefaultProjectId())
       .build().getService();
 
@@ -157,14 +153,14 @@ class DatastreamDeltaSourceTest {
   public void testInitialize() throws Exception {
     String namspace = "default";
     String appName = "datastream-ut";
-    String runId = UUID.randomUUID().toString();
+    String runId = "1234567890";
     long generation = 0;
 
     DatastreamConfig config = buildDatastreamConfig();
     DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
     DeltaSourceContext context = createContext(namspace, appName, generation, runId);
     if (gcsBucket == null) {
-      gcsBucket = "df-cdc-ds-" + runId;
+      gcsBucket = "df-rds-" + runId;
     }
     deltaSource.initialize(context);
     String replicatorId = String.format("%s-%s-%d", namspace, appName, generation);
@@ -178,67 +174,66 @@ class DatastreamDeltaSourceTest {
     clearStream(replicatorId);
   }
 
-  private void clearStream(String replicatorId) throws InterruptedException {
-    OperationFuture<Empty, OperationMetadata> response = datastreamClient
-      .deleteConnectionProfileAsync(String.format("%s/connectionProfiles/CDF-Src-%s", parentPath, replicatorId));
-    // TODO Replace below with response.get() to block until stream is successfully
-    //  created. So far this method call (getting the long running operation) has some issue for
-    //  java client.
-    waitUntilComplete(response);
+  private void clearStream(String replicatorId) throws InterruptedException, IOException {
+    Operation operation = datastream.projects().locations().connectionProfiles().delete(String.format("%s" +
+      "/connectionProfiles/DF-ORA-%s", parentPath, replicatorId)).execute();
+    operation = waitUntilComplete(operation);
+    assertNull(operation.getError());
 
-    response = datastreamClient
-      .deleteConnectionProfileAsync(String.format("%s/connectionProfiles/CDF-Tgt-%s", parentPath, replicatorId));
-    // TODO Replace below with response.get() to block until stream is successfully
-    //  created. So far this method call (getting the long running operation) has some issue for
-    //  java client.
-    waitUntilComplete(response);
+    operation = datastream.projects().locations().connectionProfiles()
+      .delete(String.format("%s/connectionProfiles/DF-GCS-%s", parentPath, replicatorId)).execute();
+    operation = waitUntilComplete(operation);
+    assertNull(operation.getError());
 
-    response = datastreamClient
-      .deleteStreamAsync(String.format("%s/streams/CDF-Stream-%s", parentPath, replicatorId));
-    // TODO Replace below with response.get() to block until stream is successfully
-    //  created. So far this method call (getting the long running operation) has some issue for
-    //  java client.
-    waitUntilComplete(response);
+    operation = datastream.projects().locations().streams()
+      .delete(String.format("%s/streams/DF-Stream-%s", parentPath, replicatorId)).execute();
+    operation = waitUntilComplete(operation);
+    assertNull(operation.getError());
 
     storage.delete(gcsBucket);
   }
 
 
-  private void waitUntilComplete(Future<?> future) throws InterruptedException {
-    while (!future.isDone() && !future.isCancelled()) {
+  private Operation waitUntilComplete(Operation operation) throws InterruptedException, IOException {
+    while (!operation.getDone()) {
       TimeUnit.MILLISECONDS.sleep(200L);
+      operation = datastream.projects().locations().operations().get(operation.getName()).execute();
     }
+    return operation;
   }
-  private void checkStream(String replicatorId) {
+  private void checkStream(String replicatorId) throws IOException {
     // Check source connection profile
-    String srcProfileName = String.format("CDF-Src-%s", replicatorId);
+    String srcProfileName = String.format("DF-ORA-%s", replicatorId);
     String srcProfilePath = String.format("%s/connectionProfiles/%s", parentPath, srcProfileName);
     ConnectionProfile srcProfile =
-      datastreamClient.getConnectionProfile(srcProfilePath);
+      datastream.projects().locations().connectionProfiles().get(srcProfilePath).execute();
     assertEquals(srcProfileName, srcProfile.getDisplayName());
     assertEquals(srcProfilePath, srcProfile.getName());
-    assertEquals(ConnectionProfile.ConnectivityCase.STATIC_SERVICE_IP_CONNECTIVITY, srcProfile.getConnectivityCase());
+    assertNotNull(srcProfile.getStaticServiceIpConnectivity());
+    assertNull(srcProfile.getForwardSshConnectivity());
+    assertNull(srcProfile.getNoConnectivity());
+    assertNull(srcProfile.getPrivateConnectivity());
     OracleProfile oracleProfile = srcProfile.getOracleProfile();
     assertEquals(oracleHost, oracleProfile.getHostname());
     assertEquals(oraclePort, oracleProfile.getPort());
     assertEquals(oracleUser, oracleProfile.getUsername());
     assertEquals(oracleDb, oracleProfile.getDatabaseService());
 
-    // Check target connection profile
-    String tgtProfileName = String.format("CDF-Tgt-%s", replicatorId);
-    String tgtProfilePath = String.format("%s/connectionProfiles/%s", parentPath, tgtProfileName);
-    ConnectionProfile tgtProfile =
-      datastreamClient.getConnectionProfile(tgtProfilePath);
-    assertEquals(tgtProfileName, tgtProfile.getDisplayName());
-    assertEquals(tgtProfilePath, tgtProfile.getName());
-    GcsProfile gcsProfile = tgtProfile.getGcsProfile();
+    // Check destination connection profile
+    String desProfileName = String.format("DF-GCS-%s", replicatorId);
+    String desProfilePath = String.format("%s/connectionProfiles/%s", parentPath, desProfileName);
+    ConnectionProfile desProfile =
+      datastream.projects().locations().connectionProfiles().get(desProfilePath).execute();
+    assertEquals(desProfileName, desProfile.getDisplayName());
+    assertEquals(desProfilePath, desProfile.getName());
+    GcsProfile gcsProfile = desProfile.getGcsProfile();
     assertEquals(gcsBucket, gcsProfile.getBucketName());
     assertEquals("/", gcsProfile.getRootPath());
 
     // Check stream
-    String streamName = String.format("CDF-Stream-%s", replicatorId);
+    String streamName = String.format("DF-Stream-%s", replicatorId);
     String streamPath = String.format("%s/streams/%s", parentPath, streamName);
-    Stream stream = datastreamClient.getStream(streamPath);
+    Stream stream = datastream.projects().locations().streams().get(streamPath).execute();
     assertEquals(streamName, stream.getDisplayName());
     assertEquals(streamPath, stream.getName());
 
@@ -248,17 +243,18 @@ class DatastreamDeltaSourceTest {
       sourceConnectionProfileName.substring(sourceConnectionProfileName.indexOf("/locations")));
     OracleSourceConfig oracleSourceConfig = sourceConfig.getOracleSourceConfig();
     OracleRdbms allowlist = oracleSourceConfig.getAllowlist();
-    allowlist.getOracleSchemasList().forEach(schema -> schema.getOracleTablesList().forEach(table -> {
+    allowlist.getOracleSchemas().forEach(schema -> schema.getOracleTables().forEach(table -> {
       assertTrue(oracleTables.contains(String.format("%s.%s", schema.getSchemaName(), table.getTableName())));
     }));
 
-    DestinationConfig tgtConfig = stream.getDestinationConfig();
-    String destinationConnectionProfileName = tgtConfig.getDestinationConnectionProfileName();
-    assertEquals(tgtProfilePath.substring(tgtProfilePath.indexOf("/locations")),
+    DestinationConfig desConfig = stream.getDestinationConfig();
+    String destinationConnectionProfileName = desConfig.getDestinationConnectionProfileName();
+    assertEquals(desProfilePath.substring(desProfilePath.indexOf("/locations")),
       destinationConnectionProfileName.substring(destinationConnectionProfileName.indexOf("/locations")));
-    GcsDestinationConfig gcsConfig = tgtConfig.getGcsDestinationConfig();
-    assertEquals(GcsFileFormat.AVRO, gcsConfig.getGcsFileFormat());
-    assertEquals(Duration.newBuilder().setSeconds(15).build(), gcsConfig.getFileRotationInterval());
+    GcsDestinationConfig gcsConfig = desConfig.getGcsDestinationConfig();
+    assertNotNull(gcsConfig.getAvroFileFormat());
+    assertNull(gcsConfig.getJsonFileFormat());
+    assertEquals("15s", gcsConfig.getFileRotationInterval());
     assertEquals(1, gcsConfig.getFileRotationMb());
     assertEquals("/" + streamName, gcsConfig.getPath());
   }
@@ -361,17 +357,8 @@ class DatastreamDeltaSourceTest {
     };
   }
 
-  private static DatastreamClient createDatastreamClient() {
-    try {
-      return DatastreamClient.create(DatastreamSettings.newBuilder().setCredentialsProvider(new CredentialsProvider() {
-        @Override
-        public Credentials getCredentials() throws IOException {
-          return credentials;
-        }
-      }).build());
-    } catch (IOException e) {
-      throw new IllegalArgumentException("Cannot create DatastreamSettings with Credentials: " + credentials, e);
-    }
+  private static DataStream createDatastreamClient() {
+    return new DataStream(new NetHttpTransport(), new JacksonFactory(), new HttpCredentialsAdapter(credentials));
   }
 
   private DatastreamConfig buildDatastreamConfig() {

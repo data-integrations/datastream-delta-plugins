@@ -253,10 +253,10 @@ public final class Utils {
         operation = datastream.projects().locations().operations().get(operation.getName()).execute();
       }
     } catch (Exception e) {
-      throw handleError(logger, String.format("Failed to query status of operation: %s", operation.toString()), e);
+      throw new RuntimeException(String.format("Failed to query status of operation: %s", operation.toString()), e);
     }
     if (operation.getError() != null) {
-      throw handleError(logger, String
+      throw new RuntimeException(String
         .format("Operation %s failed with error code :%s and error message: %s", operation.toString(),
           operation.getError().getCode(), operation.getError().getMessage()));
     }
@@ -336,29 +336,6 @@ public final class Utils {
   }
 
   /**
-   * Logs the error presented by the specified error message and return corresponding runtime exception
-   * @param logger the logger used to log the error
-   * @param errorMessage the error message of the error
-   * @return the corresponding runtime exception that wraps the error
-   */
-  public static RuntimeException handleError(Logger logger, String errorMessage) {
-    logger.error(errorMessage);
-    return new RuntimeException(errorMessage);
-  }
-
-  /**
-   * Logs the error presented by the specified error message and cause and return corresponding runtime exception
-   * @param logger the logger used to log the error
-   * @param errorMessage the error message of the error
-   * @param cause the cause of the error
-   * @return the corresponding runtime exception that wraps the error
-   */
-  public static RuntimeException handleError(Logger logger, String errorMessage, Exception cause) {
-    logger.error(errorMessage, cause);
-    return new RuntimeException(errorMessage, cause);
-  }
-
-  /**
    * Log the error with corresponding error message and construct the corresponding runtime exception with this message
    * @param logger the logger to log the error
    * @param context the Delta source context
@@ -367,7 +344,6 @@ public final class Utils {
    */
   public static RuntimeException handleError(Logger logger, DeltaSourceContext context, String errorMessage) {
     RuntimeException e = new RuntimeException(errorMessage);
-    logger.error(errorMessage);
     setError(logger, context, e);
     return e;
   }
@@ -383,7 +359,6 @@ public final class Utils {
    */
   public static RuntimeException handleError(Logger logger, DeltaSourceContext context, String errorMessage,
     Exception cause) {
-    logger.error(errorMessage, cause);
     setError(logger, context, cause);
     return new RuntimeException(errorMessage, cause);
   }

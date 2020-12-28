@@ -23,7 +23,6 @@ import io.cdap.delta.api.DMLEvent;
 import io.cdap.delta.api.DMLOperation;
 import io.cdap.delta.api.DeltaSourceContext;
 import io.cdap.delta.api.Offset;
-import io.cdap.delta.api.ReplicationError;
 import io.cdap.delta.api.SourceTable;
 import io.cdap.delta.datastream.util.Utils;
 import org.apache.avro.file.DataFileReader;
@@ -173,23 +172,13 @@ public class DatastreamEventConsumer {
     try {
        reader = new DataFileReader<>(input, datumReader);
     } catch (IOException e) {
-      LOGGER.error("Failed to read or parse file : " + currentPath, e);
-      try {
-        context.setError(new ReplicationError(e));
-      } catch (IOException ioException) {
-        LOGGER.error("Error setting error in context!", e);
-        throw new RuntimeException(ioException);
-      }
-      throw new RuntimeException(e);
+      throw Utils.handleError(LOGGER, context, "Failed to read or parse file : " + currentPath, e);
     }
     for (int i = 0; i < position; i++) {
       if (reader.hasNext()) {
         reader.next();
       } else {
-        throw handleError(
-          LOGGER, context,
-          String.format("starting position %d exceeds the max position %d in path: %s", position, i - 1,
-            currentPath));
+        break;
       }
     }
     return reader;

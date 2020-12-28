@@ -19,7 +19,6 @@ package io.cdap.delta.datastream;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import io.cdap.cdap.api.annotation.Description;
-import io.cdap.cdap.api.annotation.Macro;
 import io.cdap.cdap.api.plugin.PluginConfig;
 
 import java.io.ByteArrayInputStream;
@@ -56,7 +55,6 @@ public class DatastreamConfig extends PluginConfig {
   @Description("Username to use to connect to the Oracle server.")
   private String user;
 
-  @Macro
   @Description("Password to use to connect to the Oracle server.")
   private String password;
 
@@ -100,7 +98,6 @@ public class DatastreamConfig extends PluginConfig {
   // "Password"
   private String sshPassword;
 
-  @Macro
   @Nullable
   @Description("Private key of the login on the SSH Server.")
   // only required when connectivity method is  "Forward SSH Tunnel" and authentication method is
@@ -117,11 +114,14 @@ public class DatastreamConfig extends PluginConfig {
   private String gcsPathPrefix;
 
 
-  @Macro
   @Nullable
   @Description("The service account key of the service account that will be used to read " +
     "DataStream results from GCS Bucket. By default Dataproc service account will be used.")
   private String gcsServiceAccountKey;
+
+  @Nullable
+  @Description("The id of an existing Datastream stream that will be used to read CDC changes from.")
+  private String streamId;
 
 
   public String getHost() {
@@ -148,6 +148,10 @@ public class DatastreamConfig extends PluginConfig {
     return region == null || region.isEmpty() ? DEFAULT_REGION : region;
   }
 
+  @Nullable
+  public String getStreamId() {
+    return streamId;
+  }
 
   public String getConnectivityMethod() {
     return connectivityMethod == null || connectivityMethod
@@ -224,7 +228,8 @@ public class DatastreamConfig extends PluginConfig {
                           @Nullable Integer sshPort, @Nullable String sshUser,
                           @Nullable String sshAuthenticationMethod, @Nullable String sshPassword,
                           @Nullable String sshPrivateKey, @Nullable String gcsBucket,
-                          @Nullable String gcsPathPrefix, @Nullable String gcsServiceAccountKey) {
+                          @Nullable String gcsPathPrefix, @Nullable String gcsServiceAccountKey,
+    @Nullable String streamId) {
     this.host = host;
     this.port = port;
     this.user = user;
@@ -241,6 +246,7 @@ public class DatastreamConfig extends PluginConfig {
     this.gcsBucket = gcsBucket;
     this.gcsPathPrefix = gcsPathPrefix;
     this.gcsServiceAccountKey = gcsServiceAccountKey;
+    this.streamId = streamId;
     validate();
   }
 

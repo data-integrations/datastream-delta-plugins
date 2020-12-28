@@ -13,6 +13,7 @@ Tests require an actual connection to GCP. To run the tests, set the following s
   -Doracle.database=[Oracle DB SID]
   -Dgcs.bucket=[GCSBucket Name for writing DataStream result]
   -Doracle.tables=[List of tables to be replicated, separated by comma]
+  -Dstream.id =[Id of existing Datastream stream id]
   
 The GCP project should already enabled DataStream API.
 

@@ -20,18 +20,12 @@ package io.cdap.delta.datastream;
 import com.google.common.io.ByteStreams;
 import io.cdap.cdap.api.data.format.StructuredRecord;
 import io.cdap.cdap.api.data.schema.Schema;
-import io.cdap.cdap.api.macro.InvalidMacroException;
-import io.cdap.cdap.api.macro.MacroEvaluator;
-import io.cdap.cdap.api.metrics.Metrics;
-import io.cdap.cdap.api.plugin.PluginProperties;
 import io.cdap.delta.api.DMLEvent;
 import io.cdap.delta.api.DMLOperation;
-import io.cdap.delta.api.DeltaPipelineId;
-import io.cdap.delta.api.DeltaSourceContext;
 import io.cdap.delta.api.Offset;
-import io.cdap.delta.api.ReplicationError;
 import io.cdap.delta.api.SourceColumn;
 import io.cdap.delta.api.SourceTable;
+import io.cdap.delta.datastream.util.MockSourceContext;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -40,7 +34,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -63,7 +56,7 @@ class DatastreamEventConsumerTest {
     Schema.Type columnType1 = Schema.Type.STRING;
     String column2 = "MIN_SALARY";
     Schema.Type columnType2 = Schema.Type.LONG;
-    DatastreamEventConsumer consumer = new DatastreamEventConsumer(content, buildContext(), path,
+    DatastreamEventConsumer consumer = new DatastreamEventConsumer(content, new MockSourceContext(), path,
       new SourceTable(database, table, schema,
         new HashSet<>(Arrays.asList(new SourceColumn(column1), new SourceColumn(column2))),
         new HashSet<>(Arrays.asList(DMLOperation.Type.INSERT)), Collections.emptySet()), startingPosition, state);
@@ -109,7 +102,7 @@ class DatastreamEventConsumerTest {
     Schema.Type columnType1 = Schema.Type.STRING;
     String column2 = "MIN_SALARY";
     Schema.Type columnType2 = Schema.Type.LONG;
-    DatastreamEventConsumer consumer = new DatastreamEventConsumer(content, buildContext(), path,
+    DatastreamEventConsumer consumer = new DatastreamEventConsumer(content, new MockSourceContext(), path,
       new SourceTable(database, table, schema,
         new HashSet<>(Arrays.asList(new SourceColumn(column1), new SourceColumn(column2))),
         new HashSet<>(Arrays.asList(DMLOperation.Type.INSERT)), Collections.emptySet()), startingPosition, state);
@@ -130,7 +123,7 @@ class DatastreamEventConsumerTest {
     Schema.Type columnType1 = Schema.Type.STRING;
     String column2 = "MIN_SALARY";
     Schema.Type columnType2 = Schema.Type.LONG;
-    DatastreamEventConsumer consumer = new DatastreamEventConsumer(content, buildContext(), path,
+    DatastreamEventConsumer consumer = new DatastreamEventConsumer(content, new MockSourceContext(), path,
       new SourceTable(database, table, schema,
         new HashSet<>(Arrays.asList(new SourceColumn(column1), new SourceColumn(column2))),
         Collections.emptySet(), Collections.emptySet()), startingPosition, state);
@@ -176,7 +169,7 @@ class DatastreamEventConsumerTest {
     Schema.Type columnType1 = Schema.Type.STRING;
     String column2 = "MIN_SALARY";
     Schema.Type columnType2 = Schema.Type.LONG;
-    DatastreamEventConsumer consumer = new DatastreamEventConsumer(content, buildContext(), path,
+    DatastreamEventConsumer consumer = new DatastreamEventConsumer(content, new MockSourceContext(), path,
       new SourceTable(database, table, schema,
         new HashSet<>(Arrays.asList(new SourceColumn(column1), new SourceColumn(column2))),
         Collections.emptySet(), Collections.emptySet()), startingPosition, state);
@@ -222,7 +215,7 @@ class DatastreamEventConsumerTest {
     Schema.Type columnType1 = Schema.Type.STRING;
     String column2 = "MIN_SALARY";
     Schema.Type columnType2 = Schema.Type.LONG;
-    DatastreamEventConsumer consumer = new DatastreamEventConsumer(content, buildContext(), path,
+    DatastreamEventConsumer consumer = new DatastreamEventConsumer(content, new MockSourceContext(), path,
       new SourceTable(database, table, schema,
         new HashSet<>(Arrays.asList(new SourceColumn(column1), new SourceColumn(column2))),
         Collections.emptySet(), Collections.emptySet()), startingPosition, state);
@@ -254,101 +247,4 @@ class DatastreamEventConsumerTest {
     }
     assertEquals(1, count);
   }
-
-  private DeltaSourceContext buildContext() {
-    return new DeltaSourceContext() {
-      @Override
-      public void setError(ReplicationError replicationError) throws IOException {
-
-      }
-
-      @Override
-      public void setOK() throws IOException {
-
-      }
-
-      @Override
-      public String getApplicationName() {
-        return null;
-      }
-
-      @Override
-      public String getRunId() {
-        return null;
-      }
-
-      @Override
-      public Metrics getMetrics() {
-        return null;
-      }
-
-      @Override
-      public Map<String, String> getRuntimeArguments() {
-        return null;
-      }
-
-      @Override
-      public int getInstanceId() {
-        return 0;
-      }
-
-      @Override
-      public int getMaxRetrySeconds() {
-        return 0;
-      }
-
-      @Override
-      public byte[] getState(String s) throws IOException {
-        return new byte[0];
-      }
-
-      @Override
-      public void putState(String s, byte[] bytes) throws IOException {
-
-      }
-
-      @Override
-      public DeltaPipelineId getPipelineId() {
-        return null;
-      }
-
-      @Override
-      public Set<SourceTable> getAllTables() {
-        return null;
-      }
-
-      @Override
-      public PluginProperties getPluginProperties(String s) {
-        return null;
-      }
-
-      @Override
-      public PluginProperties getPluginProperties(String s, MacroEvaluator macroEvaluator)
-        throws InvalidMacroException {
-        return null;
-      }
-
-      @Override
-      public <T> Class<T> loadPluginClass(String s) {
-        return null;
-      }
-
-      @Override
-      public <T> T newPluginInstance(String s) throws InstantiationException {
-        return null;
-      }
-
-      @Override
-      public <T> T newPluginInstance(String s, MacroEvaluator macroEvaluator)
-        throws InstantiationException, InvalidMacroException {
-        return null;
-      }
-
-      @Override
-      public void notifyFailed(Throwable throwable) {
-
-      }
-    };
-  }
-
 }

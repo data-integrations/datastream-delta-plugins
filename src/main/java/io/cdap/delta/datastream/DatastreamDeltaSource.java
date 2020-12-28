@@ -78,8 +78,14 @@ public class DatastreamDeltaSource implements DeltaSource {
     storage = StorageOptions.newBuilder().setCredentials(config.getGcsCredentials())
       .setProjectId(ServiceOptions.getDefaultProjectId()).build().getService();
     datastream = createDatastreamClient();
-    // TODO reuse an existing datastream provided by user
-    createStreamIfNotExisted(context);
+    parentPath = Utils.buildParentPath(config.getRegion());
+
+    if (config.getStreamId() != null && !config.getStreamId().isEmpty()) {
+      datastream.projects().locations().streams().get(Utils.buildStreamPath(parentPath, config.getStreamId()))
+        .execute();
+    } else {
+      createStreamIfNotExisted(context);
+    }
   }
 
   private DataStream createDatastreamClient() throws IOException {
@@ -90,7 +96,8 @@ public class DatastreamDeltaSource implements DeltaSource {
 
   @Override
   public void configure(SourceConfigurer configurer) {
-    configurer.setProperties(new SourceProperties.Builder().setRowIdSupported(true).build());
+    configurer.setProperties(new SourceProperties.Builder().setRowIdSupported(true).setOrdering(
+      SourceProperties.Ordering.UN_ORDERED).build());
   }
 
   @Override
@@ -110,7 +117,7 @@ public class DatastreamDeltaSource implements DeltaSource {
   }
 
   private void createStreamIfNotExisted(DeltaSourceContext context) throws IOException {
-    String parentPath = Utils.buildParentPath(config.getRegion());
+
     String replicatorId = Utils.buildReplicatorId(context);
     String streamName = Utils.buildStreamName(replicatorId);
     String streamPath = Utils.buildStreamPath(parentPath, streamName);

@@ -24,7 +24,6 @@ import com.google.api.services.datastream.v1alpha1.model.OracleColumn;
 import com.google.api.services.datastream.v1alpha1.model.OracleRdbms;
 import com.google.api.services.datastream.v1alpha1.model.OracleSchema;
 import com.google.api.services.datastream.v1alpha1.model.OracleTable;
-import com.google.cloud.ServiceOptions;
 import com.google.common.collect.Iterables;
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.delta.api.assessment.ColumnDetail;
@@ -70,9 +69,7 @@ public class DatastreamTableRegistry implements TableRegistry {
     this.config = config;
     this.datastream = datastream;
     //TODO validate whether the region is valid
-
-    this.parentPath =
-      String.format("projects/%s/locations/%s", ServiceOptions.getDefaultProjectId(), config.getRegion());
+    this.parentPath = Utils.buildParentPath(config.getRegion());
   }
 
   @Override
@@ -119,11 +116,12 @@ public class DatastreamTableRegistry implements TableRegistry {
     OracleSchema oracleSchema =
       Iterables.getOnlyElement(discoverResponse.getOracleRdbms().getOracleSchemas());
     OracleTable oracleTable = Iterables.getOnlyElement(oracleSchema.getOracleTables());
-
     List<ColumnDetail> columns = new ArrayList<>(oracleTable.getOracleColumns().size());
     List<String> primaryKeys = new ArrayList<>();
     for (OracleColumn column : oracleTable.getOracleColumns()) {
       Map<String, String> properties = new HashMap<>();
+      LOGGER.debug(String.format("Found column : %s, data type : %s, precision: %s, scale: %s ",
+        column.getColumnName(), column.getDataType(), column.getPrecision(), column.getScale()));
       if (column.getPrecision() != null) {
         properties.put(DatastreamTableAssessor.PRECISION, Integer.toString(column.getPrecision()));
       }
@@ -160,17 +158,25 @@ public class DatastreamTableRegistry implements TableRegistry {
   }
 
   private DiscoverConnectionProfileResponse discover(String schema, String table) throws IOException {
-    DiscoverConnectionProfileRequest request =
-      new DiscoverConnectionProfileRequest().setConnectionProfile(Utils.buildOracleConnectionProfile(null, config))
-        .setOracleRdbms(new OracleRdbms().setOracleSchemas(Arrays.asList(new OracleSchema().setSchemaName(schema)
-          .setOracleTables(Arrays.asList(new OracleTable().setTableName(table))))));
+    DiscoverConnectionProfileRequest request = buildDiscoverConnectionProfileRequest().setOracleRdbms(new OracleRdbms()
+      .setOracleSchemas(Arrays.asList(new OracleSchema().setSchemaName(schema)
+        .setOracleTables(Arrays.asList(new OracleTable().setTableName(table))))));
     return datastream.projects().locations().connectionProfiles().discover(parentPath, request).execute();
   }
 
   private DiscoverConnectionProfileResponse discover() throws IOException {
-    DiscoverConnectionProfileRequest request =
-      new DiscoverConnectionProfileRequest().setConnectionProfile(Utils.buildOracleConnectionProfile(null, config))
-        .setRecursive(true);
-    return datastream.projects().locations().connectionProfiles().discover(parentPath, request).execute();
+    return datastream.projects().locations().connectionProfiles()
+      .discover(parentPath, buildDiscoverConnectionProfileRequest().setRecursive(true)).execute();
+  }
+
+  private DiscoverConnectionProfileRequest buildDiscoverConnectionProfileRequest() throws IOException {
+    if (config.getStreamId() == null || config.getStreamId().isEmpty()) {
+      return new DiscoverConnectionProfileRequest()
+        .setConnectionProfile(Utils.buildOracleConnectionProfile(null, config));
+    } else {
+      return new DiscoverConnectionProfileRequest().setConnectionProfileName(
+        datastream.projects().locations().streams().get(Utils.buildStreamPath(parentPath, config.getStreamId()))
+          .execute().getSourceConfig().getSourceConnectionProfileName());
+    }
   }
 }

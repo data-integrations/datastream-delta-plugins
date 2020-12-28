@@ -57,6 +57,11 @@
           }
         },
         {
+          "name": "streamName",
+          "label": "Existing Datastream stream ID",
+          "widget-type": "textbox"
+        },
+        {
           "label": "Connectivity Method",
           "name": "connectivityMethod",
           "widget-type": "radio-group",

@@ -35,13 +35,16 @@ import com.google.api.services.datastream.v1alpha1.model.SourceConfig;
 import com.google.api.services.datastream.v1alpha1.model.StaticServiceIpConnectivity;
 import com.google.api.services.datastream.v1alpha1.model.Stream;
 import com.google.cloud.ServiceOptions;
+import com.google.common.base.Joiner;
 import io.cdap.delta.api.DeltaPipelineId;
 import io.cdap.delta.api.DeltaSourceContext;
+import io.cdap.delta.api.ReplicationError;
 import io.cdap.delta.api.SourceTable;
 import io.cdap.delta.datastream.DatastreamConfig;
 import io.cdap.delta.datastream.OracleDataType;
 import org.slf4j.Logger;
 
+import java.io.IOException;
 import java.sql.SQLType;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -250,10 +253,10 @@ public final class Utils {
         operation = datastream.projects().locations().operations().get(operation.getName()).execute();
       }
     } catch (Exception e) {
-      throw handleError(logger, String.format("Failed to query status of operation: %s", operation.toString()), e);
+      throw new RuntimeException(String.format("Failed to query status of operation: %s", operation.toString()), e);
     }
     if (operation.getError() != null) {
-      throw handleError(logger, String
+      throw new RuntimeException(String
         .format("Operation %s failed with error code :%s and error message: %s", operation.toString(),
           operation.getError().getCode(), operation.getError().getMessage()));
     }
@@ -333,25 +336,55 @@ public final class Utils {
   }
 
   /**
-   * Logs the error presented by the specified error message and cause and return corresponding runtime exception
-   * @param logger the logger used to log the error
-   * @param errorMessage the error message of the error
-   * @param cause the cause of the error
-   * @return the corresponding runtime exception that wraps the error
+   * Log the error with corresponding error message and construct the corresponding runtime exception with this message
+   * @param logger the logger to log the error
+   * @param context the Delta source context
+   * @param errorMessage the error message
+   * @return the runtime exception constructed from the error message
    */
-  public static RuntimeException handleError(Logger logger, String errorMessage, Exception cause) {
-    logger.error(errorMessage, cause);
+  public static RuntimeException handleError(Logger logger, DeltaSourceContext context, String errorMessage) {
+    RuntimeException e = new RuntimeException(errorMessage);
+    setError(logger, context, e);
+    return e;
+  }
+
+  /**
+   * Log the error with corresponding error message and the exception of the cause of the error and construct the
+   * runtime exception with this message and cause
+   * @param logger the logger to log the error
+   * @param context the Delta source context
+   * @param errorMessage the error message
+   * @param cause the exception for the cause of error
+   * @return the runtime exception constructed from the error message and the casue
+   */
+  public static RuntimeException handleError(Logger logger, DeltaSourceContext context, String errorMessage,
+    Exception cause) {
+    setError(logger, context, cause);
     return new RuntimeException(errorMessage, cause);
   }
 
   /**
-   * Logs the error presented by the specified error message and return corresponding runtime exception
-   * @param logger the logger used to log the error
-   * @param errorMessage the error message of the error
-   * @return the corresponding runtime exception that wraps the error
+   * Set the error in the Delta source context
+   * @param logger the logger to log the error
+   * @param context the Delta source context
+   * @param cause the exception for the cause
    */
-  public static RuntimeException handleError(Logger logger, String errorMessage) {
-    logger.error(errorMessage);
-    return new RuntimeException(errorMessage);
+  public static void setError(Logger logger, DeltaSourceContext context, Exception cause) {
+    try {
+      context.setError(new ReplicationError(cause));
+    } catch (IOException ioException) {
+      logger.error("Error setting error in context!", cause);
+      throw new RuntimeException(ioException);
+    }
+  }
+
+  /**
+   * Build a table name with schema name as prefix if schema name is not null
+   * @param schema name of the schema where the table is in
+   * @param table name of the table
+   * @return a composite table name prefixed with schema name if schema name is not null
+   */
+  public static String buildCompositeTableName(String schema, String table) {
+    return Joiner.on("_").skipNulls().join(schema , table);
   }
 }

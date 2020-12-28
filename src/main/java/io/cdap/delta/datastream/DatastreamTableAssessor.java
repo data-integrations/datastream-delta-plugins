@@ -96,10 +96,10 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         schema = Schema.of(Type.INT);
         break;
       case NUMBER:
-        if (precision == null || precision.isEmpty() || scale == null || scale.isEmpty()) {
+        if (precision == null || precision.isEmpty()) {
           schema = Schema.of(Type.STRING);
         } else {
-          if (parseInt(oracleDataType, "scale", scale) == 0) {
+          if (scale == null || scale.isEmpty() || parseInt(oracleDataType, "scale", scale) == 0) {
             schema = Schema.of(Type.LONG);
           } else {
             schema = Schema.decimalOf(parseInt(oracleDataType, "precision", precision), parseInt(oracleDataType,

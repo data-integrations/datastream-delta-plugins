@@ -82,7 +82,7 @@ public class DatastreamEventReader implements EventReader {
     try {
       stream = datastream.projects().locations().streams().get(streamPath).execute();
     } catch (IOException e) {
-      throw Utils.handleError(LOGGER, String.format("Failed to get stream: %s", streamPath), e);
+      throw Utils.handleError(LOGGER, context, String.format("Failed to get stream: %s", streamPath), e);
     }
 
     Operation operation = null;
@@ -90,13 +90,13 @@ public class DatastreamEventReader implements EventReader {
       try {
         operation = datastream.projects().locations().streams().resume(streamPath, new ResumeStreamRequest()).execute();
       } catch (IOException e) {
-        throw Utils.handleError(LOGGER, String.format("Failed to resume stream: %s", streamPath), e);
+        throw Utils.handleError(LOGGER, context, String.format("Failed to resume stream: %s", streamPath), e);
       }
     } else if (STREAM_STATE_CREATED.equals(stream.getState())) {
       try {
         operation = datastream.projects().locations().streams().start(streamPath, new StartStreamRequest()).execute();
       } catch (IOException e) {
-        throw Utils.handleError(LOGGER, String.format("Failed to start stream: %s", streamPath), e);
+        throw Utils.handleError(LOGGER, context, String.format("Failed to start stream: %s", streamPath), e);
       }
     }
 

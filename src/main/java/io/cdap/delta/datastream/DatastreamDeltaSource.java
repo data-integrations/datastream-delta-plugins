@@ -80,7 +80,7 @@ public class DatastreamDeltaSource implements DeltaSource {
     datastream = createDatastreamClient();
     parentPath = Utils.buildParentPath(config.getRegion());
 
-    if (config.getStreamId() != null && !config.getStreamId().isEmpty()) {
+    if (config.isUsingExistingStream()) {
       datastream.projects().locations().streams().get(Utils.buildStreamPath(parentPath, config.getStreamId()))
         .execute();
     } else {

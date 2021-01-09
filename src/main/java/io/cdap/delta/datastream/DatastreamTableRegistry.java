@@ -170,13 +170,13 @@ public class DatastreamTableRegistry implements TableRegistry {
   }
 
   private DiscoverConnectionProfileRequest buildDiscoverConnectionProfileRequest() throws IOException {
-    if (config.getStreamId() == null || config.getStreamId().isEmpty()) {
-      return new DiscoverConnectionProfileRequest()
-        .setConnectionProfile(Utils.buildOracleConnectionProfile(null, config));
-    } else {
+    if (config.isUsingExistingStream()) {
       return new DiscoverConnectionProfileRequest().setConnectionProfileName(
         datastream.projects().locations().streams().get(Utils.buildStreamPath(parentPath, config.getStreamId()))
           .execute().getSourceConfig().getSourceConnectionProfileName());
+    } else {
+      return new DiscoverConnectionProfileRequest()
+        .setConnectionProfile(Utils.buildOracleConnectionProfile(null, config));
     }
   }
 }

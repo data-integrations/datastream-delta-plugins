@@ -40,7 +40,7 @@ public class DatastreamEventReaderTest extends BaseIntegrationTestCase {
   @Test
   public void testStart() throws Exception {
 
-    DatastreamConfig config = buildDatastreamConfig();
+    DatastreamConfig config = buildDatastreamConfig(true);
     DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
     DeltaSourceContext context =  new MockSourceContext();
     deltaSource.initialize(context);

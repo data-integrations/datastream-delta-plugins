@@ -74,7 +74,7 @@ public class DatastreamEventReader implements EventReader {
   public static final String PROCESSED_TIME_STATE_KEY_SUFFIX = ".processed.time";
   public static final String SOURCE_TIME_STATE_KEY_SUFFIX = ".source.time";
   public static final String PATH_STATE_KEY_SUFFIX = ".path";
-  private static final String DUMP_STATE_KEY_SUFFIX = ".dumped";
+  private static final String DUMP_STATE_KEY_SUFFIX = ".snapshot.done";
   private static final String SCAN_DONE_STATE_KEY_SUFFIX = ".last.done";
 
   // Datastream suggested 3 days scanning window
@@ -89,12 +89,12 @@ public class DatastreamEventReader implements EventReader {
   private final Storage storage;
   private final ScheduledExecutorService executorService;
   private final String streamPath;
-  // The GCS bucket in which datastream result is written to
-  private String bucketName;
-  // The root GCS path under which datastream result is written to
-  private String gcsRootPath;
   //Datastream allow each stream to specify a path prefix under which datastream result is written to
-  private String streamGcsPathPrefix;
+  private final String streamGcsPathPrefix;
+  // The root GCS path under which datastream result is written to
+  private final String gcsRootPath;
+  // The GCS bucket in which datastream result is written to
+  private final String bucketName;
 
   public DatastreamEventReader(DatastreamConfig config, EventReaderDefinition definition, DeltaSourceContext context,
     EventEmitter emitter, DataStream datastream, Storage storage) {
@@ -105,11 +105,8 @@ public class DatastreamEventReader implements EventReader {
     this.executorService = Executors.newSingleThreadScheduledExecutor();
     this.datastream = datastream;
     this.storage = storage;
-    String streamId = config.getStreamId();
-
-    if (streamId == null || streamId.isEmpty()) {
-      streamId = Utils.buildStreamName(Utils.buildReplicatorId(context));
-    }
+    String streamId = config.isUsingExistingStream() ? config.getStreamId() :
+      Utils.buildStreamName(Utils.buildReplicatorId(context));
     this.streamPath = Utils.buildStreamPath(Utils.buildParentPath(config.getRegion()), streamId);
 
     Stream stream;
@@ -118,13 +115,15 @@ public class DatastreamEventReader implements EventReader {
     } catch (IOException e) {
       throw Utils.handleError(LOGGER, context, "Failed to get stream : " + streamPath, e);
     }
-    this.streamGcsPathPrefix = stream.getDestinationConfig().getGcsDestinationConfig().getPath();
+    String path = stream.getDestinationConfig().getGcsDestinationConfig().getPath();
+    this.streamGcsPathPrefix =  path.startsWith("/") ? path.substring(1) : path;
     String gcsConnectionProfile = stream.getDestinationConfig().getDestinationConnectionProfileName();
     try {
       GcsProfile gcsProfile =
         datastream.projects().locations().connectionProfiles().get(gcsConnectionProfile).execute().getGcsProfile();
       this.bucketName = gcsProfile.getBucketName();
-      this.gcsRootPath = gcsProfile.getRootPath();
+      path = gcsProfile.getRootPath();
+      this.gcsRootPath = path.startsWith("/") ? path.substring(1) : path;
     } catch (IOException e) {
       throw Utils.handleError(LOGGER, context, "Failed to get GCS connection profile : " + gcsConnectionProfile, e);
     }
@@ -173,7 +172,7 @@ public class DatastreamEventReader implements EventReader {
   }
 
   class ScanTask implements Runnable {
-    private final HashMap<String, String> state;
+    private final Map<String, String> state;
 
     ScanTask(Offset offset) {
       this.state = new HashMap<>(offset.get());
@@ -191,7 +190,7 @@ public class DatastreamEventReader implements EventReader {
        Offset Structure:
 
        db.created                        → whether the db is created
-       ${table_name}.dumped              → whether the table is dumped
+       ${table_name}.snapshot.done       → whether the table is dumped
        ${table_name}.processed.time      → creation time of the last processed cdc/dump file for the table
                                            those files that was created before this timestamp won't be processed again
        ${table_name}.path                → the path of last scanned events file of the table
@@ -211,7 +210,7 @@ public class DatastreamEventReader implements EventReader {
        For each table do :
 
        // If snapshot is not done, scan only dump file
-       If table.dumped == false :
+       If table.snapshot.done == false :
          If  table.path is not in the state : // table has never been scanned even for dump file
              Scan table folders to get dump file folder
              emit DDL for create table
@@ -222,10 +221,10 @@ public class DatastreamEventReader implements EventReader {
          Read events from file from pos + 1
            emit Insert DML event  (table.pos = current pos , pos++)
 
-       If table.dumped is false and dump is completed
-         Set Offset: table.dumped = true;
+       If table.snapshot.done is false and dump is completed
+         Set Offset: table.snapshot.done = true;
 
-       If table.dumped is true
+       If table.snapshot.done is true
          scan all files starting from the table.source.timestamp - SLO or beginning :
          Start from current path
          If dump file skip
@@ -297,11 +296,7 @@ public class DatastreamEventReader implements EventReader {
             continue;
           }
           // dump is finished
-          saveDumped(tableName);
-          removePath(tableName);
-          removeTimeCreated(tableName);
-          clearPosition(tableName);
-
+          dumpCompleted(tableName);
         }
 
         // scanning window starts from ${table_name}.source.time - SLO
@@ -316,6 +311,13 @@ public class DatastreamEventReader implements EventReader {
         scanEvents(bucket.list(listOptions.toArray(new Storage.BlobListOption[listOptions.size()])), tableName,
           srcTable, false);
       }
+    }
+
+    private void dumpCompleted(String tableName) {
+      saveDumped(tableName);
+      removePath(tableName);
+      removeTimeCreated(tableName);
+      clearPosition(tableName);
     }
 
     private String getStartingSourceTime(String sourceTime) {
@@ -488,12 +490,11 @@ public class DatastreamEventReader implements EventReader {
     }
 
     private String buildReplicatorPathPrefix() {
-      // remove heading '/'
-      gcsRootPath = gcsRootPath.startsWith("/") ? gcsRootPath.substring(1) : gcsRootPath;
-      streamGcsPathPrefix = streamGcsPathPrefix.startsWith("/") ? streamGcsPathPrefix.substring(1) :
-        streamGcsPathPrefix;
       if (gcsRootPath.isEmpty()) {
         return streamGcsPathPrefix + "/";
+      }
+      if (streamGcsPathPrefix.isEmpty()) {
+        return gcsRootPath + "/";
       }
       return String.format("%s/%s/", gcsRootPath, streamGcsPathPrefix);
     }

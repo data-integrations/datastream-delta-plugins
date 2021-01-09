@@ -5,6 +5,45 @@
   "display-name": "DataStream(for Oracle)",
   "configuration-groups": [
     {
+      "label": "New or Existing Datastream Stream",
+      "properties": [
+        {
+          "name": "usingExistingStream",
+          "widget-type": "toggle",
+          "label": "Use an existing Datastream stream",
+          "widget-attributes": {
+            "default": "false",
+            "on": {
+              "value": "true",
+              "label": "Yes"
+            },
+            "off": {
+              "value": "false",
+              "label": "No"
+            }
+          }
+        },
+        {
+          "name": "region",
+          "label": "Region",
+          "widget-type": "textbox",
+          "widget-attributes": {
+            "default": "us-central1"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Existing Datastream Stream",
+      "properties": [
+        {
+          "name": "streamId",
+          "label": "Datastream stream identity",
+          "widget-type": "textbox"
+        }
+      ]
+    },
+    {
       "label": "Database Locations",
       "properties": [
         {
@@ -48,19 +87,6 @@
     {
       "label": "DataStream Configuration",
       "properties": [
-        {
-          "name": "region",
-          "label": "Region",
-          "widget-type": "textbox",
-          "widget-attributes": {
-            "default": "us-central1"
-          }
-        },
-        {
-          "name": "streamName",
-          "label": "Existing Datastream stream ID",
-          "widget-type": "textbox"
-        },
         {
           "label": "Connectivity Method",
           "name": "connectivityMethod",
@@ -152,6 +178,42 @@
   ],
   "outputs": [],
   "filters": [
+    {
+      "name": "showExistingStream",
+      "condition": {
+        "expression": "usingExistingStream == true"
+      },
+      "show": [
+        {
+          "type": "group",
+          "name": "Existing Datastream Stream"
+        }
+      ]
+    },
+    {
+      "name": "showNewStream",
+      "condition": {
+        "expression": "usingExistingStream == false"
+      },
+      "show": [
+        {
+          "type": "group",
+          "name": "Database Locations"
+        },
+        {
+          "type": "group",
+          "name": "Advanced"
+        },
+        {
+          "type": "group",
+          "name": "DataStream Configuration"
+        },
+        {
+          "type": "group",
+          "name": "Credentials"
+        }
+      ]
+    },
     {
       "name": "showSSH",
       "condition": {

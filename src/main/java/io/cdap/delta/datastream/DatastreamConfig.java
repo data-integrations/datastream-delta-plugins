@@ -19,6 +19,7 @@ package io.cdap.delta.datastream;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import io.cdap.cdap.api.annotation.Description;
+import io.cdap.cdap.api.annotation.Macro;
 import io.cdap.cdap.api.plugin.PluginConfig;
 
 import java.io.ByteArrayInputStream;
@@ -45,25 +46,39 @@ public class DatastreamConfig extends PluginConfig {
   public static final int DEFAULT_SSH_PORT = 22;
 
 
-  @Description("Hostname of the Oracle server to read from.")
+  @Description("Whether to use an existing Datastream stream.")
+  private boolean usingExistingStream;
+
+  @Nullable
+  @Description("Hostname of the Oracle server to read from. This information is required when you choose to create a " +
+    "new Datastream stream.")
   private String host;
 
   @Nullable
-  @Description("Port to use to connect to the Oracle server.")
+  @Description("Port to use to connect to the Oracle server. This information is required when you choose to create a" +
+    " new Datastream stream. By default \"" + DEFAULT_PORT + "\" will be used.")
   private Integer port;
 
-  @Description("Username to use to connect to the Oracle server.")
+  @Nullable
+  @Description("Username to use to connect to the Oracle server. This information is required when you choose to " +
+    "create a new Datastream stream.")
   private String user;
 
-  @Description("Password to use to connect to the Oracle server.")
+  @Nullable
+  @Macro
+  @Description("Password to use to connect to the Oracle server.  This information is required when you choose to " +
+    "create a new Datastream stream.")
   private String password;
 
   @Nullable
-  @Description("Oracle system identifier of the database to replicate changes from.")
+  @Description("Oracle system identifier of the database to replicate changes from.  This information is required " +
+    "when you choose to create a new Datastream stream. By default \"" + DEFAULT_SID + "\" will be used.")
   private String sid;
 
   @Nullable
-  @Description("Region of the DataStream instance to be created.")
+  @Description(
+    "Region of the existing Datastream stream or a new stream to be created. By default \"" + DEFAULT_REGION +
+      "\" will be used.")
   private String region;
 
   @Nullable
@@ -76,7 +91,7 @@ public class DatastreamConfig extends PluginConfig {
   private String sshHost;
 
   @Nullable
-  @Description("Port of the SSH Server to connect to.")
+  @Description("Port of the SSH Server to connect to. By default \"" + DEFAULT_SSH_PORT + "\" will be used.")
   // Cannot make sshPort an int, because UI will take this property as required and thus cannot hide
   // this property when IP allowlisting is selected as connectivity method
   // only required when connectivity method is  "Forward SSH Tunnel"
@@ -92,12 +107,14 @@ public class DatastreamConfig extends PluginConfig {
   // only required when connectivity method is  "Forward SSH Tunnel"
   private String sshAuthenticationMethod;
 
+  @Macro
   @Nullable
   @Description("Password of the login on the SSH Server.")
   // only required when connectivity method is  "Forward SSH Tunnel" and authentication method is
   // "Password"
   private String sshPassword;
 
+  @Macro
   @Nullable
   @Description("Private key of the login on the SSH Server.")
   // only required when connectivity method is  "Forward SSH Tunnel" and authentication method is
@@ -114,16 +131,23 @@ public class DatastreamConfig extends PluginConfig {
   private String gcsPathPrefix;
 
 
+  @Macro
   @Nullable
   @Description("The service account key of the service account that will be used to read " +
     "DataStream results from GCS Bucket. By default Dataproc service account will be used.")
   private String gcsServiceAccountKey;
 
   @Nullable
-  @Description("The id of an existing Datastream stream that will be used to read CDC changes from.")
+  @Description("The id of an existing Datastream stream that will be used to read CDC changes from.  This information" +
+    " is required when you choose to use an existing Datastream stream.")
   private String streamId;
 
 
+  public boolean isUsingExistingStream() {
+    return usingExistingStream;
+  }
+
+  @Nullable
   public String getHost() {
     return host;
   }
@@ -132,10 +156,12 @@ public class DatastreamConfig extends PluginConfig {
     return port == null ? DEFAULT_PORT : port;
   }
 
+  @Nullable
   public String getUser() {
     return user;
   }
 
+  @Nullable
   public String getPassword() {
     return password;
   }
@@ -163,7 +189,6 @@ public class DatastreamConfig extends PluginConfig {
     return sshHost;
   }
 
-  @Nullable
   public Integer getSshPort() {
     return sshPort == null ? DEFAULT_SSH_PORT : sshPort;
   }
@@ -222,14 +247,13 @@ public class DatastreamConfig extends PluginConfig {
     }
   }
 
-  public DatastreamConfig(String host, @Nullable Integer port, String user, String password,
-                          @Nullable String sid, @Nullable String region,
-                          @Nullable String connectivityMethod, @Nullable String sshHost,
-                          @Nullable Integer sshPort, @Nullable String sshUser,
-                          @Nullable String sshAuthenticationMethod, @Nullable String sshPassword,
-                          @Nullable String sshPrivateKey, @Nullable String gcsBucket,
-                          @Nullable String gcsPathPrefix, @Nullable String gcsServiceAccountKey,
+  public DatastreamConfig(boolean usingExistingStream, @Nullable String host, @Nullable Integer port,
+    @Nullable String user, @Nullable String password, @Nullable String sid, @Nullable String region,
+    @Nullable String connectivityMethod, @Nullable String sshHost, @Nullable Integer sshPort, @Nullable String sshUser,
+    @Nullable String sshAuthenticationMethod, @Nullable String sshPassword, @Nullable String sshPrivateKey,
+    @Nullable String gcsBucket, @Nullable String gcsPathPrefix, @Nullable String gcsServiceAccountKey,
     @Nullable String streamId) {
+    this.usingExistingStream = usingExistingStream;
     this.host = host;
     this.port = port;
     this.user = user;
@@ -256,28 +280,42 @@ public class DatastreamConfig extends PluginConfig {
    */
   public void validate() {
 
-    if (CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL.equals(connectivityMethod)) {
-      // have to annotate sshHost as nullable otherwise we cannot hide it when
-      // IP allowlisting is selected as connectivity method
-      if (sshHost == null || sshHost.isEmpty()) {
-        throw new IllegalArgumentException("Hostname of SSH Server is missing!");
+    if (usingExistingStream) {
+      if (streamId == null || streamId.isEmpty()) {
+        throw new IllegalArgumentException("Id of the existing Datastream stream is missing!");
       }
-
-      if (sshUser == null || sshUser.isEmpty()) {
-        throw new IllegalArgumentException("Username of SSH server is missing!");
+    } else {
+      if (host == null || host.isEmpty()) {
+        throw new IllegalArgumentException("Host of the database is missing!");
       }
-
-      if (AUTHENTICATION_METHOD_PASSWORD.equals(sshAuthenticationMethod)) {
-        if (sshPassword == null || sshPassword.isEmpty()) {
-          throw new IllegalArgumentException("Password of SSH server login is missing!");
+      if (user == null || user.isEmpty()) {
+        throw new IllegalArgumentException("Username of the database is missing!");
+      }
+      if (password == null || password.isEmpty()) {
+        throw new IllegalArgumentException("Password of the database is missing!");
+      }
+      if (CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL.equals(connectivityMethod)) {
+        // have to annotate sshHost as nullable otherwise we cannot hide it when
+        // IP allowlisting is selected as connectivity method
+        if (sshHost == null || sshHost.isEmpty()) {
+          throw new IllegalArgumentException("Hostname of SSH Server is missing!");
         }
-      } else {
-        // take it as the default value  -- private/public key pair
-        if (sshPrivateKey == null || sshPrivateKey.isEmpty()) {
-          throw new IllegalArgumentException("Private key of SSH server login is missing!");
+
+        if (sshUser == null || sshUser.isEmpty()) {
+          throw new IllegalArgumentException("Username of SSH server is missing!");
+        }
+
+        if (AUTHENTICATION_METHOD_PASSWORD.equals(sshAuthenticationMethod)) {
+          if (sshPassword == null || sshPassword.isEmpty()) {
+            throw new IllegalArgumentException("Password of SSH server login is missing!");
+          }
+        } else {
+          // take it as the default value  -- private/public key pair
+          if (sshPrivateKey == null || sshPrivateKey.isEmpty()) {
+            throw new IllegalArgumentException("Private key of SSH server login is missing!");
+          }
         }
       }
-
     }
   }
 

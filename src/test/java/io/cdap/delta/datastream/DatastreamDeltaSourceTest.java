@@ -47,7 +47,7 @@ class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
     String runId = "1234567890";
     long generation = 0;
 
-    DatastreamConfig config = buildDatastreamConfig();
+    DatastreamConfig config = buildDatastreamConfig(false);
     DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
     DeltaSourceContext context = new MockSourceContext(namspace, appName, generation, runId, oracleTables, oracleDb);
     if (gcsBucket == null) {

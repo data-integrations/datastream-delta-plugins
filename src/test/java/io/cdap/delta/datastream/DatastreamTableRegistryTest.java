@@ -37,7 +37,7 @@ class DatastreamTableRegistryTest extends BaseIntegrationTestCase {
   @Test
   public void testListDescribeTable_IPallowList() throws IOException, TableNotFoundException {
     TableList tableList = null;
-    DatastreamConfig config = buildDatastreamConfig();
+    DatastreamConfig config = buildDatastreamConfig(false);
     try (DatastreamTableRegistry registry = new DatastreamTableRegistry(config, datastream)) {
       tableList = registry.listTables();
     }

@@ -5,7 +5,7 @@
   "display-name": "DataStream(for Oracle)",
   "configuration-groups": [
     {
-      "label": "New or Existing Datastream Stream",
+      "label": "Common Information",
       "properties": [
         {
           "name": "usingExistingStream",
@@ -29,6 +29,14 @@
           "widget-type": "textbox",
           "widget-attributes": {
             "default": "us-central1"
+          }
+        },
+        {
+          "name": "gcsServiceAccountKey",
+          "label": "Service Account Key",
+          "widget-type": "securekey-textarea",
+          "widget-attributes": {
+            "default": "auto-detect"
           }
         }
       ]
@@ -157,11 +165,6 @@
           "name": "gcsBucket",
           "label": "GCS Bucket",
           "widget-type": "textbox"
-        },
-        {
-          "name": "gcsServiceAccountKey",
-          "label": "Service Account Key",
-          "widget-type": "securekey-textarea"
         }
       ]
     },

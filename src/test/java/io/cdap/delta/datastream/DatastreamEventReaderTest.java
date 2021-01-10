@@ -74,7 +74,7 @@ public class DatastreamEventReaderTest extends BaseIntegrationTestCase {
 
       @Override
       public void emit(DMLEvent dmlEvent) throws InterruptedException {
-        System.out.println("DDLEvent:" + dmleventsNum++ + "-" + GSON.toJson(dmlEvent));
+        System.out.println("DMLEvent:" + dmleventsNum++ + "-" + GSON.toJson(dmlEvent));
       }
     };
   }

@@ -77,7 +77,18 @@ public class DatastreamTableRegistry implements TableRegistry {
     LOGGER.debug("List tables...");
     List<TableSummary> tables = new ArrayList<>();
 
-    DiscoverConnectionProfileResponse response = discover();
+    String databaseName;
+    String sourceConnectionProfileName = null;
+    if (config.isUsingExistingStream()) {
+      sourceConnectionProfileName =
+        datastream.projects().locations().streams().get(Utils.buildStreamPath(parentPath, config.getStreamId()))
+          .execute().getSourceConfig().getSourceConnectionProfileName();
+      databaseName = datastream.projects().locations().connectionProfiles().get(sourceConnectionProfileName).execute()
+        .getOracleProfile().getDatabaseService();
+    } else {
+      databaseName = config.getSid();
+    }
+    DiscoverConnectionProfileResponse response = discover(sourceConnectionProfileName);
     if (response.getOracleRdbms().getOracleSchemas() == null) {
       return new TableList(tables);
     }
@@ -93,7 +104,7 @@ public class DatastreamTableRegistry implements TableRegistry {
       }
       for (OracleTable table : schema.getOracleTables()) {
         String tableName = table.getTableName();
-        tables.add(new TableSummary(config.getSid(), tableName,
+        tables.add(new TableSummary(databaseName, tableName,
           table.getOracleColumns() == null ? 0 : table.getOracleColumns().size(), schemaName));
       }
     }
@@ -105,7 +116,9 @@ public class DatastreamTableRegistry implements TableRegistry {
     LOGGER.debug(String.format("Describe table, db: %s, table: %s, schema: %s", db, table, schema));
     DiscoverConnectionProfileResponse discoverResponse;
     try {
-      discoverResponse = discover(schema, table);
+      discoverResponse = discover(schema, table, config.isUsingExistingStream() ?
+        datastream.projects().locations().streams().get(Utils.buildStreamPath(parentPath, config.getStreamId()))
+          .execute().getSourceConfig().getSourceConnectionProfileName() : null);
     } catch (GoogleJsonResponseException e) {
       if (e.getStatusCode() == 404) {
         throw new TableNotFoundException(db, schema, table, e.getMessage(), e);
@@ -157,26 +170,26 @@ public class DatastreamTableRegistry implements TableRegistry {
   public void close() throws IOException {
   }
 
-  private DiscoverConnectionProfileResponse discover(String schema, String table) throws IOException {
-    DiscoverConnectionProfileRequest request = buildDiscoverConnectionProfileRequest().setOracleRdbms(new OracleRdbms()
-      .setOracleSchemas(Arrays.asList(new OracleSchema().setSchemaName(schema)
+  private DiscoverConnectionProfileResponse discover(String schema, String table, String sourceConnectionProfileName)
+    throws IOException {
+    DiscoverConnectionProfileRequest request = buildDiscoverConnectionProfileRequest(sourceConnectionProfileName)
+      .setOracleRdbms(new OracleRdbms().setOracleSchemas(Arrays.asList(new OracleSchema().setSchemaName(schema)
         .setOracleTables(Arrays.asList(new OracleTable().setTableName(table))))));
     return datastream.projects().locations().connectionProfiles().discover(parentPath, request).execute();
   }
 
-  private DiscoverConnectionProfileResponse discover() throws IOException {
+  private DiscoverConnectionProfileResponse discover(String sourceConnectionProfileName) throws IOException {
     return datastream.projects().locations().connectionProfiles()
-      .discover(parentPath, buildDiscoverConnectionProfileRequest().setRecursive(true)).execute();
+      .discover(parentPath, buildDiscoverConnectionProfileRequest(sourceConnectionProfileName).setRecursive(true))
+      .execute();
   }
 
-  private DiscoverConnectionProfileRequest buildDiscoverConnectionProfileRequest() throws IOException {
-    if (config.isUsingExistingStream()) {
-      return new DiscoverConnectionProfileRequest().setConnectionProfileName(
-        datastream.projects().locations().streams().get(Utils.buildStreamPath(parentPath, config.getStreamId()))
-          .execute().getSourceConfig().getSourceConnectionProfileName());
-    } else {
+  private DiscoverConnectionProfileRequest buildDiscoverConnectionProfileRequest(String sourceConnectionProfileName)
+    throws IOException {
+    if (sourceConnectionProfileName == null || sourceConnectionProfileName.isEmpty()) {
       return new DiscoverConnectionProfileRequest()
         .setConnectionProfile(Utils.buildOracleConnectionProfile(null, config));
     }
+    return new DiscoverConnectionProfileRequest().setConnectionProfileName(sourceConnectionProfileName);
   }
 }

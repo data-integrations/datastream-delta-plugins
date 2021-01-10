@@ -36,7 +36,9 @@ import com.google.api.services.datastream.v1alpha1.model.OracleRdbms;
 import com.google.api.services.datastream.v1alpha1.model.OracleSchema;
 import com.google.api.services.datastream.v1alpha1.model.OracleSourceConfig;
 import com.google.api.services.datastream.v1alpha1.model.OracleTable;
+import com.google.api.services.datastream.v1alpha1.model.PauseStreamRequest;
 import com.google.api.services.datastream.v1alpha1.model.SourceConfig;
+import com.google.api.services.datastream.v1alpha1.model.StartStreamRequest;
 import com.google.api.services.datastream.v1alpha1.model.StaticServiceIpConnectivity;
 import com.google.api.services.datastream.v1alpha1.model.Stream;
 import com.google.auth.Credentials;
@@ -193,15 +195,31 @@ public class DatastreamClientTest {
     streamCreationOperation = waitUntilComplete(streamCreationOperation);
     assertNull(streamCreationOperation.getError());
 
-    assertNotNull(datastream.projects().locations().streams().get(buildStreamPath(streamName)).execute());
+    String streamPath = buildStreamPath(streamName);
+    assertNotNull(datastream.projects().locations().streams().get(streamPath).execute());
+    Operation streamStartOperation =
+      datastream.projects().locations().streams().start(streamPath, new StartStreamRequest())
+        .execute();
+    streamStartOperation = waitUntilComplete(streamStartOperation);
+    assertNull(streamStartOperation.getError());
+    assertEquals("RUNNING",
+      datastream.projects().locations().streams().get(streamPath).execute().getState());
+
+    Operation streamPauseOperation =
+      datastream.projects().locations().streams().pause(streamPath, new PauseStreamRequest())
+        .execute();
+    streamPauseOperation = waitUntilComplete(streamPauseOperation);
+    assertNull(streamPauseOperation.getError());
+    assertEquals("PAUSED",
+      datastream.projects().locations().streams().get(streamPath).execute().getState());
 
     Operation streamDeletionOperation =
-      datastream.projects().locations().streams().delete(buildStreamPath(streamName)).execute();
+      datastream.projects().locations().streams().delete(streamPath).execute();
 
     streamDeletionOperation = waitUntilComplete(streamDeletionOperation);
     assertNull(streamDeletionOperation.getError());
     GoogleJsonResponseException exception = assertThrows(GoogleJsonResponseException.class,
-      () -> datastream.projects().locations().streams().get(buildStreamPath(streamName)).execute());
+      () -> datastream.projects().locations().streams().get(streamPath).execute());
     assertEquals(404, exception.getStatusCode());
 
     Operation sourceProfileDeletionOperation =

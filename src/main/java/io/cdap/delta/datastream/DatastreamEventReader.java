@@ -21,6 +21,8 @@ import com.google.api.gax.paging.Page;
 import com.google.api.services.datastream.v1alpha1.DataStream;
 import com.google.api.services.datastream.v1alpha1.model.GcsProfile;
 import com.google.api.services.datastream.v1alpha1.model.Operation;
+import com.google.api.services.datastream.v1alpha1.model.OracleProfile;
+import com.google.api.services.datastream.v1alpha1.model.PauseStreamRequest;
 import com.google.api.services.datastream.v1alpha1.model.ResumeStreamRequest;
 import com.google.api.services.datastream.v1alpha1.model.StartStreamRequest;
 import com.google.api.services.datastream.v1alpha1.model.Stream;
@@ -96,6 +98,8 @@ public class DatastreamEventReader implements EventReader {
   // The GCS bucket in which datastream result is written to
   private final String bucketName;
 
+  private final String databaseName;
+
   public DatastreamEventReader(DatastreamConfig config, EventReaderDefinition definition, DeltaSourceContext context,
     EventEmitter emitter, DataStream datastream, Storage storage) {
     this.context = context;
@@ -109,23 +113,32 @@ public class DatastreamEventReader implements EventReader {
       Utils.buildStreamName(Utils.buildReplicatorId(context));
     this.streamPath = Utils.buildStreamPath(Utils.buildParentPath(config.getRegion()), streamId);
 
+    //TODO optimize below logic to get information from config if not using existing stream
     Stream stream;
     try {
       stream = datastream.projects().locations().streams().get(streamPath).execute();
     } catch (IOException e) {
       throw Utils.handleError(LOGGER, context, "Failed to get stream : " + streamPath, e);
     }
+    String oracleProfileName = stream.getSourceConfig().getSourceConnectionProfileName();
+    try {
+      OracleProfile oracleProfile =
+        datastream.projects().locations().connectionProfiles().get(oracleProfileName).execute().getOracleProfile();
+      this.databaseName = oracleProfile.getDatabaseService();
+    } catch (IOException e) {
+      throw Utils.handleError(LOGGER, context, "Failed to get oracle connection profile : " + oracleProfileName, e);
+    }
     String path = stream.getDestinationConfig().getGcsDestinationConfig().getPath();
     this.streamGcsPathPrefix =  path.startsWith("/") ? path.substring(1) : path;
-    String gcsConnectionProfile = stream.getDestinationConfig().getDestinationConnectionProfileName();
+    String gcsProfileName = stream.getDestinationConfig().getDestinationConnectionProfileName();
     try {
       GcsProfile gcsProfile =
-        datastream.projects().locations().connectionProfiles().get(gcsConnectionProfile).execute().getGcsProfile();
+        datastream.projects().locations().connectionProfiles().get(gcsProfileName).execute().getGcsProfile();
       this.bucketName = gcsProfile.getBucketName();
       path = gcsProfile.getRootPath();
       this.gcsRootPath = path.startsWith("/") ? path.substring(1) : path;
     } catch (IOException e) {
-      throw Utils.handleError(LOGGER, context, "Failed to get GCS connection profile : " + gcsConnectionProfile, e);
+      throw Utils.handleError(LOGGER, context, "Failed to get GCS connection profile : " + gcsProfileName, e);
     }
   }
 
@@ -139,6 +152,16 @@ public class DatastreamEventReader implements EventReader {
 
   public void stop() throws InterruptedException {
     executorService.shutdownNow();
+
+    try {
+      Operation operation =
+        datastream.projects().locations().streams().pause(streamPath, new PauseStreamRequest()).execute();
+      Utils.waitUntilComplete(datastream, operation, LOGGER);
+    } catch (IOException e) {
+      LOGGER.warn("Failed to pause the stream : " + streamPath , e);
+    }
+
+
     if (!executorService.awaitTermination(2, TimeUnit.MINUTES)) {
       LOGGER.warn("Unable to cleanly shutdown reader within the timeout.");
     }
@@ -244,8 +267,8 @@ public class DatastreamEventReader implements EventReader {
       boolean dbCreated = Boolean.parseBoolean(state.getOrDefault(DB_CREATED_STATE_KEY, "false"));
       // Emit DDL for DB creation if DB not created yet
       if (!dbCreated) {
-        emitEvent(DDLEvent.builder().setDatabaseName(config.getSid()).setOperation(DDLOperation.Type.CREATE_DATABASE)
-          .setSourceTimestamp(0).setSnapshot(true).build());
+        emitEvent(DDLEvent.builder().setDatabaseName(databaseName).setOperation(DDLOperation.Type.CREATE_DATABASE)
+          .setSourceTimestamp(0).setSnapshot(true).setOffset(new Offset(state)).build());
         state.put(DB_CREATED_STATE_KEY, "true");
       }
 
@@ -389,8 +412,15 @@ public class DatastreamEventReader implements EventReader {
             updateSourceTime(tableName, parseSourceTime(tableName, path));
           }
 
-          DatastreamEventConsumer consumer =
-            new DatastreamEventConsumer(blob.getBlob().getContent(), context, path, srcTable, position, state);
+          DatastreamEventConsumer consumer;
+          try {
+            consumer =
+              new DatastreamEventConsumer(blob.getBlob().getContent(), context, path, srcTable, position, state);
+          } catch (Exception e) {
+            Utils.handleError(LOGGER, context, "Failed to parse the datastream file : " + path, e);
+            position = 0;
+            continue;
+          }
           if (consumer.isSnapshot() != snapshot) {
             continue;
           }
@@ -500,7 +530,7 @@ public class DatastreamEventReader implements EventReader {
     }
 
     private void emitEvent(ChangeEvent event) {
-      LOGGER.error("###SEAN emit event: " + GSON.toJson(event));
+      LOGGER.debug("Emitting event: " + GSON.toJson(event));
       try {
         if (event instanceof DMLEvent) {
           emitter.emit((DMLEvent) event);

@@ -47,10 +47,12 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.sql.SQLType;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 import static io.cdap.delta.datastream.DatastreamConfig.AUTHENTICATION_METHOD_PASSWORD;
@@ -223,19 +225,31 @@ public final class Utils {
 
   // build an allow list of what tables to be tracked change of
   private static OracleRdbms buildAllowlist(Set<SourceTable> tables) {
-    Map<String, OracleSchema> schemaToTables = new HashMap<>();
-    // TODO decide whether we should filter tables here, because it will make the stream hard to reuse
-    // But datastream claims to support modifying a stream without stoping it
+    List<OracleSchema> schemas = new ArrayList<>();
+    addTablesToAllowList(tables, schemas);
+    return new OracleRdbms().setOracleSchemas(schemas);
+  }
+
+  private static void addTablesToAllowList(Set<SourceTable> tables, List<OracleSchema> schemas) {
+    Map<String, Set<String>> schemaToTables = schemas.stream().collect(Collectors.toMap(s->s.getSchemaName(),
+      s -> s.getOracleTables().stream().map(o -> o.getTableName()).collect(Collectors.toSet())));
+    Map<String, OracleSchema> nameToSchema = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s -> s));
+
     tables.forEach(table -> {
-      OracleSchema oracleSchema =
-        schemaToTables.computeIfAbsent(table.getSchema(), name -> new OracleSchema().setSchemaName(name));
+      Set<String> oracleTables = schemaToTables.computeIfAbsent(table.getSchema(), name -> new HashSet<>());
+      OracleSchema oracleSchema = nameToSchema.computeIfAbsent(table.getSchema(), name -> {
+        OracleSchema newSchema = new OracleSchema().setSchemaName(name);
+        schemas.add(newSchema);
+        return newSchema;
+      });
       if (oracleSchema.getOracleTables() == null) {
         oracleSchema.setOracleTables(new ArrayList<>());
       }
-      oracleSchema.getOracleTables().add(new OracleTable().setTableName(table.getTable()));
+      if (!oracleTables.contains(table.getTable())) {
+        oracleSchema.getOracleTables().add(new OracleTable().setTableName(table.getTable()));
+        oracleTables.add(table.getTable());
+      }
     });
-
-    return new OracleRdbms().setOracleSchemas(new ArrayList<>(schemaToTables.values()));
   }
 
   /**
@@ -386,5 +400,14 @@ public final class Utils {
    */
   public static String buildCompositeTableName(String schema, String table) {
     return Joiner.on("_").skipNulls().join(schema , table);
+  }
+
+  /**
+   * Adds the specified tables to the allowlist of the stream
+   * @param stream the stream the specified tables will be added to
+   * @param tables the tables to be added to the allowlist of the stream
+   */
+  public static void addToAllowList(Stream stream, Set<SourceTable> tables) {
+    addTablesToAllowList(tables, stream.getSourceConfig().getOracleSourceConfig().getAllowlist().getOracleSchemas());
   }
 }

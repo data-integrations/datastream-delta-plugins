@@ -21,6 +21,7 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.datastream.v1alpha1.DataStream;
 import com.google.api.services.datastream.v1alpha1.model.Operation;
+import com.google.api.services.datastream.v1alpha1.model.Stream;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.ServiceOptions;
@@ -81,11 +82,22 @@ public class DatastreamDeltaSource implements DeltaSource {
     parentPath = Utils.buildParentPath(config.getRegion());
 
     if (config.isUsingExistingStream()) {
-      datastream.projects().locations().streams().get(Utils.buildStreamPath(parentPath, config.getStreamId()))
-        .execute();
+      // for reusing an existing stream, it's possible we add more tables to replicate
+      updateStream(context);
     } else {
       createStreamIfNotExisted(context);
     }
+  }
+
+  private void updateStream(DeltaSourceContext context) throws IOException {
+    String streamPath = Utils.buildStreamPath(parentPath, config.getStreamId());
+    Stream stream =
+      datastream.projects().locations().streams().get(streamPath)
+        .execute();
+    Utils.addToAllowList(stream, context.getAllTables());
+    //TODO add update mask when new client is ready for the new API
+    Operation operation = datastream.projects().locations().streams().patch(streamPath, stream).execute();
+    Utils.waitUntilComplete(datastream, operation, LOGGER);
   }
 
   private DataStream createDatastreamClient() throws IOException {

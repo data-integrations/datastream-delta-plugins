@@ -74,7 +74,6 @@ public class DatastreamTableRegistry implements TableRegistry {
 
   @Override
   public TableList listTables() throws IOException {
-    LOGGER.debug("List tables...");
     List<TableSummary> tables = new ArrayList<>();
 
     String databaseName;
@@ -113,7 +112,9 @@ public class DatastreamTableRegistry implements TableRegistry {
 
   @Override
   public TableDetail describeTable(String db, String schema, String table) throws TableNotFoundException, IOException {
-    LOGGER.debug(String.format("Describe table, db: %s, table: %s, schema: %s", db, table, schema));
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug(String.format("Describe table, db: %s, table: %s, schema: %s", db, table, schema));
+    }
     DiscoverConnectionProfileResponse discoverResponse;
     try {
       discoverResponse = discover(schema, table, config.isUsingExistingStream() ?
@@ -133,8 +134,11 @@ public class DatastreamTableRegistry implements TableRegistry {
     List<String> primaryKeys = new ArrayList<>();
     for (OracleColumn column : oracleTable.getOracleColumns()) {
       Map<String, String> properties = new HashMap<>();
-      LOGGER.debug(String.format("Found column : %s, data type : %s, precision: %s, scale: %s ",
-        column.getColumnName(), column.getDataType(), column.getPrecision(), column.getScale()));
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug(String
+          .format("Found column : %s, data type : %s, precision: %s, scale: %s ", column.getColumnName(),
+            column.getDataType(), column.getPrecision(), column.getScale()));
+      }
       if (column.getPrecision() != null) {
         properties.put(DatastreamTableAssessor.PRECISION, Integer.toString(column.getPrecision()));
       }

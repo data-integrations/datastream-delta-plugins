@@ -530,7 +530,9 @@ public class DatastreamEventReader implements EventReader {
     }
 
     private void emitEvent(ChangeEvent event) {
-      LOGGER.debug("Emitting event: " + GSON.toJson(event));
+      if (LOGGER.isTraceEnabled()) {
+        LOGGER.trace("Emitting event: " + GSON.toJson(event));
+      }
       try {
         if (event instanceof DMLEvent) {
           emitter.emit((DMLEvent) event);

@@ -32,6 +32,7 @@ import io.cdap.delta.datastream.util.MockSourceContext;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -41,12 +42,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
 
   @Test
-  public void testInitialize() throws Exception {
+  public void testInitialize_existingStream() throws Exception {
+    DatastreamConfig config = buildDatastreamConfig(true);
+    DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
+    DeltaSourceContext context = new MockSourceContext(null, null, 0L, null, oracleTables, oracleDb);
+    deltaSource.initialize(context);
+    String streamPath = String.format("%s/streams/%s", parentPath, streamId);;
+    Stream stream = datastream.projects().locations().streams().get(streamPath).execute();
+    OracleRdbms allowlist = stream.getSourceConfig().getOracleSourceConfig().getAllowlist();
+    assertTrue(allowlist.getOracleSchemas().stream().flatMap(schema -> schema.getOracleTables().stream()
+      .map(table -> String.format("%s.%s", schema.getSchemaName(), table.getTableName()))).collect(Collectors.toSet())
+      .containsAll(oracleTables));
+  }
+  @Test
+  public void testInitialize_newStream() throws Exception {
     String namspace = "default";
     String appName = "datastream-ut";
     String runId = "1234567890";
     long generation = 0;
-
     DatastreamConfig config = buildDatastreamConfig(false);
     DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
     DeltaSourceContext context = new MockSourceContext(namspace, appName, generation, runId, oracleTables, oracleDb);

@@ -60,7 +60,7 @@ public class BaseIntegrationTestCase {
   protected static String gcsBucket;
   protected static Storage storage;
   protected static String servcieAccountKey;
-  private static String streamId;
+  protected static String streamId;
 
   @BeforeAll
   public static void setupTestClass() throws Exception {

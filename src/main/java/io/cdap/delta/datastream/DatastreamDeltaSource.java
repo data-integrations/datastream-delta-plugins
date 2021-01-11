@@ -21,8 +21,8 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.datastream.v1alpha1.DataStream;
 import com.google.api.services.datastream.v1alpha1.model.Operation;
+import com.google.api.services.datastream.v1alpha1.model.Stream;
 import com.google.auth.http.HttpCredentialsAdapter;
-import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.ServiceOptions;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
@@ -78,19 +78,36 @@ public class DatastreamDeltaSource implements DeltaSource {
     storage = StorageOptions.newBuilder().setCredentials(config.getGcsCredentials())
       .setProjectId(ServiceOptions.getDefaultProjectId()).build().getService();
     datastream = createDatastreamClient();
-    // TODO reuse an existing datastream provided by user
-    createStreamIfNotExisted(context);
+    parentPath = Utils.buildParentPath(config.getRegion());
+
+    if (config.isUsingExistingStream()) {
+      // for reusing an existing stream, it's possible we add more tables to replicate
+      updateStream(context);
+    } else {
+      createStreamIfNotExisted(context);
+    }
+  }
+
+  private void updateStream(DeltaSourceContext context) throws IOException {
+    String streamPath = Utils.buildStreamPath(parentPath, config.getStreamId());
+    Stream stream =
+      datastream.projects().locations().streams().get(streamPath)
+        .execute();
+    Utils.addToAllowList(stream, context.getAllTables());
+    //TODO add update mask when new client is ready for the new API
+    Operation operation = datastream.projects().locations().streams().patch(streamPath, stream).execute();
+    Utils.waitUntilComplete(datastream, operation, LOGGER);
   }
 
   private DataStream createDatastreamClient() throws IOException {
-    return new DataStream(new NetHttpTransport(), new JacksonFactory(), new HttpCredentialsAdapter(
-      ServiceAccountCredentials.getApplicationDefault()
-        .createScoped("https://www.googleapis.com/auth/cloud-platform")));
+    return new DataStream(new NetHttpTransport(), new JacksonFactory(),
+      new HttpCredentialsAdapter(config.getDatastreamCredentials()));
   }
 
   @Override
   public void configure(SourceConfigurer configurer) {
-    configurer.setProperties(new SourceProperties.Builder().setRowIdSupported(true).build());
+    configurer.setProperties(new SourceProperties.Builder().setRowIdSupported(true).setOrdering(
+      SourceProperties.Ordering.UN_ORDERED).build());
   }
 
   @Override
@@ -110,7 +127,7 @@ public class DatastreamDeltaSource implements DeltaSource {
   }
 
   private void createStreamIfNotExisted(DeltaSourceContext context) throws IOException {
-    String parentPath = Utils.buildParentPath(config.getRegion());
+
     String replicatorId = Utils.buildReplicatorId(context);
     String streamName = Utils.buildStreamName(replicatorId);
     String streamPath = Utils.buildStreamPath(parentPath, streamName);

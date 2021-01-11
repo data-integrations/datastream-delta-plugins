@@ -5,6 +5,40 @@
   "display-name": "DataStream(for Oracle)",
   "configuration-groups": [
     {
+      "label": "Existing or New stream",
+      "properties": [
+        {
+          "name": "usingExistingStream",
+          "widget-type": "toggle",
+          "label": "Use an existing Datastream stream",
+          "widget-attributes": {
+            "default": "false",
+            "on": {
+              "value": "true",
+              "label": "Yes"
+            },
+            "off": {
+              "value": "false",
+              "label": "No"
+            }
+          }
+        },
+        {
+          "name": "region",
+          "label": "Region",
+          "widget-type": "textbox",
+          "widget-attributes": {
+            "default": "us-central1"
+          }
+        },
+        {
+          "name": "streamId",
+          "label": "Datastream stream identity",
+          "widget-type": "textbox"
+        }
+      ]
+    },
+    {
       "label": "Database Locations",
       "properties": [
         {
@@ -48,14 +82,6 @@
     {
       "label": "DataStream Configuration",
       "properties": [
-        {
-          "name": "region",
-          "label": "Region",
-          "widget-type": "textbox",
-          "widget-attributes": {
-            "default": "us-central1"
-          }
-        },
         {
           "label": "Connectivity Method",
           "name": "connectivityMethod",
@@ -126,11 +152,6 @@
           "name": "gcsBucket",
           "label": "GCS Bucket",
           "widget-type": "textbox"
-        },
-        {
-          "name": "gcsServiceAccountKey",
-          "label": "Service Account Key",
-          "widget-type": "securekey-textarea"
         }
       ]
     },
@@ -141,12 +162,64 @@
           "name": "gcsPathPrefix",
           "label": "Path Prefix",
           "widget-type": "textbox"
+        },
+        {
+          "name": "gcsServiceAccountKey",
+          "label": "GCS Service Account Key",
+          "widget-type": "securekey-textarea",
+          "widget-attributes": {
+            "default": "auto-detect"
+          }
+        },
+        {
+          "name": "dsServiceAccountKey",
+          "label": "Datastream Service Account Key",
+          "widget-type": "securekey-textarea",
+          "widget-attributes": {
+            "default": "auto-detect"
+          }
         }
       ]
     }
   ],
   "outputs": [],
   "filters": [
+    {
+      "name": "showExistingStream",
+      "condition": {
+        "expression": "usingExistingStream == true"
+      },
+      "show": [
+        {
+          "type": "property",
+          "name": "streamId"
+        }
+      ]
+    },
+    {
+      "name": "showNewStream",
+      "condition": {
+        "expression": "usingExistingStream == false"
+      },
+      "show": [
+        {
+          "type": "group",
+          "name": "Database Locations"
+        },
+        {
+          "type": "property",
+          "name": "gcsPathPrefix"
+        },
+        {
+          "type": "group",
+          "name": "DataStream Configuration"
+        },
+        {
+          "type": "group",
+          "name": "Credentials"
+        }
+      ]
+    },
     {
       "name": "showSSH",
       "condition": {

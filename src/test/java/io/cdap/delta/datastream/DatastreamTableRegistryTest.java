@@ -17,99 +17,28 @@
 
 package io.cdap.delta.datastream;
 
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.services.datastream.v1alpha1.DataStream;
-import com.google.auth.http.HttpCredentialsAdapter;
-import com.google.auth.oauth2.GoogleCredentials;
 import io.cdap.delta.api.assessment.ColumnDetail;
 import io.cdap.delta.api.assessment.TableDetail;
 import io.cdap.delta.api.assessment.TableList;
 import io.cdap.delta.api.assessment.TableNotFoundException;
 import io.cdap.delta.api.assessment.TableSummary;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
-class DatastreamTableRegistryTest {
-
-  private static String serviceLocation;
-  private static String oracleHost;
-  private static String oracleUser;
-  private static String oraclePassword;
-  private static String oracleDb;
-  private static int oraclePort;
-  private static GoogleCredentials credentials;
-
-  @BeforeAll
-  public static void setupTestClass() throws Exception {
-    // Certain properties need to be configured otherwise the whole tests will be skipped.
-    // Check README for how to configure the properties below.
-
-    String messageTemplate = "%s is not configured, please refer to README for details.";
-
-    String project = System.getProperty("project.id");
-    if (project == null) {
-      project = System.getProperty("GOOGLE_CLOUD_PROJECT");
-    }
-    if (project == null) {
-      project = System.getProperty("GCLOUD_PROJECT");
-    }
-    assumeFalse(project == null, String.format(messageTemplate, "project id"));
-    System.setProperty("GCLOUD_PROJECT", project);
-    
-    String serviceAccountFilePath = System.getProperty("service.account.file");
-    assumeFalse(serviceAccountFilePath == null, String.format(messageTemplate, "service account key file"));
-
-    serviceLocation = System.getProperty("service.location");
-    if (serviceLocation == null) {
-      serviceLocation = "us-central1";
-    }
-
-    String port = System.getProperty("oracle.port");
-    if (port == null) {
-      oraclePort = 1521;
-    } else {
-      oraclePort = Integer.parseInt(port);
-    }
-
-    oracleHost = System.getProperty("oracle.host");
-    assumeFalse(oracleHost == null, String.format(messageTemplate, "oracle host"));
-
-    oracleUser = System.getProperty("oracle.user");
-    assumeFalse(oracleUser == null, String.format(messageTemplate, "oracle user"));
-
-    oraclePassword = System.getProperty("oracle.password", String.format(messageTemplate, "oracle password"));
-    assumeFalse(oraclePassword == null);
-
-    oracleDb = System.getProperty("oracle.database");
-    assumeFalse(oracleDb == null, String.format(messageTemplate, "oracle  sid"));
-
-    File serviceAccountFile = new File(serviceAccountFilePath);
-    try (InputStream is = new FileInputStream(serviceAccountFile)) {
-      credentials = GoogleCredentials.fromStream(is).createScoped("https://www.googleapis.com/auth/cloud-platform");
-    }
-
-  }
+class DatastreamTableRegistryTest extends BaseIntegrationTestCase {
 
   @Test
   public void testListDescribeTable_IPallowList() throws IOException, TableNotFoundException {
     TableList tableList = null;
-    try (DatastreamTableRegistry registry = new DatastreamTableRegistry(
-      new DatastreamConfig(oracleHost, oraclePort, oracleUser, oraclePassword, oracleDb, serviceLocation,
-        DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null, null, null, null, null, null, null),
-      createDatastreamClient())) {
+    DatastreamConfig config = buildDatastreamConfig(false);
+    try (DatastreamTableRegistry registry = new DatastreamTableRegistry(config, datastream)) {
       tableList = registry.listTables();
     }
     assertNotNull(tableList);
@@ -125,10 +54,7 @@ class DatastreamTableRegistryTest {
       String tableName = table.getTable();
       assertNotNull(tableName);
       TableDetail tableDetail = null;
-      try (DatastreamTableRegistry registry = new DatastreamTableRegistry(
-        new DatastreamConfig(oracleHost, oraclePort, oracleUser, oraclePassword, oracleDb, serviceLocation,
-          DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null, null, null, null, null, null, null),
-        createDatastreamClient())) {
+      try (DatastreamTableRegistry registry = new DatastreamTableRegistry(config, datastream)) {
         tableDetail = registry.describeTable(oracleDb, schema, tableName);
       }
       assertNotNull(tableDetail);
@@ -150,10 +76,4 @@ class DatastreamTableRegistryTest {
       }
     }
   }
-
-  private DataStream createDatastreamClient() {
-    return new DataStream(new NetHttpTransport(), new JacksonFactory(),
-      new HttpCredentialsAdapter(credentials));
-  }
-
 }

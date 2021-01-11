@@ -257,11 +257,20 @@ public class DatastreamEventReader implements EventReader {
            emit DML event  (table.pos = current pos , pos++)
 
        **/
-
+      Stream stream = null;
       try {
-        context.setOK();
+         stream = datastream.projects().locations().streams().get(streamPath).execute();
       } catch (IOException e) {
-        LOGGER.warn("Unable to set source state to OK.", e);
+        Utils.handleError(LOGGER, context, "Failed to get stream " + streamPath, e);
+      }
+      if (stream != null && !"RUNNING".equals(stream.getState())) {
+        Utils.handleError(LOGGER, context, "Stream " + streamPath + " is in status : " + stream.getState());
+      } else {
+        try {
+          context.setOK();
+        } catch (IOException e) {
+          LOGGER.warn("Unable to set source state to OK.", e);
+        }
       }
 
       boolean dbCreated = Boolean.parseBoolean(state.getOrDefault(DB_CREATED_STATE_KEY, "false"));

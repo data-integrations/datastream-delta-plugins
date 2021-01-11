@@ -23,7 +23,6 @@ import com.google.api.services.datastream.v1alpha1.DataStream;
 import com.google.api.services.datastream.v1alpha1.model.Operation;
 import com.google.api.services.datastream.v1alpha1.model.Stream;
 import com.google.auth.http.HttpCredentialsAdapter;
-import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.ServiceOptions;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
@@ -101,9 +100,8 @@ public class DatastreamDeltaSource implements DeltaSource {
   }
 
   private DataStream createDatastreamClient() throws IOException {
-    return new DataStream(new NetHttpTransport(), new JacksonFactory(), new HttpCredentialsAdapter(
-      ServiceAccountCredentials.getApplicationDefault()
-        .createScoped("https://www.googleapis.com/auth/cloud-platform")));
+    return new DataStream(new NetHttpTransport(), new JacksonFactory(),
+      new HttpCredentialsAdapter(config.getDatastreamCredentials()));
   }
 
   @Override

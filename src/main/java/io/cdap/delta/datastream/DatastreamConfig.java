@@ -142,6 +142,12 @@ public class DatastreamConfig extends PluginConfig {
     " is required when you choose to use an existing Datastream stream.")
   private String streamId;
 
+  @Macro
+  @Nullable
+  @Description("The service account key of the service account that will be used to create or query DataStream stream" +
+    ". By default Cloud Data Fusion service account will be used when you create a replicator and Dataproc service " +
+    "account will be used when replicator pipeline is running.")
+  private String dsServiceAccountKey;
 
   public boolean isUsingExistingStream() {
     return usingExistingStream;
@@ -231,7 +237,14 @@ public class DatastreamConfig extends PluginConfig {
   }
 
   public Credentials getGcsCredentials() {
-    if (gcsServiceAccountKey == null || "auto-detect".equalsIgnoreCase(gcsServiceAccountKey)) {
+    return getCredentials(gcsServiceAccountKey);
+  }
+  public Credentials getDatastreamCredentials() {
+    return getCredentials(dsServiceAccountKey);
+  }
+
+  private Credentials getCredentials(String serviceAccountKey) {
+    if (serviceAccountKey == null || "auto-detect".equalsIgnoreCase(serviceAccountKey)) {
       try {
         return GoogleCredentials.getApplicationDefault();
       } catch (IOException e) {
@@ -239,11 +252,11 @@ public class DatastreamConfig extends PluginConfig {
       }
     }
 
-    try (InputStream is = new ByteArrayInputStream(gcsServiceAccountKey.getBytes(StandardCharsets.UTF_8))) {
+    try (InputStream is = new ByteArrayInputStream(serviceAccountKey.getBytes(StandardCharsets.UTF_8))) {
       return GoogleCredentials.fromStream(is)
         .createScoped(Collections.singleton("https://www.googleapis.com/auth/cloud-platform"));
     } catch (IOException e) {
-      throw new RuntimeException("Fail to read GCS service account key!", e);
+      throw new RuntimeException("Fail to read service account key!", e);
     }
   }
 
@@ -252,7 +265,7 @@ public class DatastreamConfig extends PluginConfig {
     @Nullable String connectivityMethod, @Nullable String sshHost, @Nullable Integer sshPort, @Nullable String sshUser,
     @Nullable String sshAuthenticationMethod, @Nullable String sshPassword, @Nullable String sshPrivateKey,
     @Nullable String gcsBucket, @Nullable String gcsPathPrefix, @Nullable String gcsServiceAccountKey,
-    @Nullable String streamId) {
+    @Nullable String dsServiceAccountKey, @Nullable String streamId) {
     this.usingExistingStream = usingExistingStream;
     this.host = host;
     this.port = port;
@@ -270,6 +283,7 @@ public class DatastreamConfig extends PluginConfig {
     this.gcsBucket = gcsBucket;
     this.gcsPathPrefix = gcsPathPrefix;
     this.gcsServiceAccountKey = gcsServiceAccountKey;
+    this.dsServiceAccountKey = dsServiceAccountKey;
     this.streamId = streamId;
     validate();
   }

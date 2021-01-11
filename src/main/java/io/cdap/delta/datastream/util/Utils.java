@@ -387,8 +387,7 @@ public final class Utils {
     try {
       context.setError(new ReplicationError(cause));
     } catch (IOException ioException) {
-      logger.error("Error setting error in context!", cause);
-      throw new RuntimeException(ioException);
+      logger.warn("Unable to set error for source status!", cause);
     }
   }
 

@@ -32,15 +32,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -59,7 +56,7 @@ public class BaseIntegrationTestCase {
   protected static String parentPath;
   protected static String gcsBucket;
   protected static Storage storage;
-  protected static String servcieAccountKey;
+  protected static String serviceAccountKey;
   protected static String streamId;
 
   @BeforeAll
@@ -120,8 +117,7 @@ public class BaseIntegrationTestCase {
     storage = StorageOptions.newBuilder().setCredentials(credentials).setProjectId(ServiceOptions.getDefaultProjectId())
       .build().getService();
 
-    setEnv("GOOGLE_APPLICATION_CREDENTIALS", serviceAccountFilePath);
-    servcieAccountKey = new String(Files.readAllBytes(Paths.get(new File(serviceAccountFilePath).getAbsolutePath())),
+    serviceAccountKey = new String(Files.readAllBytes(Paths.get(new File(serviceAccountFilePath).getAbsolutePath())),
       StandardCharsets.UTF_8);
 
     gcsBucket = System.getProperty("gcs.bucket");
@@ -133,41 +129,10 @@ public class BaseIntegrationTestCase {
     return new DataStream(new NetHttpTransport(), new JacksonFactory(), new HttpCredentialsAdapter(credentials));
   }
 
-  private static void setEnv(String key, String value) throws Exception {
-    Map<String, String> newEnv = new HashMap<>(System.getenv());
-    newEnv.put(key, value);
-    try {
-      Class<?> processEnvironmentClass = Class.forName("java.lang.ProcessEnvironment");
-      Field theEnvironmentField = processEnvironmentClass.getDeclaredField("theEnvironment");
-      theEnvironmentField.setAccessible(true);
-      Map<String, String> env = (Map<String, String>) theEnvironmentField.get(null);
-      env.putAll(newEnv);
-      Field theCaseInsensitiveEnvironmentField =
-        processEnvironmentClass.getDeclaredField("theCaseInsensitiveEnvironment");
-      theCaseInsensitiveEnvironmentField.setAccessible(true);
-      Map<String, String> cienv = (Map<String, String>) theCaseInsensitiveEnvironmentField.get(null);
-      cienv.putAll(newEnv);
-    } catch (NoSuchFieldException e) {
-      Class[] classes = Collections.class.getDeclaredClasses();
-      Map<String, String> env = System.getenv();
-      for (Class cl : classes) {
-        if ("java.util.Collections$UnmodifiableMap".equals(cl.getName())) {
-          Field field = cl.getDeclaredField("m");
-          field.setAccessible(true);
-          Object obj = field.get(env);
-          Map<String, String> map = (Map<String, String>) obj;
-          map.clear();
-          map.putAll(newEnv);
-        }
-      }
-    }
-  }
-
   protected DatastreamConfig buildDatastreamConfig(boolean usingExisting) {
     return new DatastreamConfig(usingExisting, oracleHost, oraclePort, oracleUser, oraclePassword, oracleDb,
-      serviceLocation,
-      DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null, null, null, null, gcsBucket, null, null
-      , streamId);
+      serviceLocation, DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null, null, null, null,
+      gcsBucket, null, serviceAccountKey, serviceAccountKey, streamId);
   }
 
   protected Operation waitUntilComplete(Operation operation) throws InterruptedException, IOException {

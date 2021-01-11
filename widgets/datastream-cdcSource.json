@@ -5,7 +5,7 @@
   "display-name": "DataStream(for Oracle)",
   "configuration-groups": [
     {
-      "label": "Common Information",
+      "label": "Existing or New stream",
       "properties": [
         {
           "name": "usingExistingStream",
@@ -31,19 +31,6 @@
             "default": "us-central1"
           }
         },
-        {
-          "name": "gcsServiceAccountKey",
-          "label": "Service Account Key",
-          "widget-type": "securekey-textarea",
-          "widget-attributes": {
-            "default": "auto-detect"
-          }
-        }
-      ]
-    },
-    {
-      "label": "Existing Datastream Stream",
-      "properties": [
         {
           "name": "streamId",
           "label": "Datastream stream identity",
@@ -175,6 +162,22 @@
           "name": "gcsPathPrefix",
           "label": "Path Prefix",
           "widget-type": "textbox"
+        },
+        {
+          "name": "gcsServiceAccountKey",
+          "label": "GCS Service Account Key",
+          "widget-type": "securekey-textarea",
+          "widget-attributes": {
+            "default": "auto-detect"
+          }
+        },
+        {
+          "name": "dsServiceAccountKey",
+          "label": "Datastream Service Account Key",
+          "widget-type": "securekey-textarea",
+          "widget-attributes": {
+            "default": "auto-detect"
+          }
         }
       ]
     }
@@ -188,8 +191,8 @@
       },
       "show": [
         {
-          "type": "group",
-          "name": "Existing Datastream Stream"
+          "type": "property",
+          "name": "streamId"
         }
       ]
     },
@@ -204,8 +207,8 @@
           "name": "Database Locations"
         },
         {
-          "type": "group",
-          "name": "Advanced"
+          "type": "property",
+          "name": "gcsPathPrefix"
         },
         {
           "type": "group",

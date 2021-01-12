@@ -69,7 +69,7 @@ public class DatastreamTableRegistry implements TableRegistry {
     this.config = config;
     this.datastream = datastream;
     //TODO validate whether the region is valid
-    this.parentPath = Utils.buildParentPath(config.getRegion());
+    this.parentPath = Utils.buildParentPath(config.getRegion(), config.getProject());
   }
 
   @Override

@@ -23,7 +23,6 @@ import com.google.api.services.datastream.v1alpha1.DataStream;
 import com.google.api.services.datastream.v1alpha1.model.Operation;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.ServiceOptions;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -58,6 +57,7 @@ public class BaseIntegrationTestCase {
   protected static Storage storage;
   protected static String serviceAccountKey;
   protected static String streamId;
+  protected static String project;
 
   @BeforeAll
   public static void setupTestClass() throws Exception {
@@ -66,7 +66,7 @@ public class BaseIntegrationTestCase {
 
     String messageTemplate = "%s is not configured, please refer to README for details.";
 
-    String project = System.getProperty("project.id");
+    project = System.getProperty("project.id");
     if (project == null) {
       project = System.getProperty("GOOGLE_CLOUD_PROJECT");
     }
@@ -114,7 +114,7 @@ public class BaseIntegrationTestCase {
       credentials = GoogleCredentials.fromStream(is).createScoped("https://www.googleapis.com/auth/cloud-platform");
     }
     datastream = createDatastreamClient();
-    storage = StorageOptions.newBuilder().setCredentials(credentials).setProjectId(ServiceOptions.getDefaultProjectId())
+    storage = StorageOptions.newBuilder().setCredentials(credentials).setProjectId(project)
       .build().getService();
 
     serviceAccountKey = new String(Files.readAllBytes(Paths.get(new File(serviceAccountFilePath).getAbsolutePath())),
@@ -132,7 +132,7 @@ public class BaseIntegrationTestCase {
   protected DatastreamConfig buildDatastreamConfig(boolean usingExisting) {
     return new DatastreamConfig(usingExisting, oracleHost, oraclePort, oracleUser, oraclePassword, oracleDb,
       serviceLocation, DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null, null, null, null,
-      gcsBucket, null, serviceAccountKey, serviceAccountKey, streamId);
+      gcsBucket, null, serviceAccountKey, serviceAccountKey, streamId, project);
   }
 
   protected Operation waitUntilComplete(Operation operation) throws InterruptedException, IOException {

@@ -30,6 +30,7 @@ import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.Storage;
 import com.google.gson.Gson;
+import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.delta.api.ChangeEvent;
 import io.cdap.delta.api.DDLEvent;
 import io.cdap.delta.api.DDLOperation;
@@ -39,10 +40,12 @@ import io.cdap.delta.api.EventEmitter;
 import io.cdap.delta.api.EventReader;
 import io.cdap.delta.api.EventReaderDefinition;
 import io.cdap.delta.api.Offset;
+import io.cdap.delta.api.ReplicationError;
 import io.cdap.delta.api.SourceTable;
 import io.cdap.delta.api.assessment.StandardizedTableDetail;
 import io.cdap.delta.api.assessment.TableDetail;
 import io.cdap.delta.api.assessment.TableNotFoundException;
+import io.cdap.delta.datastream.util.DatastreamDeltaSourceException;
 import io.cdap.delta.datastream.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,6 +81,8 @@ public class DatastreamEventReader implements EventReader {
   public static final String PATH_STATE_KEY_SUFFIX = ".path";
   private static final String DUMP_STATE_KEY_SUFFIX = ".snapshot.done";
   private static final String SCAN_DONE_STATE_KEY_SUFFIX = ".last.done";
+  private static final String TABLE_DETAIL_STATE_KEY_SUFFIX = ".table.detail";
+  private static final String SCHEMA_KEY_STATE_KEY_SUFFIX = ".schema.key";
 
   // Datastream suggested 3 days scanning window
   private static final int DATASTREAM_SLA_IN_MINUTES = 60 * 24 * 3;
@@ -111,7 +116,7 @@ public class DatastreamEventReader implements EventReader {
     this.storage = storage;
     String streamId = config.isUsingExistingStream() ? config.getStreamId() :
       Utils.buildStreamName(Utils.buildReplicatorId(context));
-    this.streamPath = Utils.buildStreamPath(Utils.buildParentPath(config.getRegion()), streamId);
+    this.streamPath = Utils.buildStreamPath(Utils.buildParentPath(config.getRegion(), config.getProject()), streamId);
 
     //TODO optimize below logic to get information from config if not using existing stream
     Stream stream;
@@ -196,12 +201,31 @@ public class DatastreamEventReader implements EventReader {
 
   class ScanTask implements Runnable {
     private final Map<String, String> state;
+    private final Map<String, StandardizedTableDetail> tableDetails;
 
     ScanTask(Offset offset) {
       this.state = new HashMap<>(offset.get());
+      this.tableDetails = new HashMap<>();
     }
     @Override
     public void run() {
+      try {
+        scanResults();
+      } catch (DatastreamDeltaSourceException e) {
+        context.notifyFailed(e);
+      } catch (Throwable t) {
+        //handle un-detected errors
+        try {
+          context.setError(new ReplicationError(t));
+        } catch (IOException e) {
+          LOGGER.error("Failed to set error {} in context ", t);
+        } finally {
+          context.notifyFailed(t);
+        }
+      }
+    }
+
+    private void scanResults() {
       /**
        Scanning strategy:
        Assume we have below SLO:
@@ -223,6 +247,20 @@ public class DatastreamEventReader implements EventReader {
                                            scan. The window is "this timestamp - SLO (3 days) " to current time
        ${table_name}.last.done           → whether last scan of the table was done or not
 
+
+       ${table_name}.table.detail        → the the latest cdap table detail commited on the target, if it changes , then
+                                           generate a DDL event. It's possible source table schema is changed while cdap
+                                           schema doesn't need to change due to :
+                                           a. source column data type changed but it's still mapped to the same
+                                              cdap data type
+                                           b. datastream doesn't generate separate DDL, we can only query the latest
+                                              source table schema, when we were processing the old change events, we
+                                              already got the latest table schema.
+       ${table_name}.schema.key          → the schema key of latest events (the greatest source timestamp) seen when
+                                           the schema hash was recorded. Each datastream result file is attached with
+                                           a schema key, this key gives a hint about whether there is a schema change
+                                           in the source. If this key changes, we query the actual source table
+                                           schema to see whether we need to emit a DDL
        Algorithm:
 
        // Create DB
@@ -309,12 +347,15 @@ public class DatastreamEventReader implements EventReader {
           if (path == null) {
             // get the dump file folder, dump files should be in the same folder
             // becasue dump files are put in the folder that represents the read time
-            dumpFilePathPrefix = getDumpFilePathPrefix(bucket, prefix, srcTable);
-            if (dumpFilePathPrefix == null) {
+            // don't update path here, because we need original value of path to know
+            // whether new dump file has been found
+            String dumpFilePath = getDumpFilePath(bucket, prefix, srcTable);
+            if (dumpFilePath == null) {
               //no dump file was ever found yet
               continue;
             }
-            emitCreateTableDDL(srcTable);
+            emitCreateTableDDL(tableName, srcTable, parseSchemaKey(dumpFilePath));
+            dumpFilePathPrefix = dumpFilePath.substring(0, dumpFilePath.lastIndexOf("/") + 1);
           } else {
             dumpFilePathPrefix = path.substring(0, path.lastIndexOf("/") + 1);
           }
@@ -368,7 +409,21 @@ public class DatastreamEventReader implements EventReader {
       }
     }
 
-    private void emitCreateTableDDL(SourceTable table) {
+    private void emitCreateTableDDL(String tableName, SourceTable table, String schemaKey) {
+      StandardizedTableDetail tableDetail = getStandardizedTableDetail(table);
+      DDLEvent event = DDLEvent.builder().setDatabaseName(table.getDatabase()).setTableName(table.getTable())
+        .setSchemaName(table.getSchema()).setOperation(DDLOperation.Type.CREATE_TABLE)
+        .setPrimaryKey(tableDetail.getPrimaryKey()).setSourceTimestamp(0L)
+        .setSchema(tableDetail.getSchema()).setSnapshot(true).setOffset(new Offset(state)).build();
+       tableDetail.getSchema();
+      // for dump file we just record the shcema key of itself
+      saveSchemaKey(tableName, schemaKey);
+      saveTableDetail(tableName, tableDetail);
+      tableDetails.put(tableName, tableDetail);
+      emitEvent(event);
+    }
+
+    private StandardizedTableDetail getStandardizedTableDetail(SourceTable table) {
       DatastreamTableRegistry tableRegistry = new DatastreamTableRegistry(config, datastream);
       TableDetail tableDetail;
       try {
@@ -383,18 +438,24 @@ public class DatastreamEventReader implements EventReader {
             table.getSchema(), table.getTable()), e);
       }
       StandardizedTableDetail standardizedTableDetail = tableRegistry.standardize(tableDetail);
-      emitEvent(DDLEvent.builder().setDatabaseName(table.getDatabase()).setTableName(table.getTable())
-        .setSchemaName(table.getSchema()).setOperation(DDLOperation.Type.CREATE_TABLE)
-        .setPrimaryKey(standardizedTableDetail.getPrimaryKey()).setSourceTimestamp(0L)
-        .setSchema(standardizedTableDetail.getSchema()).setSnapshot(true).setOffset(new Offset(state)).build());
+      return standardizedTableDetail;
     }
 
     private void scanEvents(Page<Blob> allBlobs, String tableName, SourceTable srcTable, boolean snapshot) {
       List<BlobWrapper> blobs = new ArrayList<>();
 
       for (Blob blob : allBlobs.iterateAll()) {
-        blobs.add(new BlobWrapper(blob));
+        // each blob can be a folder or a file
+        if (blob.getSize() > 0) {
+          blobs.add(new BlobWrapper(blob));
+        }
       }
+      if (blobs.isEmpty()) {
+        //should not reach here
+        return;
+      }
+      // get the schema key of the latest seen schema file
+      Schema schema = updateTableSchema(tableName, srcTable, parseSchemaKey(blobs.get(blobs.size() - 1).getName()));
       // sort the blobs based on creation time
       blobs.sort(Comparator.<BlobWrapper>naturalOrder());
       String path = getPath(tableName);
@@ -406,33 +467,33 @@ public class DatastreamEventReader implements EventReader {
         // clear the source time before new scan
         clearSourceTime(tableName);
       }
-
       for (int i = start; i < blobs.size(); i++) {
         BlobWrapper blob = blobs.get(i);
-        // each blob can be a folder or a file
-        if (blob.getBlob().getSize() > 0) {
 
-          path = blob.getName();
-          lastProcessed = blob.getTimeCreated();
-          savePath(tableName, path);
-          saveTimeCreated(tableName, lastProcessed);
 
-          if (!snapshot) {
-            updateSourceTime(tableName, parseSourceTime(tableName, path));
-          }
+        path = blob.getName();
+        lastProcessed = blob.getTimeCreated();
+        savePath(tableName, path);
+        saveTimeCreated(tableName, lastProcessed);
 
-          DatastreamEventConsumer consumer;
-          try {
-            consumer =
-              new DatastreamEventConsumer(blob.getBlob().getContent(), context, path, srcTable, position, state);
-          } catch (Exception e) {
-            Utils.handleError(LOGGER, context, "Failed to parse the datastream file : " + path, e);
-            position = 0;
-            continue;
-          }
-          if (consumer.isSnapshot() != snapshot) {
-            continue;
-          }
+        if (!snapshot) {
+          updateSourceTime(tableName, parseSourceTime(tableName, path));
+        }
+
+        DatastreamEventConsumer consumer;
+        try {
+          consumer = new DatastreamEventConsumer(blob.getBlob().getContent(), context, path, srcTable, position,
+            state, schema);
+        } catch (Exception e) {
+          Utils.handleError(LOGGER, context, "Failed to parse the datastream file : " + path, e);
+          continue;
+        } finally {
+          position = 0;
+        }
+        if (consumer.isSnapshot() != snapshot) {
+          continue;
+        }
+        try {
           while (consumer.hasNextEvent()) {
             DMLEvent event = consumer.nextEvent();
             //worker level DML blacklist
@@ -440,10 +501,40 @@ public class DatastreamEventReader implements EventReader {
               emitEvent(event);
             }
           }
-          position = 0;
+        } catch (Exception e) {
+          Utils.handleError(LOGGER, context, "Failed to consume events in the datastream file : " + path, e);
         }
       }
       setLastScanDone(tableName, true);
+    }
+
+    private String parseSchemaKey(String path) {
+      int lastSlashPosition = path.lastIndexOf("/");
+      return path.substring(lastSlashPosition + 1, path.indexOf("_", lastSlashPosition));
+    }
+
+    private Schema updateTableSchema(String tableName, SourceTable table, String schemaKey) {
+      StandardizedTableDetail tableDetail = tableDetails.computeIfAbsent(tableName, n -> getTableDetail(n));
+      if (schemaKey.equals(getSchemaKey(tableName))) {
+        // no schema changes
+        return tableDetail.getSchema();
+      }
+
+      StandardizedTableDetail latestTableDetail = getStandardizedTableDetail(table);
+
+      if (latestTableDetail.equals(tableDetail)) {
+        return tableDetail.getSchema();
+      }
+
+      tableDetail = latestTableDetail;
+      // has schema changes
+      saveSchemaKey(tableName, schemaKey);
+      saveTableDetail(tableName, tableDetail);
+      emitEvent(DDLEvent.builder().setOffset(new Offset(state)).setSnapshot(false).setSchema(tableDetail.getSchema())
+        .setSchemaName(tableDetail.getSchemaName()).setDatabaseName(tableDetail.getDatabase())
+        .setSourceTimestamp(System.currentTimeMillis()).setTableName(tableDetail.getTable())
+        .setOperation(DDLOperation.Type.ALTER_TABLE).setPrimaryKey(tableDetail.getPrimaryKey()).build());
+      return tableDetail.getSchema();
     }
 
     private String parseSourceTime(String tableName, String path) {
@@ -475,6 +566,23 @@ public class DatastreamEventReader implements EventReader {
       if (originalSourceTime == null || originalSourceTime.compareTo(sourceTime) > 0) {
         state.put(tableName + SOURCE_TIME_STATE_KEY_SUFFIX, sourceTime);
       }
+    }
+
+
+    private void saveTableDetail(String tableName, StandardizedTableDetail tableDetail) {
+      state.put(tableName + TABLE_DETAIL_STATE_KEY_SUFFIX, GSON.toJson(tableDetail));
+    }
+
+    private StandardizedTableDetail getTableDetail(String tableName) {
+      return GSON.fromJson(state.get(tableName + TABLE_DETAIL_STATE_KEY_SUFFIX), StandardizedTableDetail.class);
+    }
+
+    private void saveSchemaKey(String tableName, String key) {
+      state.put(tableName + SCHEMA_KEY_STATE_KEY_SUFFIX, key);
+    }
+
+    private String getSchemaKey(String tableName) {
+      return state.get(tableName + SCHEMA_KEY_STATE_KEY_SUFFIX);
     }
 
     private boolean getDumped(String tableName) {
@@ -509,10 +617,10 @@ public class DatastreamEventReader implements EventReader {
     }
 
     private String getSourceTime(String tableName) {
-      return state.getOrDefault(tableName + SOURCE_TIME_STATE_KEY_SUFFIX, null);
+      return state.get(tableName + SOURCE_TIME_STATE_KEY_SUFFIX);
     }
 
-    private String getDumpFilePathPrefix(Bucket bucket, String prefix, SourceTable table) {
+    private String getDumpFilePath(Bucket bucket, String prefix, SourceTable table) {
       Page<Blob> blobs = bucket.list(Storage.BlobListOption.prefix(prefix), Storage.BlobListOption.fields(
         Storage.BlobField.SIZE, Storage.BlobField.NAME));
       for (Blob blob : blobs.iterateAll()) {
@@ -521,7 +629,7 @@ public class DatastreamEventReader implements EventReader {
           DatastreamEventConsumer consumer =
             new DatastreamEventConsumer(blob.getContent(), context, path, table, 0, state);
           if (consumer.isSnapshot()) {
-            return path.substring(0, path.lastIndexOf("/") + 1);
+            return path;
           }
         }
       }

@@ -61,15 +61,19 @@ public class DatastreamEventConsumer {
   private final DataFileReader<GenericRecord> dataFileReader;
   private final boolean isSnapshot;
   private final SourceTable table;
-  private final Schema schema;
   private final Map<String, String> state;
   private final String tableName;
+  private Schema schema;
   private long position;
   private GenericRecord record;
   private DMLEvent event;
 
   public DatastreamEventConsumer(byte[] content, DeltaSourceContext context, String currentPath, SourceTable table,
     long startingPosition, Map<String, String> state) {
+    this (content, context, currentPath, table, startingPosition, state, null);
+  }
+  public DatastreamEventConsumer(byte[] content, DeltaSourceContext context, String currentPath, SourceTable table,
+    long startingPosition, Map<String, String> state, Schema schema) {
     this.content = content;
     this.context = context;
     this.currentPath = currentPath;
@@ -77,7 +81,7 @@ public class DatastreamEventConsumer {
     this.tableName = Utils.buildCompositeTableName(table.getSchema(), table.getTable());
     this.position = startingPosition;
     this.dataFileReader = parseContent();
-    this.schema = parseSchema(dataFileReader.getSchema());
+    this.schema = schema;
     this.isSnapshot = isDumpFile(dataFileReader.getSchema());
     this.state = state;
   }
@@ -256,6 +260,9 @@ public class DatastreamEventConsumer {
   }
 
   private StructuredRecord parseRecord(GenericRecord payload) {
+    if (schema == null) {
+      schema = parseSchema(dataFileReader.getSchema());
+    }
     StructuredRecord.Builder builder = StructuredRecord.builder(schema);
     if (schema.getFields() == null) {
       return builder.build();
@@ -287,5 +294,4 @@ public class DatastreamEventConsumer {
   private void savePosition() {
     state.put(tableName + POSITION_STATE_KEY_SUFFIX, String.valueOf(position++));
   }
-
 }

@@ -217,12 +217,8 @@ public class DatastreamEventConsumer {
 
   private void fetchNext() {
     while (dataFileReader.hasNext()) {
-      try {
-        record = dataFileReader.next(record);
-        savePosition();
-      } catch (IOException e) {
-        throw Utils.handleError(LOGGER, context, "Failed to read next record in : " + currentPath, e);
-      }
+      record = dataFileReader.next();
+      savePosition();
       GenericRecord sourceMetadata = (GenericRecord) record.get(SOURCE_METADATA_FIELD_NAME);
       DMLOperation.Type eventType = DMLOperation.Type.INSERT;
       // if it's not snapshot , get the actual event type

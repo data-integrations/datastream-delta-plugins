@@ -259,7 +259,8 @@ public class DatastreamConfig extends PluginConfig {
   private Credentials getCredentials(String serviceAccountKey) {
     if (serviceAccountKey == null || "auto-detect".equalsIgnoreCase(serviceAccountKey)) {
       try {
-        return GoogleCredentials.getApplicationDefault();
+        return GoogleCredentials.getApplicationDefault()
+          .createScoped(Collections.singleton("https://www.googleapis.com/auth/cloud-platform"));
       } catch (IOException e) {
         throw new RuntimeException("Fail to get application default credentials!", e);
       }

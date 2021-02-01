@@ -53,6 +53,7 @@ class DatastreamTableRegistryTest extends BaseIntegrationTestCase {
       assertNotNull(schema);
       String tableName = table.getTable();
       assertNotNull(tableName);
+      System.out.println(String.format("table : %s.%s", schema, tableName));
       TableDetail tableDetail = null;
       try (DatastreamTableRegistry registry = new DatastreamTableRegistry(config, datastream)) {
         tableDetail = registry.describeTable(oracleDb, schema, tableName);
@@ -67,8 +68,10 @@ class DatastreamTableRegistryTest extends BaseIntegrationTestCase {
         Map<String, String> properties = column.getProperties();
         assertNotNull(properties);
         assertNotNull(column.getType());
+        System.out.println(String.format("column: %s type : %s", column.getName(), column.getType()));
       }
       List<String> primaryKeys = tableDetail.getPrimaryKey();
+      System.out.println("primary keys: " + primaryKeys);
       assertNotNull(primaryKeys);
       for (String key : primaryKeys) {
         assertNotNull(key);

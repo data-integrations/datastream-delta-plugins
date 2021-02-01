@@ -77,7 +77,7 @@ public class DatastreamDeltaSource implements DeltaSource {
     storage = StorageOptions.newBuilder().setCredentials(config.getGcsCredentials())
       .setProjectId(config.getProject()).build().getService();
     datastream = createDatastreamClient();
-    parentPath = Utils.buildParentPath(config.getRegion(), config.getProject());
+    parentPath = Utils.buildParentPath(config.getProject(), config.getRegion());
 
     if (config.isUsingExistingStream()) {
       // for reusing an existing stream, it's possible we add more tables to replicate
@@ -111,7 +111,7 @@ public class DatastreamDeltaSource implements DeltaSource {
 
   @Override
   public DatastreamEventReader createReader(EventReaderDefinition definition, DeltaSourceContext context,
-    EventEmitter eventEmitter) {
+    EventEmitter eventEmitter) throws Exception {
     return new DatastreamEventReader(config, definition, context, eventEmitter, datastream, storage);
   }
 

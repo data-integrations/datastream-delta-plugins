@@ -151,7 +151,7 @@ public class DatastreamConfig extends PluginConfig {
   private String dsServiceAccountKey;
 
   @Nullable
-  @Description("Project of the Datastream stream. When running on a Google Cloud Data Fusion, this can be set to "
+  @Description("Project of the Datastream stream. When running on Google Cloud Platform, this can be set to "
     + "'auto-detect', which will use the project of the Google Cloud Data Fusion.")
   private String project;
 

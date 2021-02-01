@@ -69,11 +69,12 @@ public class DatastreamEventConsumer {
   private DMLEvent event;
 
   public DatastreamEventConsumer(byte[] content, DeltaSourceContext context, String currentPath, SourceTable table,
-    long startingPosition, Map<String, String> state) {
+    long startingPosition, Map<String, String> state) throws Exception {
     this (content, context, currentPath, table, startingPosition, state, null);
   }
+
   public DatastreamEventConsumer(byte[] content, DeltaSourceContext context, String currentPath, SourceTable table,
-    long startingPosition, Map<String, String> state, Schema schema) {
+    long startingPosition, Map<String, String> state, Schema schema) throws Exception {
     this.content = content;
     this.context = context;
     this.currentPath = currentPath;
@@ -86,10 +87,10 @@ public class DatastreamEventConsumer {
     this.state = state;
   }
 
-  private Schema parseSchema(org.apache.avro.Schema schema) {
+  private Schema parseSchema(org.apache.avro.Schema schema) throws Exception {
     org.apache.avro.Schema.Field payload = schema.getField(PAYLOAD_FIELD_NAME);
     if (payload == null) {
-      throw Utils.handleError(LOGGER, context, "Failed to get payload schema from schema : " + schema);
+      throw Utils.handleError(LOGGER, context, "Failed to get payload schema from schema : " + schema, false);
     }
     org.apache.avro.Schema payloadSchema = payload.schema();
     Set<String> columns = table.getColumns().stream().map(column -> column.getName()).collect(Collectors.toSet());
@@ -169,14 +170,14 @@ public class DatastreamEventConsumer {
     }
   }
 
-  private DataFileReader<GenericRecord> parseContent() {
+  private DataFileReader<GenericRecord> parseContent() throws Exception {
     DatumReader<GenericRecord> datumReader = new GenericDatumReader<GenericRecord>();
     SeekableByteArrayInput input = new SeekableByteArrayInput(content);
     DataFileReader<GenericRecord> reader = null;
     try {
        reader = new DataFileReader<>(input, datumReader);
     } catch (IOException e) {
-      throw Utils.handleError(LOGGER, context, "Failed to read or parse file : " + currentPath, e);
+      throw Utils.handleError(LOGGER, context, "Failed to read or parse file : " + currentPath, e, true);
     }
     for (int i = 0; i < position; i++) {
       if (reader.hasNext()) {
@@ -188,11 +189,11 @@ public class DatastreamEventConsumer {
     return reader;
   }
 
-  private boolean isDumpFile(org.apache.avro.Schema schema) {
+  private boolean isDumpFile(org.apache.avro.Schema schema) throws Exception {
     org.apache.avro.Schema.Field metaData = schema.getField(SOURCE_METADATA_FIELD_NAME);
     if (metaData == null) {
       throw handleError(LOGGER, context,
-        String.format("Cannot find %s field in the schema %s", SOURCE_METADATA_FIELD_NAME, schema.toString()));
+        String.format("Cannot find %s field in the schema %s", SOURCE_METADATA_FIELD_NAME, schema.toString()), false);
     }
     return metaData.schema().getField(CHANGE_TYPE_FIELD_NAME) == null;
   }
@@ -207,7 +208,7 @@ public class DatastreamEventConsumer {
   /**
    * @return whether there is more event available to be read
    */
-  public boolean hasNextEvent() {
+  public boolean hasNextEvent() throws Exception {
     // lazy fetch
     if (event == null) {
       fetchNext();
@@ -215,7 +216,7 @@ public class DatastreamEventConsumer {
     return event != null;
   }
 
-  private void fetchNext() {
+  private void fetchNext() throws Exception {
     while (dataFileReader.hasNext()) {
       record = dataFileReader.next();
       savePosition();
@@ -246,7 +247,7 @@ public class DatastreamEventConsumer {
   /**
    * @return the next available DML event
    */
-  public DMLEvent nextEvent() {
+  public DMLEvent nextEvent() throws Exception {
     if (!hasNextEvent()) {
       throw new NoSuchElementException("No more event!");
     }
@@ -255,7 +256,7 @@ public class DatastreamEventConsumer {
     return result;
   }
 
-  private StructuredRecord parseRecord(GenericRecord payload) {
+  private StructuredRecord parseRecord(GenericRecord payload) throws Exception {
     if (schema == null) {
       schema = parseSchema(dataFileReader.getSchema());
     }

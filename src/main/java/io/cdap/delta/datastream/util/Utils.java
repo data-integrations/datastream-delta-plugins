@@ -35,6 +35,7 @@ import com.google.api.services.datastream.v1alpha1.model.SourceConfig;
 import com.google.api.services.datastream.v1alpha1.model.StaticServiceIpConnectivity;
 import com.google.api.services.datastream.v1alpha1.model.Stream;
 import com.google.common.base.Joiner;
+import io.cdap.delta.api.DeltaFailureException;
 import io.cdap.delta.api.DeltaPipelineId;
 import io.cdap.delta.api.DeltaSourceContext;
 import io.cdap.delta.api.ReplicationError;
@@ -72,8 +73,6 @@ public final class Utils {
 
   private Utils() {
   }
-
-  ;
 
   /**
    * Convert the string oracle data type returned by Datastream to SQLType
@@ -195,11 +194,11 @@ public final class Utils {
   /**
    * Build the parent path of a stream based on the region of the stream
    *
-   * @param region  the region of the stream
    * @param project the project in which the stream is in
+   * @param region  the region of the stream
    * @return parent path of the stream
    */
-  public static String buildParentPath(String region, String project) {
+  public static String buildParentPath(String project, String region) {
     return String.format("projects/%s/locations/%s", project, region);
   }
 
@@ -364,11 +363,17 @@ public final class Utils {
    * @param logger       the logger to log the error
    * @param context      the Delta source context
    * @param errorMessage the error message
+   * @param recoverable  whether the error is recoverable
    * @return the runtime exception constructed from the error message
    */
-  public static DatastreamDeltaSourceException handleError(Logger logger, DeltaSourceContext context,
-    String errorMessage) {
-    DatastreamDeltaSourceException e = new DatastreamDeltaSourceException(errorMessage);
+  public static Exception handleError(Logger logger, DeltaSourceContext context,
+    String errorMessage, boolean recoverable) {
+    Exception e;
+    if (recoverable) {
+      e = new DatastreamDeltaSourceException(errorMessage);
+    } else {
+      e = new DeltaFailureException(errorMessage);
+    }
     setError(logger, context, e);
     return e;
   }
@@ -381,12 +386,16 @@ public final class Utils {
    * @param context      the Delta source context
    * @param errorMessage the error message
    * @param cause        the exception for the cause of error
+   * @param recoverable  whether the error is recoverable
    * @return the runtime exception constructed from the error message and the casue
    */
-  public static DatastreamDeltaSourceException handleError(Logger logger, DeltaSourceContext context,
-    String errorMessage, Exception cause) {
+  public static Exception handleError(Logger logger, DeltaSourceContext context,
+    String errorMessage, Exception cause, boolean recoverable) {
     setError(logger, context, cause);
-    return new DatastreamDeltaSourceException(errorMessage, cause);
+    if (recoverable) {
+      return new DatastreamDeltaSourceException(errorMessage, cause);
+    }
+    return new DeltaFailureException(errorMessage, cause);
   }
 
   /**

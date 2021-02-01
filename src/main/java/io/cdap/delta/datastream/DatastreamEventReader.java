@@ -45,7 +45,6 @@ import io.cdap.delta.api.SourceTable;
 import io.cdap.delta.api.assessment.StandardizedTableDetail;
 import io.cdap.delta.api.assessment.TableDetail;
 import io.cdap.delta.api.assessment.TableNotFoundException;
-import io.cdap.delta.datastream.util.DatastreamDeltaSourceException;
 import io.cdap.delta.datastream.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,7 +105,7 @@ public class DatastreamEventReader implements EventReader {
   private final String databaseName;
 
   public DatastreamEventReader(DatastreamConfig config, EventReaderDefinition definition, DeltaSourceContext context,
-    EventEmitter emitter, DataStream datastream, Storage storage) {
+    EventEmitter emitter, DataStream datastream, Storage storage) throws Exception {
     this.context = context;
     this.config = config;
     this.definition = definition;
@@ -116,14 +115,14 @@ public class DatastreamEventReader implements EventReader {
     this.storage = storage;
     String streamId = config.isUsingExistingStream() ? config.getStreamId() :
       Utils.buildStreamName(Utils.buildReplicatorId(context));
-    this.streamPath = Utils.buildStreamPath(Utils.buildParentPath(config.getRegion(), config.getProject()), streamId);
+    this.streamPath = Utils.buildStreamPath(Utils.buildParentPath(config.getProject(), config.getRegion()), streamId);
 
     //TODO optimize below logic to get information from config if not using existing stream
     Stream stream;
     try {
       stream = datastream.projects().locations().streams().get(streamPath).execute();
     } catch (IOException e) {
-      throw Utils.handleError(LOGGER, context, "Failed to get stream : " + streamPath, e);
+      throw Utils.handleError(LOGGER, context, "Failed to get stream : " + streamPath, e, true);
     }
     String oracleProfileName = stream.getSourceConfig().getSourceConnectionProfileName();
     try {
@@ -131,7 +130,8 @@ public class DatastreamEventReader implements EventReader {
         datastream.projects().locations().connectionProfiles().get(oracleProfileName).execute().getOracleProfile();
       this.databaseName = oracleProfile.getDatabaseService();
     } catch (IOException e) {
-      throw Utils.handleError(LOGGER, context, "Failed to get oracle connection profile : " + oracleProfileName, e);
+      throw Utils
+        .handleError(LOGGER, context, "Failed to get oracle connection profile : " + oracleProfileName, e, true);
     }
     String path = stream.getDestinationConfig().getGcsDestinationConfig().getPath();
     this.streamGcsPathPrefix =  path.startsWith("/") ? path.substring(1) : path;
@@ -143,15 +143,20 @@ public class DatastreamEventReader implements EventReader {
       path = gcsProfile.getRootPath();
       this.gcsRootPath = path.startsWith("/") ? path.substring(1) : path;
     } catch (IOException e) {
-      throw Utils.handleError(LOGGER, context, "Failed to get GCS connection profile : " + gcsProfileName, e);
+      throw Utils.handleError(LOGGER, context, "Failed to get GCS connection profile : " + gcsProfileName, e, true);
     }
   }
 
   @Override
   public void start(Offset offset) {
 
-    startStreamIfNot();
-    executorService.scheduleWithFixedDelay(new ScanTask(offset), 0, SCAN_INTERVAL_IN_SECONDS, TimeUnit.SECONDS);
+    try {
+      startStreamIfNot();
+    } catch (Throwable e) {
+      context.notifyFailed(e);
+      return;
+    }
+    executorService.scheduleAtFixedRate(new ScanTask(offset), 0, SCAN_INTERVAL_IN_SECONDS, TimeUnit.SECONDS);
 
   }
 
@@ -172,13 +177,13 @@ public class DatastreamEventReader implements EventReader {
     }
   }
 
-  private void startStreamIfNot() {
+  private void startStreamIfNot() throws Exception {
 
     Stream stream = null;
     try {
       stream = datastream.projects().locations().streams().get(streamPath).execute();
     } catch (IOException e) {
-      throw Utils.handleError(LOGGER, context, String.format("Failed to get stream: %s", streamPath), e);
+      throw Utils.handleError(LOGGER, context, String.format("Failed to get stream: %s", streamPath), e, true);
     }
 
     Operation operation = null;
@@ -186,13 +191,13 @@ public class DatastreamEventReader implements EventReader {
       try {
         operation = datastream.projects().locations().streams().resume(streamPath, new ResumeStreamRequest()).execute();
       } catch (IOException e) {
-        throw Utils.handleError(LOGGER, context, String.format("Failed to resume stream: %s", streamPath), e);
+        throw Utils.handleError(LOGGER, context, String.format("Failed to resume stream: %s", streamPath), e, true);
       }
     } else if (STREAM_STATE_CREATED.equals(stream.getState())) {
       try {
         operation = datastream.projects().locations().streams().start(streamPath, new StartStreamRequest()).execute();
       } catch (IOException e) {
-        throw Utils.handleError(LOGGER, context, String.format("Failed to start stream: %s", streamPath), e);
+        throw Utils.handleError(LOGGER, context, String.format("Failed to start stream: %s", streamPath), e, true);
       }
     }
 
@@ -211,21 +216,21 @@ public class DatastreamEventReader implements EventReader {
     public void run() {
       try {
         scanResults();
-      } catch (DatastreamDeltaSourceException e) {
+      } catch (Exception e) {
         context.notifyFailed(e);
       } catch (Throwable t) {
         //handle un-detected errors
         try {
           context.setError(new ReplicationError(t));
         } catch (IOException e) {
-          LOGGER.error("Failed to set error {} in context ", t);
+          LOGGER.error(String.format("Failed to set error %s in context", t), e);
         } finally {
           context.notifyFailed(t);
         }
       }
     }
 
-    private void scanResults() {
+    private void scanResults() throws Exception {
       /**
        Scanning strategy:
        Assume we have below SLO:
@@ -299,10 +304,10 @@ public class DatastreamEventReader implements EventReader {
       try {
          stream = datastream.projects().locations().streams().get(streamPath).execute();
       } catch (IOException e) {
-        Utils.handleError(LOGGER, context, "Failed to get stream " + streamPath, e);
+        Utils.handleError(LOGGER, context, "Failed to get stream " + streamPath, e, true);
       }
       if (stream != null && !"RUNNING".equals(stream.getState())) {
-        Utils.handleError(LOGGER, context, "Stream " + streamPath + " is in status : " + stream.getState());
+        Utils.handleError(LOGGER, context, "Stream " + streamPath + " is in status : " + stream.getState(), true);
       } else {
         try {
           context.setOK();
@@ -393,7 +398,7 @@ public class DatastreamEventReader implements EventReader {
       clearPosition(tableName);
     }
 
-    private String getStartingSourceTime(String sourceTime) {
+    private String getStartingSourceTime(String sourceTime) throws Exception {
       if (sourceTime == null) {
         return null;
       }
@@ -405,11 +410,11 @@ public class DatastreamEventReader implements EventReader {
           .toMillis(DATASTREAM_SLA_IN_MINUTES));
       } catch (ParseException e) {
         throw Utils.handleError(
-          LOGGER, context, String.format("Failed to parse date from : %s", sourceTime), e);
+          LOGGER, context, String.format("Failed to parse date from : %s", sourceTime), e, false);
       }
     }
 
-    private void emitCreateTableDDL(String tableName, SourceTable table, String schemaKey) {
+    private void emitCreateTableDDL(String tableName, SourceTable table, String schemaKey) throws Exception {
       StandardizedTableDetail tableDetail = getStandardizedTableDetail(table);
       DDLEvent event = DDLEvent.builder().setDatabaseName(table.getDatabase()).setTableName(table.getTable())
         .setSchemaName(table.getSchema()).setOperation(DDLOperation.Type.CREATE_TABLE)
@@ -423,7 +428,7 @@ public class DatastreamEventReader implements EventReader {
       emitEvent(event);
     }
 
-    private StandardizedTableDetail getStandardizedTableDetail(SourceTable table) {
+    private StandardizedTableDetail getStandardizedTableDetail(SourceTable table) throws Exception {
       DatastreamTableRegistry tableRegistry = new DatastreamTableRegistry(config, datastream);
       TableDetail tableDetail;
       try {
@@ -431,17 +436,18 @@ public class DatastreamEventReader implements EventReader {
       } catch (TableNotFoundException e) {
         throw Utils.handleError(LOGGER, context,
           String.format("Cannot find the table: database: %s, schema: %s, table: %s", table.getDatabase(),
-            table.getSchema(), table.getTable()), e);
+            table.getSchema(), table.getTable()), e, true);
       } catch (IOException e) {
         throw Utils.handleError(LOGGER, context,
           String.format("Failed to describe the table: database: %s, schema: %s, table: %s", table.getDatabase(),
-            table.getSchema(), table.getTable()), e);
+            table.getSchema(), table.getTable()), e, true);
       }
       StandardizedTableDetail standardizedTableDetail = tableRegistry.standardize(tableDetail);
       return standardizedTableDetail;
     }
 
-    private void scanEvents(Page<Blob> allBlobs, String tableName, SourceTable srcTable, boolean snapshot) {
+    private void scanEvents(Page<Blob> allBlobs, String tableName, SourceTable srcTable, boolean snapshot)
+      throws Exception {
       List<BlobWrapper> blobs = new ArrayList<>();
 
       for (Blob blob : allBlobs.iterateAll()) {
@@ -481,28 +487,18 @@ public class DatastreamEventReader implements EventReader {
         }
 
         DatastreamEventConsumer consumer;
-        try {
-          consumer = new DatastreamEventConsumer(blob.getBlob().getContent(), context, path, srcTable, position,
-            state, schema);
-        } catch (Exception e) {
-          Utils.handleError(LOGGER, context, "Failed to parse the datastream file : " + path, e);
-          continue;
-        } finally {
-          position = 0;
-        }
+        consumer =
+          new DatastreamEventConsumer(blob.getBlob().getContent(), context, path, srcTable, position, state, schema);
+        position = 0;
         if (consumer.isSnapshot() != snapshot) {
           continue;
         }
-        try {
-          while (consumer.hasNextEvent()) {
-            DMLEvent event = consumer.nextEvent();
-            //worker level DML blacklist
-            if (!definition.getDmlBlacklist().contains(event.getOperation().getType())) {
-              emitEvent(event);
-            }
+        while (consumer.hasNextEvent()) {
+          DMLEvent event = consumer.nextEvent();
+          //worker level DML blacklist
+          if (!definition.getDmlBlacklist().contains(event.getOperation().getType())) {
+            emitEvent(event);
           }
-        } catch (Exception e) {
-          Utils.handleError(LOGGER, context, "Failed to consume events in the datastream file : " + path, e);
         }
       }
       setLastScanDone(tableName, true);
@@ -513,7 +509,7 @@ public class DatastreamEventReader implements EventReader {
       return path.substring(lastSlashPosition + 1, path.indexOf("_", lastSlashPosition));
     }
 
-    private Schema updateTableSchema(String tableName, SourceTable table, String schemaKey) {
+    private Schema updateTableSchema(String tableName, SourceTable table, String schemaKey) throws Exception {
       StandardizedTableDetail tableDetail = tableDetails.computeIfAbsent(tableName, n -> getTableDetail(n));
       if (schemaKey.equals(getSchemaKey(tableName))) {
         // no schema changes
@@ -568,7 +564,6 @@ public class DatastreamEventReader implements EventReader {
       }
     }
 
-
     private void saveTableDetail(String tableName, StandardizedTableDetail tableDetail) {
       state.put(tableName + TABLE_DETAIL_STATE_KEY_SUFFIX, GSON.toJson(tableDetail));
     }
@@ -620,7 +615,7 @@ public class DatastreamEventReader implements EventReader {
       return state.get(tableName + SOURCE_TIME_STATE_KEY_SUFFIX);
     }
 
-    private String getDumpFilePath(Bucket bucket, String prefix, SourceTable table) {
+    private String getDumpFilePath(Bucket bucket, String prefix, SourceTable table) throws Exception {
       Page<Blob> blobs = bucket.list(Storage.BlobListOption.prefix(prefix), Storage.BlobListOption.fields(
         Storage.BlobField.SIZE, Storage.BlobField.NAME));
       for (Blob blob : blobs.iterateAll()) {
@@ -657,7 +652,7 @@ public class DatastreamEventReader implements EventReader {
           emitter.emit((DDLEvent) event);
         }
       } catch (InterruptedException e) {
-        Utils.handleError(LOGGER, context, "Failed to emit event : " + GSON.toJson(event), e);
+        Utils.handleError(LOGGER, context, "Failed to emit event : " + GSON.toJson(event), e, true);
       }
     }
   }

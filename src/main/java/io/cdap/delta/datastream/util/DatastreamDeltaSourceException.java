@@ -19,7 +19,12 @@ package io.cdap.delta.datastream.util;
 
 /**
  * Exception thrown by Datastream Delta Source on purpose. Such exception is thrown after Datastream Delta Source
- * detects certain errors. Such exception should be hanlded by restarting the Datastream Delta Source.
+ * detects certain errors. Such exception should be handled by restarting the Datastream Delta Source. For example,
+ * some long running operation of datastream failed (create stream , start stream , pause stream, etc.)
+ * This exception is used to differentiate from those exception:
+ * 1) Some runtime exception that was not caught by Datastream Delta Source (for example, NPE)
+ * 2) Some exception that could not be recovered. (for example, datastream generated a result dump/cdc file that
+ * cannot be parsed.)
  */
 public class DatastreamDeltaSourceException extends RuntimeException {
   public DatastreamDeltaSourceException(String errorMessage, Exception cause) {

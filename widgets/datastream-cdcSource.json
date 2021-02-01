@@ -2,7 +2,7 @@
   "metadata": {
     "spec-version": "1.5"
   },
-  "display-name": "DataStream(for Oracle)",
+  "display-name": "Oracle by DataStream",
   "configuration-groups": [
     {
       "label": "Existing or New stream",
@@ -147,17 +147,17 @@
           "name": "sshPrivateKey",
           "label": "Private Key",
           "widget-type": "securekey-textarea"
-        },
-        {
-          "name": "gcsBucket",
-          "label": "GCS Bucket",
-          "widget-type": "textbox"
         }
       ]
     },
     {
       "label": "Advanced",
       "properties": [
+        {
+          "name": "gcsBucket",
+          "label": "GCS Bucket",
+          "widget-type": "textbox"
+        },
         {
           "name": "gcsPathPrefix",
           "label": "Path Prefix",
@@ -175,6 +175,14 @@
           "name": "dsServiceAccountKey",
           "label": "Datastream Service Account Key",
           "widget-type": "securekey-textarea",
+          "widget-attributes": {
+            "default": "auto-detect"
+          }
+        },
+        {
+          "name": "project",
+          "label": "Project ID",
+          "widget-type": "textbox",
           "widget-attributes": {
             "default": "auto-detect"
           }
@@ -217,6 +225,10 @@
         {
           "type": "group",
           "name": "Credentials"
+        },
+        {
+          "type": "property",
+          "name": "gcsBucket"
         }
       ]
     },

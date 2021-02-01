@@ -23,7 +23,6 @@ import com.google.api.services.datastream.v1alpha1.DataStream;
 import com.google.api.services.datastream.v1alpha1.model.Operation;
 import com.google.api.services.datastream.v1alpha1.model.Stream;
 import com.google.auth.http.HttpCredentialsAdapter;
-import com.google.cloud.ServiceOptions;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
@@ -76,9 +75,9 @@ public class DatastreamDeltaSource implements DeltaSource {
   @Override
   public void initialize(DeltaSourceContext context) throws Exception {
     storage = StorageOptions.newBuilder().setCredentials(config.getGcsCredentials())
-      .setProjectId(ServiceOptions.getDefaultProjectId()).build().getService();
+      .setProjectId(config.getProject()).build().getService();
     datastream = createDatastreamClient();
-    parentPath = Utils.buildParentPath(config.getRegion());
+    parentPath = Utils.buildParentPath(config.getProject(), config.getRegion());
 
     if (config.isUsingExistingStream()) {
       // for reusing an existing stream, it's possible we add more tables to replicate
@@ -112,7 +111,7 @@ public class DatastreamDeltaSource implements DeltaSource {
 
   @Override
   public DatastreamEventReader createReader(EventReaderDefinition definition, DeltaSourceContext context,
-    EventEmitter eventEmitter) {
+    EventEmitter eventEmitter) throws Exception {
     return new DatastreamEventReader(config, definition, context, eventEmitter, datastream, storage);
   }
 

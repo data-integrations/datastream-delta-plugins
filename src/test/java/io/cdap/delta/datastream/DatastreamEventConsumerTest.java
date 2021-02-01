@@ -28,7 +28,6 @@ import io.cdap.delta.api.SourceTable;
 import io.cdap.delta.datastream.util.MockSourceContext;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DatastreamEventConsumerTest {
 
   @Test
-  public void testDump() throws IOException {
+  public void testDump() throws Exception {
     byte[] content = ByteStreams.toByteArray(this.getClass().getClassLoader().getResourceAsStream("dump.avro"));
     String path = "current_path";
     Map<String, String> state = new HashMap<>();
@@ -90,7 +89,7 @@ class DatastreamEventConsumerTest {
   }
 
   @Test
-  public void testBlacklist() throws IOException {
+  public void testBlacklist() throws Exception {
     byte[] content = ByteStreams.toByteArray(this.getClass().getClassLoader().getResourceAsStream("insert.avro"));
     String path = "current_path";
     Map<String, String> state = new HashMap<>();
@@ -111,7 +110,7 @@ class DatastreamEventConsumerTest {
   }
 
   @Test
-  public void testInsert() throws IOException {
+  public void testInsert() throws Exception {
     byte[] content = ByteStreams.toByteArray(this.getClass().getClassLoader().getResourceAsStream("insert.avro"));
     String path = "current_path";
     Map<String, String> state = new HashMap<>();
@@ -157,7 +156,7 @@ class DatastreamEventConsumerTest {
   }
 
   @Test
-  public void testUpdate() throws IOException {
+  public void testUpdate() throws Exception {
     byte[] content = ByteStreams.toByteArray(this.getClass().getClassLoader().getResourceAsStream("update.avro"));
     String path = "current_path";
     Map<String, String> state = new HashMap<>();
@@ -203,7 +202,7 @@ class DatastreamEventConsumerTest {
   }
 
   @Test
-  public void testDelete() throws IOException {
+  public void testDelete() throws Exception {
     byte[] content = ByteStreams.toByteArray(this.getClass().getClassLoader().getResourceAsStream("delete.avro"));
     String path = "current_path";
     Map<String, String> state = new HashMap<>();

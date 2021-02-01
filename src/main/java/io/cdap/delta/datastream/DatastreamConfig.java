@@ -18,6 +18,7 @@ package io.cdap.delta.datastream;
 
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.ServiceOptions;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Macro;
 import io.cdap.cdap.api.plugin.PluginConfig;
@@ -149,6 +150,11 @@ public class DatastreamConfig extends PluginConfig {
     "account will be used when replicator pipeline is running.")
   private String dsServiceAccountKey;
 
+  @Nullable
+  @Description("Project of the Datastream stream. When running on Google Cloud Platform, this can be set to "
+    + "'auto-detect', which will use the project of the Google Cloud Data Fusion.")
+  private String project;
+
   public boolean isUsingExistingStream() {
     return usingExistingStream;
   }
@@ -243,10 +249,18 @@ public class DatastreamConfig extends PluginConfig {
     return getCredentials(dsServiceAccountKey);
   }
 
+  public String getProject() {
+    if (project == null || project.trim().isEmpty() || "auto-detect".equalsIgnoreCase(project)) {
+      return ServiceOptions.getDefaultProjectId();
+    }
+    return project;
+  }
+
   private Credentials getCredentials(String serviceAccountKey) {
     if (serviceAccountKey == null || "auto-detect".equalsIgnoreCase(serviceAccountKey)) {
       try {
-        return GoogleCredentials.getApplicationDefault();
+        return GoogleCredentials.getApplicationDefault()
+          .createScoped(Collections.singleton("https://www.googleapis.com/auth/cloud-platform"));
       } catch (IOException e) {
         throw new RuntimeException("Fail to get application default credentials!", e);
       }
@@ -265,7 +279,7 @@ public class DatastreamConfig extends PluginConfig {
     @Nullable String connectivityMethod, @Nullable String sshHost, @Nullable Integer sshPort, @Nullable String sshUser,
     @Nullable String sshAuthenticationMethod, @Nullable String sshPassword, @Nullable String sshPrivateKey,
     @Nullable String gcsBucket, @Nullable String gcsPathPrefix, @Nullable String gcsServiceAccountKey,
-    @Nullable String dsServiceAccountKey, @Nullable String streamId) {
+    @Nullable String dsServiceAccountKey, @Nullable String streamId, @Nullable String project) {
     this.usingExistingStream = usingExistingStream;
     this.host = host;
     this.port = port;
@@ -285,6 +299,7 @@ public class DatastreamConfig extends PluginConfig {
     this.gcsServiceAccountKey = gcsServiceAccountKey;
     this.dsServiceAccountKey = dsServiceAccountKey;
     this.streamId = streamId;
+    this.project = project;
     validate();
   }
 

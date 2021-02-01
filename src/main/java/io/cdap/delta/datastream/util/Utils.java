@@ -34,8 +34,8 @@ import com.google.api.services.datastream.v1alpha1.model.OracleTable;
 import com.google.api.services.datastream.v1alpha1.model.SourceConfig;
 import com.google.api.services.datastream.v1alpha1.model.StaticServiceIpConnectivity;
 import com.google.api.services.datastream.v1alpha1.model.Stream;
-import com.google.cloud.ServiceOptions;
 import com.google.common.base.Joiner;
+import io.cdap.delta.api.DeltaFailureException;
 import io.cdap.delta.api.DeltaPipelineId;
 import io.cdap.delta.api.DeltaSourceContext;
 import io.cdap.delta.api.ReplicationError;
@@ -61,7 +61,7 @@ import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_FORW
 import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING;
 
 /**
- *  Common Utils for Datastream source plugins
+ * Common Utils for Datastream source plugins
  */
 public final class Utils {
 
@@ -71,7 +71,8 @@ public final class Utils {
   private static final String GCS_PROFILE_NAME_PREFIX = "DF-GCS-";
   private static final String STREAM_NAME_PREFIX = "DF-Stream-";
 
-  private Utils() { };
+  private Utils() {
+  }
 
   /**
    * Convert the string oracle data type returned by Datastream to SQLType
@@ -168,9 +169,8 @@ public final class Utils {
     switch (config.getConnectivityMethod()) {
       case CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL:
         ForwardSshTunnelConnectivity forwardSSHTunnelConnectivity =
-          new ForwardSshTunnelConnectivity().setHostname(config.getSshHost())
-            .setPassword(config.getSshPassword()).setPort(config.getSshPort())
-            .setUsername(config.getSshUser());
+          new ForwardSshTunnelConnectivity().setHostname(config.getSshHost()).setPassword(config.getSshPassword())
+            .setPort(config.getSshPort()).setUsername(config.getSshUser());
         switch (config.getSshAuthenticationMethod()) {
           case AUTHENTICATION_METHOD_PASSWORD:
             forwardSSHTunnelConnectivity.setPassword(config.getSshPassword());
@@ -184,43 +184,43 @@ public final class Utils {
         }
         return profile.setForwardSshConnectivity(forwardSSHTunnelConnectivity);
       case CONNECTIVITY_METHOD_IP_ALLOWLISTING:
-        return profile
-          .setStaticServiceIpConnectivity(new StaticServiceIpConnectivity());
+        return profile.setStaticServiceIpConnectivity(new StaticServiceIpConnectivity());
       default:
-        throw new IllegalArgumentException(
-          "Unsupported connectivity method: " + config.getConnectivityMethod());
+        throw new IllegalArgumentException("Unsupported connectivity method: " + config.getConnectivityMethod());
     }
   }
 
 
   /**
    * Build the parent path of a stream based on the region of the stream
-   * @param region the region of the stream
+   *
+   * @param project the project in which the stream is in
+   * @param region  the region of the stream
    * @return parent path of the stream
    */
-  public static String buildParentPath(String region) {
-    return String.format("projects/%s/locations/%s", ServiceOptions.getDefaultProjectId(), region);
+  public static String buildParentPath(String project, String region) {
+    return String.format("projects/%s/locations/%s", project, region);
   }
 
   /**
    * Build a Datastream stream config
+   *
    * @param parentPath the parent path of the stream to be crated
-   * @param name the name of the stream to be created
+   * @param name       the name of the stream to be created
    * @param sourcePath the path of the source connection profile
    * @param targetPath the path of the target connection profile
-   * @param tables tables to be tracked changes of
+   * @param tables     tables to be tracked changes of
    * @return the Datastream stream config
    */
-  public static Stream buildStreamConfig(String parentPath, String name, String sourcePath,
-    String targetPath, Set<SourceTable> tables) {
-    return
-      new Stream().setDisplayName(name).setDestinationConfig(
-        new DestinationConfig().setDestinationConnectionProfileName(targetPath).setGcsDestinationConfig(
-          new GcsDestinationConfig().setAvroFileFormat(new AvroFileFormat()).setPath("/" + name)
-            .setFileRotationMb(FILE_ROTATIONS_SIZE_IN_MB)
-            .setFileRotationInterval(FILE_ROTATION_INTERVAL_IN_SECONDS + "s")))
-        .setSourceConfig(new SourceConfig().setSourceConnectionProfileName(sourcePath)
-          .setOracleSourceConfig(new OracleSourceConfig().setAllowlist(buildAllowlist(tables))));
+  public static Stream buildStreamConfig(String parentPath, String name, String sourcePath, String targetPath,
+    Set<SourceTable> tables) {
+    return new Stream().setDisplayName(name).setDestinationConfig(
+      new DestinationConfig().setDestinationConnectionProfileName(targetPath).setGcsDestinationConfig(
+        new GcsDestinationConfig().setAvroFileFormat(new AvroFileFormat()).setPath("/" + name)
+          .setFileRotationMb(FILE_ROTATIONS_SIZE_IN_MB)
+          .setFileRotationInterval(FILE_ROTATION_INTERVAL_IN_SECONDS + "s"))).setSourceConfig(
+      new SourceConfig().setSourceConnectionProfileName(sourcePath)
+        .setOracleSourceConfig(new OracleSourceConfig().setAllowlist(buildAllowlist(tables))));
   }
 
   // build an allow list of what tables to be tracked change of
@@ -231,7 +231,7 @@ public final class Utils {
   }
 
   private static void addTablesToAllowList(Set<SourceTable> tables, List<OracleSchema> schemas) {
-    Map<String, Set<String>> schemaToTables = schemas.stream().collect(Collectors.toMap(s->s.getSchemaName(),
+    Map<String, Set<String>> schemaToTables = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(),
       s -> s.getOracleTables().stream().map(o -> o.getTableName()).collect(Collectors.toSet())));
     Map<String, OracleSchema> nameToSchema = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s -> s));
 
@@ -254,6 +254,7 @@ public final class Utils {
 
   /**
    * Wait until the specified operation is completed.
+   *
    * @param operation the operation to wait for
    * @return the refreshed operation with latest status
    */
@@ -267,10 +268,11 @@ public final class Utils {
         operation = datastream.projects().locations().operations().get(operation.getName()).execute();
       }
     } catch (Exception e) {
-      throw new RuntimeException(String.format("Failed to query status of operation: %s", operation.toString()), e);
+      throw new DatastreamDeltaSourceException(
+        String.format("Failed to query status of operation: %s", operation.toString()), e);
     }
     if (operation.getError() != null) {
-      throw new RuntimeException(String
+      throw new DatastreamDeltaSourceException(String
         .format("Operation %s failed with error code :%s and error message: %s", operation.toString(),
           operation.getError().getCode(), operation.getError().getMessage()));
     }
@@ -279,23 +281,24 @@ public final class Utils {
 
   /**
    * Build a Datastream GCS connection profile
-   * @param parentPath the parent path of the connection profile to be created
-   * @param name the name of the connection profile to be created
-   * @param gcsBucket the name of GCS bucket where the stream result will be written to
+   *
+   * @param parentPath    the parent path of the connection profile to be created
+   * @param name          the name of the connection profile to be created
+   * @param gcsBucket     the name of GCS bucket where the stream result will be written to
    * @param gcsPathPrefix the prefix of the path for the stream result
    * @return the Datastream GCS connection profile
    */
-  public static ConnectionProfile buildGcsConnectionProfile(String parentPath, String name,
-    String gcsBucket, String gcsPathPrefix) {
-    return new ConnectionProfile().setDisplayName(name)
-        .setNoConnectivity(new NoConnectivitySettings()).setGcsProfile(
-          new GcsProfile().setBucketName(gcsBucket).setRootPath(gcsPathPrefix));
+  public static ConnectionProfile buildGcsConnectionProfile(String parentPath, String name, String gcsBucket,
+    String gcsPathPrefix) {
+    return new ConnectionProfile().setDisplayName(name).setNoConnectivity(new NoConnectivitySettings())
+      .setGcsProfile(new GcsProfile().setBucketName(gcsBucket).setRootPath(gcsPathPrefix));
   }
 
   /**
    * Build the path of a Datastream connection profile
+   *
    * @param parentPath the parent path of the connection profile
-   * @param name the name of the connection profile
+   * @param name       the name of the connection profile
    * @return the path of the connection profile
    */
   public static String buildConnectionProfilePath(String parentPath, String name) {
@@ -304,6 +307,7 @@ public final class Utils {
 
   /**
    * Build the predefined Datastream Oracle connection profile name for a replicator instance
+   *
    * @param replicatorId the id of a replicator
    * @return the predefined Datastream Oracle connection profile name
    */
@@ -313,6 +317,7 @@ public final class Utils {
 
   /**
    * Build the predefined Datastream GCS connection profile name for a replicator instance
+   *
    * @param replicatorId the id of a replicator
    * @return the predefined Datastream GCS connection profile name
    */
@@ -322,8 +327,9 @@ public final class Utils {
 
   /**
    * Build the path of a Datastream stream
+   *
    * @param parentPath the parent path of the stream
-   * @param name the name of the stream
+   * @param name       the name of the stream
    * @return the path of the stream
    */
   public static String buildStreamPath(String parentPath, String name) {
@@ -332,6 +338,7 @@ public final class Utils {
 
   /**
    * Build the predefined Datastream stream name for a replicator instance
+   *
    * @param replicatorId the id of a replicator
    * @return the predefined Datastream source connection profile name
    */
@@ -341,6 +348,7 @@ public final class Utils {
 
   /**
    * Build the stringed form of an id for a replicator
+   *
    * @param context the delta source context
    * @return the stringed form of an id for the replicator
    */
@@ -351,13 +359,21 @@ public final class Utils {
 
   /**
    * Log the error with corresponding error message and construct the corresponding runtime exception with this message
-   * @param logger the logger to log the error
-   * @param context the Delta source context
+   *
+   * @param logger       the logger to log the error
+   * @param context      the Delta source context
    * @param errorMessage the error message
+   * @param recoverable  whether the error is recoverable
    * @return the runtime exception constructed from the error message
    */
-  public static RuntimeException handleError(Logger logger, DeltaSourceContext context, String errorMessage) {
-    RuntimeException e = new RuntimeException(errorMessage);
+  public static Exception handleError(Logger logger, DeltaSourceContext context,
+    String errorMessage, boolean recoverable) {
+    Exception e;
+    if (recoverable) {
+      e = new DatastreamDeltaSourceException(errorMessage);
+    } else {
+      e = new DeltaFailureException(errorMessage);
+    }
     setError(logger, context, e);
     return e;
   }
@@ -365,23 +381,29 @@ public final class Utils {
   /**
    * Log the error with corresponding error message and the exception of the cause of the error and construct the
    * runtime exception with this message and cause
-   * @param logger the logger to log the error
-   * @param context the Delta source context
+   *
+   * @param logger       the logger to log the error
+   * @param context      the Delta source context
    * @param errorMessage the error message
-   * @param cause the exception for the cause of error
+   * @param cause        the exception for the cause of error
+   * @param recoverable  whether the error is recoverable
    * @return the runtime exception constructed from the error message and the casue
    */
-  public static RuntimeException handleError(Logger logger, DeltaSourceContext context, String errorMessage,
-    Exception cause) {
+  public static Exception handleError(Logger logger, DeltaSourceContext context,
+    String errorMessage, Exception cause, boolean recoverable) {
     setError(logger, context, cause);
-    return new RuntimeException(errorMessage, cause);
+    if (recoverable) {
+      return new DatastreamDeltaSourceException(errorMessage, cause);
+    }
+    return new DeltaFailureException(errorMessage, cause);
   }
 
   /**
    * Set the error in the Delta source context
-   * @param logger the logger to log the error
+   *
+   * @param logger  the logger to log the error
    * @param context the Delta source context
-   * @param cause the exception for the cause
+   * @param cause   the exception for the cause
    */
   public static void setError(Logger logger, DeltaSourceContext context, Exception cause) {
     try {
@@ -393,16 +415,18 @@ public final class Utils {
 
   /**
    * Build a table name with schema name as prefix if schema name is not null
+   *
    * @param schema name of the schema where the table is in
-   * @param table name of the table
+   * @param table  name of the table
    * @return a composite table name prefixed with schema name if schema name is not null
    */
   public static String buildCompositeTableName(String schema, String table) {
-    return Joiner.on("_").skipNulls().join(schema , table);
+    return Joiner.on("_").skipNulls().join(schema, table);
   }
 
   /**
    * Adds the specified tables to the allowlist of the stream
+   *
    * @param stream the stream the specified tables will be added to
    * @param tables the tables to be added to the allowlist of the stream
    */

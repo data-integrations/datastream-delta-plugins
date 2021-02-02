@@ -65,6 +65,7 @@ import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_IP_A
  */
 public final class Utils {
 
+  private static final String GCS_BUCKET_NAME_PREFIX = "df-rds-";
   private static final long FILE_ROTATION_INTERVAL_IN_SECONDS = 15L;
   private static final int FILE_ROTATIONS_SIZE_IN_MB = 1;
   private static final String ORACLE_PROFILE_NAME_PREFIX = "DF-ORA-";
@@ -259,6 +260,19 @@ public final class Utils {
    * @return the refreshed operation with latest status
    */
   public static Operation waitUntilComplete(DataStream datastream, Operation operation, Logger logger) {
+   return waitUntilComplete(datastream, operation, logger, false);
+  }
+
+  /**
+   * Wait until the specified operation is completed.
+   *
+   * @param operation the operation to wait for
+   * @param suppressError whether to suppress error. When error is suppressed, exception won't be thrown.It's used for
+   *                      some validation purpose , e.g. validate a stream
+   * @return the refreshed operation with latest status
+   */
+  public static Operation waitUntilComplete(DataStream datastream, Operation operation, Logger logger,
+    boolean suppressError) {
     if (operation == null) {
       return null;
     }
@@ -268,13 +282,23 @@ public final class Utils {
         operation = datastream.projects().locations().operations().get(operation.getName()).execute();
       }
     } catch (Exception e) {
-      throw new DatastreamDeltaSourceException(
-        String.format("Failed to query status of operation: %s", operation.toString()), e);
+      if (suppressError) {
+        logger.error(String.format("Failed to query status of operation: %s", operation.toString()), e);
+      } else {
+        throw new DatastreamDeltaSourceException(
+          String.format("Failed to query status of operation: %s", operation.toString()), e);
+      }
     }
     if (operation.getError() != null) {
-      throw new DatastreamDeltaSourceException(String
-        .format("Operation %s failed with error code :%s and error message: %s", operation.toString(),
-          operation.getError().getCode(), operation.getError().getMessage()));
+      if (suppressError) {
+        logger.error(String
+          .format("Operation %s failed with error code :%s and error message: %s", operation.toString(),
+            operation.getError().getCode(), operation.getError().getMessage()));
+      } else {
+        throw new DatastreamDeltaSourceException(String
+          .format("Operation %s failed with error code :%s and error message: %s", operation.toString(),
+            operation.getError().getCode(), operation.getError().getMessage()));
+      }
     }
     return operation;
   }
@@ -432,5 +456,14 @@ public final class Utils {
    */
   public static void addToAllowList(Stream stream, Set<SourceTable> tables) {
     addTablesToAllowList(tables, stream.getSourceConfig().getOracleSourceConfig().getAllowlist().getOracleSchemas());
+  }
+
+  /**
+   * Builds a name for GCS bucket by prefixing the specified name with some prefix
+   * @param name the name of the GCS bucket
+   * @return GCS bucket name by prefixing the specified name with some prefix
+   */
+  public static String buildBucketName(String name) {
+    return GCS_BUCKET_NAME_PREFIX + name;
   }
 }

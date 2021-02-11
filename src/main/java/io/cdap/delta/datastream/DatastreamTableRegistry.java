@@ -158,10 +158,9 @@ public class DatastreamTableRegistry implements TableRegistry {
         primaryKeys.add(column.getColumnName());
       }
       if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug(String
-            .format("Found column : %s, data type : %s (converted to %s), precision: %s, scale: %s , isPrimary: %s",
-              column.getColumnName(), column.getDataType(), sqlType, column.getPrecision(), column.getScale()),
-          column.getPrimaryKey());
+        LOGGER.debug("Found column : {}, data type : {} (converted to {}), precision: {}, scale: {}, isPrimary: {}",
+                     column.getColumnName(), column.getDataType(), sqlType, column.getPrecision(), column.getScale(),
+                     column.getPrimaryKey());
       }
     }
     return new TableDetail.Builder(db, table, schema).setColumns(columns).setPrimaryKey(primaryKeys).build();

@@ -26,6 +26,7 @@ import com.google.api.services.datastream.v1alpha1.model.ConnectionProfile;
 import com.google.api.services.datastream.v1alpha1.model.DestinationConfig;
 import com.google.api.services.datastream.v1alpha1.model.DiscoverConnectionProfileRequest;
 import com.google.api.services.datastream.v1alpha1.model.DiscoverConnectionProfileResponse;
+import com.google.api.services.datastream.v1alpha1.model.FetchErrorsRequest;
 import com.google.api.services.datastream.v1alpha1.model.GcsDestinationConfig;
 import com.google.api.services.datastream.v1alpha1.model.GcsProfile;
 import com.google.api.services.datastream.v1alpha1.model.NoConnectivitySettings;
@@ -208,6 +209,10 @@ public class DatastreamClientTest {
     assertEquals("RUNNING",
       datastream.projects().locations().streams().get(streamPath).execute().getState());
 
+    Operation operation = datastream.projects().locations().streams().fetchErrors(streamPath, new FetchErrorsRequest())
+      .execute();
+    operation = waitUntilComplete(operation);
+
     Operation streamPauseOperation =
       datastream.projects().locations().streams().pause(streamPath, new PauseStreamRequest())
         .execute();
@@ -249,6 +254,7 @@ public class DatastreamClientTest {
         .execute());
     assertEquals(404, exception.getStatusCode());
   }
+
 
   @Test
   public void testValidateStreams() throws IOException, InterruptedException {

@@ -2,15 +2,15 @@
   "metadata": {
     "spec-version": "1.5"
   },
-  "display-name": "Oracle by DataStream",
+  "display-name": "Oracle (by DataStream)",
   "configuration-groups": [
     {
-      "label": "Existing or New stream",
+      "label": "Basic",
       "properties": [
         {
           "name": "usingExistingStream",
           "widget-type": "toggle",
-          "label": "Use an existing Datastream stream",
+          "label": "Use an existing DataStream stream",
           "widget-attributes": {
             "default": "false",
             "on": {
@@ -33,55 +33,9 @@
         },
         {
           "name": "streamId",
-          "label": "Datastream stream identity",
-          "widget-type": "textbox"
-        }
-      ]
-    },
-    {
-      "label": "Database Locations",
-      "properties": [
-        {
-          "name": "host",
-          "label": "Host",
+          "label": "Stream ID",
           "widget-type": "textbox"
         },
-        {
-          "name": "port",
-          "label": "Port",
-          "widget-type": "textbox",
-          "widget-attributes": {
-            "default": "1521"
-          }
-        },
-        {
-          "name": "sid",
-          "label": "System Identifier (SID)",
-          "widget-type": "textbox",
-          "widget-attributes": {
-            "default": "ORCL"
-          }
-        }
-      ]
-    },
-    {
-      "label": "Credentials",
-      "properties": [
-        {
-          "name": "user",
-          "label": "User",
-          "widget-type": "textbox"
-        },
-        {
-          "name": "password",
-          "label": "Password",
-          "widget-type": "password"
-        }
-      ]
-    },
-    {
-      "label": "DataStream Configuration",
-      "properties": [
         {
           "label": "Connectivity Method",
           "name": "connectivityMethod",
@@ -151,6 +105,47 @@
       ]
     },
     {
+      "label": "Database Locations",
+      "properties": [
+        {
+          "name": "host",
+          "label": "Host",
+          "widget-type": "textbox"
+        },
+        {
+          "name": "port",
+          "label": "Port",
+          "widget-type": "textbox",
+          "widget-attributes": {
+            "default": "1521"
+          }
+        },
+        {
+          "name": "sid",
+          "label": "System Identifier (SID)",
+          "widget-type": "textbox",
+          "widget-attributes": {
+            "default": "ORCL"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Credentials",
+      "properties": [
+        {
+          "name": "user",
+          "label": "User",
+          "widget-type": "textbox"
+        },
+        {
+          "name": "password",
+          "label": "Password",
+          "widget-type": "password"
+        }
+      ]
+    },
+    {
       "label": "Advanced",
       "properties": [
         {
@@ -173,7 +168,7 @@
         },
         {
           "name": "dsServiceAccountKey",
-          "label": "Datastream Service Account Key",
+          "label": "DataStream Service Account Key",
           "widget-type": "securekey-textarea",
           "widget-attributes": {
             "default": "auto-detect"
@@ -212,15 +207,15 @@
       "show": [
         {
           "type": "group",
-          "name": "Database Locations"
+          "name": "Database Location"
         },
         {
           "type": "property",
           "name": "gcsPathPrefix"
         },
         {
-          "type": "group",
-          "name": "DataStream Configuration"
+          "type": "property",
+          "name": "connectivityMethod"
         },
         {
           "type": "group",
@@ -235,7 +230,7 @@
     {
       "name": "showSSH",
       "condition": {
-        "expression": "connectivityMethod == 'forward-ssh-tunnel'"
+        "expression": "usingExistingStream == false && connectivityMethod == 'forward-ssh-tunnel'"
       },
       "show": [
         {
@@ -259,7 +254,7 @@
     {
       "name": "showSSHPassword",
       "condition": {
-        "expression": "sshAuthenticationMethod == 'password' && connectivityMethod == 'forward-ssh-tunnel'"
+        "expression": "sshAuthenticationMethod == 'password' && connectivityMethod == 'forward-ssh-tunnel' && usingExistingStream == false"
       },
       "show": [
         {
@@ -271,7 +266,7 @@
     {
       "name": "showSSHPrivateKey",
       "condition": {
-        "expression": "sshAuthenticationMethod == 'private-public-key' && connectivityMethod == 'forward-ssh-tunnel'"
+        "expression": "sshAuthenticationMethod == 'private-public-key' && connectivityMethod == 'forward-ssh-tunnel' && usingExistingStream == false"
       },
       "show": [
         {

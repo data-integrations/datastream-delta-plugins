@@ -19,10 +19,12 @@ package io.cdap.delta.datastream;
 
 import com.google.api.services.datastream.v1alpha1.DataStream;
 import com.google.api.services.datastream.v1alpha1.model.Operation;
+import com.google.api.services.datastream.v1alpha1.model.OracleSchema;
 import com.google.api.services.datastream.v1alpha1.model.Stream;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
+import com.google.gson.Gson;
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.cdap.api.data.schema.Schema.LogicalType;
 import io.cdap.cdap.api.data.schema.Schema.Type;
@@ -57,6 +59,7 @@ import static io.cdap.delta.datastream.util.Utils.waitUntilComplete;
  */
 public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DatastreamTableAssessor.class);
+  private static final Gson GSON = new Gson();
   static final String PRECISION = "PRECISION";
   static final String SCALE = "SCALE";
   private final DatastreamConfig conf;
@@ -176,23 +179,43 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
           String.format("Fail to assess replicator pipeline due to failure of getting existing stream %s ",
             streamPath), e);
       }
+
+      List<OracleSchema> allowList =
+        new ArrayList<>(stream.getSourceConfig().getOracleSourceConfig().getAllowlist().getOracleSchemas());
       Utils.addToAllowList(stream, new HashSet<>(tables));
       //TODO set validate only to true when datastream supports validate only correctly
       try {
-        streamValidationOperation = datastream.projects().locations().streams().patch(streamPath, stream).execute();
+        DataStream.Projects.Locations.Streams.Patch update = datastream.projects().locations().streams().patch(
+          streamPath, stream);
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Validating stream when through update stream API, request : {} ", GSON.toJson(update));
+        }
+        streamValidationOperation = update.execute();
       } catch (IOException e) {
         throw new RuntimeException(
           String.format("Fail to assess replicator pipeline due to failure of updating existing stream %s ",
             streamPath), e);
       }
       waitUntilComplete(datastream, streamValidationOperation, LOGGER, true);
+
+      // rollback changes of the update which was for validation
+      //TODO below rollback logic can be removed once datastream supports validate only correctly
+      stream.getSourceConfig().getOracleSourceConfig().getAllowlist().setOracleSchemas(allowList);
+      try {
+        Operation operation = datastream.projects().locations().streams().patch(streamPath, stream).execute();
+        waitUntilComplete(datastream, operation, LOGGER, true);
+      } catch (IOException e) {
+        LOGGER.error(String.format("Fail to rollback the update of existing stream %s after validating",
+                                   streamPath), e);
+      }
+
     } else {
       // creating new stream
       String uuid = UUID.randomUUID().toString() + System.currentTimeMillis();
       String streamName = Utils.buildStreamName(uuid);
 
       String oracleProfileName = Utils.buildOracleProfileName(uuid);
-      // crete the oracle connection profile
+      // crete the oraclprofile
       Operation operation = null;
       try {
         operation = datastream.projects().locations().connectionProfiles()
@@ -210,9 +233,11 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         bucketName = Utils.buildBucketName(uuid);
       }
       Bucket bucket = storage.get(bucketName);
+      boolean newBucketCreated = false;
       if (bucket == null) {
+        newBucketCreated = true;
         // create corresponding GCS bucket
-        storage.create(BucketInfo.newBuilder(bucketName).build());
+        bucket = storage.create(BucketInfo.newBuilder(bucketName).build());
       }
       // crete the gcs connection profile
       try {
@@ -231,15 +256,21 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
       // validate stream
       try {
         //TODO set validate only to true when datastream supports validate only correctly
-        streamValidationOperation = datastream.projects().locations().streams().create(parentPath,
+        DataStream.Projects.Locations.Streams.Create create = datastream.projects().locations().streams().create(
+          parentPath,
           Utils.buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, new HashSet<>(tables)))
-          .setStreamId(streamName).execute();
+          .setStreamId(streamName);
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Validating stream through create stream API, request : {} ", GSON.toJson(create));
+        }
+        streamValidationOperation = create.execute();
       } catch (IOException e) {
         throw new RuntimeException("Fail to assess replicator pipeline due to failure of creating stream.", e);
       }
       waitUntilComplete(datastream, streamValidationOperation, LOGGER, true);
 
       //clear temporary stream
+      //TODO below logic for clearing temporary stream can be removed once datastream supports validate only correctly
       Operation streamDeletionOperation = null;
       String streamPath = buildStreamPath(parentPath, streamName);
       try {
@@ -269,8 +300,14 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
       waitUntilComplete(datastream, sourceProfileDeletionOperation, LOGGER, true);
       waitUntilComplete(datastream, destinationProfileDeletionOperation, LOGGER, true);
 
+      //remove temporarily created GCS bucket
+      if (newBucketCreated) {
+        bucket.delete();
+      }
     }
-
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Stream validation response : {}", GSON.toJson(streamValidationOperation));
+    }
     if (streamValidationOperation.getError() == null) {
       return new Assessment(Collections.emptyList(), Collections.emptyList());
     }
@@ -318,7 +355,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
             break;
           default:
             LOGGER
-              .warn("Unknown validation failure : %s with description %s and message %s.", code, description, message);
+              .warn("Unknown validation failure : {} with description {} and message {}.", code, description,
+                    message);
             missingFeatures.add(
               new Problem("General Issue", String.format("Issue : %s found when %s", message, description), "N/A",
                 "Unknown"));

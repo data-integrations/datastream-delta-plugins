@@ -209,7 +209,9 @@ public class DatastreamClientTest {
     assertEquals("RUNNING",
       datastream.projects().locations().streams().get(streamPath).execute().getState());
 
-    Operation operation = datastream.projects().locations().streams().fetchErrors(streamPath, new FetchErrorsRequest())
+    Operation operation = datastream.projects().locations().streams().fetchErrors(
+      streamPath.substring(0, streamPath.lastIndexOf("/") + 1) +
+        "DF-Stream-default-datastream-demo-0125-new-1611594919702", new FetchErrorsRequest())
       .execute();
     operation = waitUntilComplete(operation);
 

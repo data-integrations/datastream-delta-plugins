@@ -19,6 +19,7 @@ package io.cdap.delta.datastream;
 
 import com.google.api.gax.paging.Page;
 import com.google.api.services.datastream.v1alpha1.DataStream;
+import com.google.api.services.datastream.v1alpha1.model.FetchErrorsRequest;
 import com.google.api.services.datastream.v1alpha1.model.GcsProfile;
 import com.google.api.services.datastream.v1alpha1.model.Operation;
 import com.google.api.services.datastream.v1alpha1.model.OracleProfile;
@@ -302,13 +303,31 @@ public class DatastreamEventReader implements EventReader {
        **/
       Stream stream = null;
       try {
-         stream = datastream.projects().locations().streams().get(streamPath).execute();
+        stream = datastream.projects().locations().streams().get(streamPath).execute();
       } catch (IOException e) {
         Utils.handleError(LOGGER, context, "Failed to get stream " + streamPath, e, true);
       }
       if (stream != null && !"RUNNING".equals(stream.getState())) {
         Utils.handleError(LOGGER, context, "Stream " + streamPath + " is in status : " + stream.getState(), true);
       } else {
+        // check stream errors
+        Operation operation = datastream.projects().locations().streams().fetchErrors(streamPath,
+                                                                                      new FetchErrorsRequest())
+          .execute();
+        operation = Utils.waitUntilComplete(datastream, operation, LOGGER);
+        if (operation != null) {
+          Map<String, Object> response = operation.getResponse();
+          if (response != null) {
+            List<Object> errors = (List<Object>) response.get("errors");
+            if (errors != null && !errors.isEmpty()) {
+              Map<String, String> error = (Map<String, String>) errors.get(0);
+              throw Utils.handleError(LOGGER, context, String
+                                        .format("%s, id: %s, reason: %s", error.get("message"),
+                                                error.get("errorUuid"), error.get("reason")),
+                                      true);
+            }
+          }
+        }
         try {
           context.setOK();
         } catch (IOException e) {

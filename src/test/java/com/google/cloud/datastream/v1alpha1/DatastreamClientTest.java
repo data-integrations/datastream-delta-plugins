@@ -18,6 +18,8 @@
 package com.google.cloud.datastream.v1alpha1;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.datastream.v1alpha1.DataStream;
@@ -131,8 +133,25 @@ public class DatastreamClientTest {
         .createScoped("https://www.googleapis.com/auth/cloud-platform");
     }
 
-    datastream = new DataStream(new NetHttpTransport(), new JacksonFactory(),
+    HttpRequestInitializer httpRequestInitializer = setAdditionalHttpRequestHeaders(
       new HttpCredentialsAdapter(credentials));
+    datastream = new DataStream(new NetHttpTransport(), new JacksonFactory(), httpRequestInitializer);
+  }
+
+  public static HttpRequestInitializer setAdditionalHttpRequestHeaders(
+    final HttpRequestInitializer requestInitializer) {
+    return new HttpRequestInitializer() {
+      @Override
+      public void initialize(HttpRequest httpRequest) throws IOException {
+        requestInitializer.initialize(httpRequest);
+        httpRequest.setConnectTimeout(3 * 60000);  // 3 minutes connect timeout
+        httpRequest.setReadTimeout(3 * 60000);  // 3 minutes read timeout
+
+        // Workaround to support custom error message (for validations details)
+        // https://buganizer.corp.google.com/issues/179156441
+        httpRequest.getHeaders().put("X-GOOG-API-FORMAT-VERSION", "2");
+      }
+    };
   }
 
   @Test
@@ -283,6 +302,7 @@ public class DatastreamClientTest {
           .setFileRotationInterval("15s"))).setSourceConfig(
       new SourceConfig().setSourceConnectionProfileName(buildConnectionProfilePath(sourceName)).setOracleSourceConfig(
         new OracleSourceConfig().setAllowlist(new OracleRdbms()).setRejectlist(new OracleRdbms())));
+
     //TODO set validateOnly to true when datastream supports validateOnly correctly.
     DataStream.Projects.Locations.Streams.Create creatRequest =
       datastream.projects().locations().streams().create(parent, steam).setStreamId(streamName);

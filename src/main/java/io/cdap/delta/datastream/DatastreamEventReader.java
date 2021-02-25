@@ -134,7 +134,7 @@ public class DatastreamEventReader implements EventReader {
         .handleError(LOGGER, context, "Failed to get oracle connection profile : " + oracleProfileName, e, true);
     }
     String path = stream.getDestinationConfig().getGcsDestinationConfig().getPath();
-    this.streamGcsPathPrefix =  path.startsWith("/") ? path.substring(1) : path;
+    this.streamGcsPathPrefix =  path == null ? "" : path.startsWith("/") ? path.substring(1) : path;
     String gcsProfileName = stream.getDestinationConfig().getDestinationConnectionProfileName();
     try {
       GcsProfile gcsProfile =

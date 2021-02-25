@@ -231,8 +231,19 @@ public final class Utils {
   }
 
   private static void addTablesToAllowList(Set<SourceTable> tables, List<OracleSchema> schemas) {
+    // if the stream has allow list as "*.*" , the schemas will be null
+    if (schemas == null) {
+      return;
+    }
     Map<String, Set<String>> schemaToTables = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(),
-      s -> s.getOracleTables().stream().map(o -> o.getTableName()).collect(Collectors.toSet())));
+      s -> {
+        List<OracleTable> oracleTables = s.getOracleTables();
+        // if the stream has allow list as "hr.*", then the schema name will be "hr" and oracleTables will be null
+        if (oracleTables == null) {
+          return new HashSet<>();
+        }
+        return oracleTables.stream().map(o -> o.getTableName()).collect(Collectors.toSet());
+      }));
     Map<String, OracleSchema> nameToSchema = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s -> s));
 
     tables.forEach(table -> {
@@ -240,12 +251,11 @@ public final class Utils {
       OracleSchema oracleSchema = nameToSchema.computeIfAbsent(table.getSchema(), name -> {
         OracleSchema newSchema = new OracleSchema().setSchemaName(name);
         schemas.add(newSchema);
+        newSchema.setOracleTables(new ArrayList<>());
         return newSchema;
       });
-      if (oracleSchema.getOracleTables() == null) {
-        oracleSchema.setOracleTables(new ArrayList<>());
-      }
-      if (!oracleTables.contains(table.getTable())) {
+      // if oracleSchema.getOracleTables() is null it means it allows all tables under this schema
+      if (oracleSchema.getOracleTables() != null && !oracleTables.contains(table.getTable())) {
         oracleSchema.getOracleTables().add(new OracleTable().setTableName(table.getTable()));
         oracleTables.add(table.getTable());
       }

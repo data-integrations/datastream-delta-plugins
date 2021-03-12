@@ -21,6 +21,7 @@ import com.google.api.services.datastream.v1alpha1.DataStream;
 import com.google.api.services.datastream.v1alpha1.model.AvroFileFormat;
 import com.google.api.services.datastream.v1alpha1.model.ConnectionProfile;
 import com.google.api.services.datastream.v1alpha1.model.DestinationConfig;
+import com.google.api.services.datastream.v1alpha1.model.FetchErrorsRequest;
 import com.google.api.services.datastream.v1alpha1.model.ForwardSshTunnelConnectivity;
 import com.google.api.services.datastream.v1alpha1.model.GcsDestinationConfig;
 import com.google.api.services.datastream.v1alpha1.model.GcsProfile;
@@ -432,5 +433,37 @@ public final class Utils {
    */
   public static void addToAllowList(Stream stream, Set<SourceTable> tables) {
     addTablesToAllowList(tables, stream.getSourceConfig().getOracleSourceConfig().getAllowlist().getOracleSchemas());
+  }
+
+  /**
+   * Fetch errors of a stream. If the stream has any errors, return an exception that contains error message of all
+   * the errors otherwise return null;
+   * @param datastream the Datastream client
+   * @param streamPath the full stream resource path
+   * @param logger the logger
+   * @param context the delta source context
+   * @throws Exception the exception that contains the error message of all the stream errors
+   */
+
+  public static Exception fetchErrors(DataStream datastream, String streamPath, Logger logger,
+    DeltaSourceContext context) throws IOException {
+    // check stream errors
+    Operation operation = datastream.projects().locations().streams().fetchErrors(streamPath, new FetchErrorsRequest())
+      .execute();
+    operation = Utils.waitUntilComplete(datastream, operation, logger);
+    if (operation != null) {
+      Map<String, Object> response = operation.getResponse();
+      if (response != null) {
+        List<Object> errors = (List<Object>) response.get("errors");
+        if (errors != null && !errors.isEmpty()) {
+          return Utils.handleError(logger, context, errors.stream().map(error -> {
+            Map<String, String> errorMap = (Map<String, String>) error;
+            return String.format("%s, id: %s, reason: %s", errorMap.get("message"), errorMap.get("errorUuid"),
+                                 errorMap.get("reason"));
+          }).collect(Collectors.joining("\n")), true);
+        }
+      }
+    }
+    return null;
   }
 }

@@ -19,6 +19,7 @@ package io.cdap.delta.datastream.util;
 
 import com.google.api.services.datastream.v1alpha1.DataStream;
 import com.google.api.services.datastream.v1alpha1.model.AvroFileFormat;
+import com.google.api.services.datastream.v1alpha1.model.BackfillAllStrategy;
 import com.google.api.services.datastream.v1alpha1.model.ConnectionProfile;
 import com.google.api.services.datastream.v1alpha1.model.DestinationConfig;
 import com.google.api.services.datastream.v1alpha1.model.ForwardSshTunnelConnectivity;
@@ -221,7 +222,8 @@ public final class Utils {
           .setFileRotationMb(FILE_ROTATIONS_SIZE_IN_MB)
           .setFileRotationInterval(FILE_ROTATION_INTERVAL_IN_SECONDS + "s"))).setSourceConfig(
       new SourceConfig().setSourceConnectionProfileName(sourcePath)
-        .setOracleSourceConfig(new OracleSourceConfig().setAllowlist(buildAllowlist(tables))));
+        .setOracleSourceConfig(new OracleSourceConfig().setAllowlist(buildAllowlist(tables)))).setBackfillAll(
+      new BackfillAllStrategy());
   }
 
   // build an allow list of what tables to be tracked change of

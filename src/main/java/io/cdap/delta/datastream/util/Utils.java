@@ -17,6 +17,8 @@
 
 package io.cdap.delta.datastream.util;
 
+import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.services.datastream.v1alpha1.DataStream;
 import com.google.api.services.datastream.v1alpha1.model.AvroFileFormat;
 import com.google.api.services.datastream.v1alpha1.model.ConnectionProfile;
@@ -70,6 +72,7 @@ public final class Utils {
   private static final String ORACLE_PROFILE_NAME_PREFIX = "DF-ORA-";
   private static final String GCS_PROFILE_NAME_PREFIX = "DF-GCS-";
   private static final String STREAM_NAME_PREFIX = "DF-Stream-";
+  private static final int TIMEOUT_IN_MILLISECONDS = 3 * 60000;   // 3 minutes read and connect timeout
 
   private Utils() {
   }
@@ -432,5 +435,28 @@ public final class Utils {
    */
   public static void addToAllowList(Stream stream, Set<SourceTable> tables) {
     addTablesToAllowList(tables, stream.getSourceConfig().getOracleSourceConfig().getAllowlist().getOracleSchemas());
+  }
+
+
+  /**
+   * Set additional Google API version http header through http request initializer
+   * @param requestInitializer the original http request initializer
+   * @return the http request initializer which set Google API version http header after applying the original
+   * initializer
+   */
+  public static HttpRequestInitializer setAdditionalHttpRequestHeaders(
+    final HttpRequestInitializer requestInitializer) {
+    return new HttpRequestInitializer() {
+      @Override
+      public void initialize(HttpRequest httpRequest) throws IOException {
+        requestInitializer.initialize(httpRequest);
+        httpRequest.setConnectTimeout(TIMEOUT_IN_MILLISECONDS);
+        httpRequest.setReadTimeout(TIMEOUT_IN_MILLISECONDS);
+
+        // Workaround to support custom error message (for validations details)
+        // https://buganizer.corp.google.com/issues/179156441
+        httpRequest.getHeaders().put("X-GOOG-API-FORMAT-VERSION", "2");
+      }
+    };
   }
 }

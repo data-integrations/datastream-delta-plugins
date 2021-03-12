@@ -17,7 +17,6 @@
 package io.cdap.delta.datastream;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
@@ -62,7 +61,6 @@ public class DatastreamDeltaSource implements DeltaSource {
   public static final String NAME = "datastream";
   private static final Logger LOGGER = LoggerFactory.getLogger(DatastreamDeltaSource.class);
   private static final String GCS_BUCKET_NAME_PREFIX = "df-rds-";
-
   private final DatastreamConfig config;
   private Storage storage;
   private DataStream datastream;
@@ -101,25 +99,9 @@ public class DatastreamDeltaSource implements DeltaSource {
   }
 
   private DataStream createDatastreamClient() throws IOException {
-    HttpRequestInitializer httpRequestInitializer = setAdditionalHttpRequestHeaders(
+    HttpRequestInitializer httpRequestInitializer = Utils.setAdditionalHttpRequestHeaders(
       new HttpCredentialsAdapter(config.getDatastreamCredentials()));
     return new DataStream(new NetHttpTransport(), new JacksonFactory(), httpRequestInitializer);
-  }
-
-  private static HttpRequestInitializer setAdditionalHttpRequestHeaders(
-    final HttpRequestInitializer requestInitializer) {
-    return new HttpRequestInitializer() {
-      @Override
-      public void initialize(HttpRequest httpRequest) throws IOException {
-        requestInitializer.initialize(httpRequest);
-        httpRequest.setConnectTimeout(3 * 60000);  // 3 minutes connect timeout
-        httpRequest.setReadTimeout(3 * 60000);  // 3 minutes read timeout
-
-        // Workaround to support custom error message (for validations details)
-        // https://buganizer.corp.google.com/issues/179156441
-        httpRequest.getHeaders().put("X-GOOG-API-FORMAT-VERSION", "2");
-      }
-    };
   }
 
   @Override

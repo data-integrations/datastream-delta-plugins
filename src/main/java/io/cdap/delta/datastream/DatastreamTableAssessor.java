@@ -145,11 +145,11 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         schema = null;
     }
 
-    Schema.Field field = schema == null ? null : Schema.Field.of(detail.getName(),
-                                                                 detail.isNullable() ? Schema.nullableOf(schema) :
-                                                                   schema);
-    ColumnAssessment assessment = ColumnAssessment.builder(detail.getName(), detail.getType().getName()).setSupport(
-      support).setSuggestion(suggestion).build();
+    Schema.Field field = schema == null ? null :
+      Schema.Field.of(detail.getName(), detail.isNullable() ? Schema.nullableOf(schema) : schema);
+    ColumnAssessment assessment =
+      ColumnAssessment.builder(detail.getName(), detail.getType().getName()).setSupport(support)
+        .setSuggestion(suggestion).build();
     return new ColumnEvaluation(field, assessment);
   }
 
@@ -211,7 +211,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
       String streamName = Utils.buildStreamName(uuid);
 
       String oracleProfileName = Utils.buildOracleProfileName(uuid);
-      // crete the oraclprofile
+      // crete the oracle profile
       Operation operation = null;
       try {
         operation = datastream.projects().locations().connectionProfiles().create(parentPath,
@@ -296,6 +296,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
       waitUntilComplete(datastream, destinationProfileDeletionOperation, LOGGER, true);
 
       //remove temporarily created GCS bucket
+      //TODO retry deleting if failed
       if (newBucketCreated) {
         bucket.delete();
       }

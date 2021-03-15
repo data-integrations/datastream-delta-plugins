@@ -73,6 +73,8 @@ public final class Utils {
   private static final String GCS_PROFILE_NAME_PREFIX = "DF-GCS-";
   private static final String STREAM_NAME_PREFIX = "DF-Stream-";
   private static final int TIMEOUT_IN_MILLISECONDS = 3 * 60000;   // 3 minutes read and connect timeout
+  private static final String GOOGLE_API_VERSION_HEADER = "X-GOOG-API-FORMAT-VERSION";
+  private static final String  GOOGLE_API_VERSION = "2";
 
   private Utils() {
   }
@@ -455,7 +457,7 @@ public final class Utils {
 
         // Workaround to support custom error message (for validations details)
         // https://buganizer.corp.google.com/issues/179156441
-        httpRequest.getHeaders().put("X-GOOG-API-FORMAT-VERSION", "2");
+        httpRequest.getHeaders().put(GOOGLE_API_VERSION_HEADER, GOOGLE_API_VERSION);
       }
     };
   }

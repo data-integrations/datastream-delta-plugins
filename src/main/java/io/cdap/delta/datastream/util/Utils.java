@@ -21,8 +21,10 @@ import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.services.datastream.v1alpha1.DataStream;
 import com.google.api.services.datastream.v1alpha1.model.AvroFileFormat;
+import com.google.api.services.datastream.v1alpha1.model.BackfillAllStrategy;
 import com.google.api.services.datastream.v1alpha1.model.ConnectionProfile;
 import com.google.api.services.datastream.v1alpha1.model.DestinationConfig;
+import com.google.api.services.datastream.v1alpha1.model.FetchErrorsRequest;
 import com.google.api.services.datastream.v1alpha1.model.ForwardSshTunnelConnectivity;
 import com.google.api.services.datastream.v1alpha1.model.GcsDestinationConfig;
 import com.google.api.services.datastream.v1alpha1.model.GcsProfile;
@@ -49,6 +51,7 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.sql.SQLType;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -225,7 +228,8 @@ public final class Utils {
           .setFileRotationMb(FILE_ROTATIONS_SIZE_IN_MB)
           .setFileRotationInterval(FILE_ROTATION_INTERVAL_IN_SECONDS + "s"))).setSourceConfig(
       new SourceConfig().setSourceConnectionProfileName(sourcePath)
-        .setOracleSourceConfig(new OracleSourceConfig().setAllowlist(buildAllowlist(tables))));
+        .setOracleSourceConfig(new OracleSourceConfig().setAllowlist(buildAllowlist(tables)))).setBackfillAll(
+      new BackfillAllStrategy());
   }
 
   // build an allow list of what tables to be tracked change of
@@ -235,9 +239,20 @@ public final class Utils {
     return new OracleRdbms().setOracleSchemas(schemas);
   }
 
-  private static void addTablesToAllowList(Set<SourceTable> tables, List<OracleSchema> schemas) {
+  private static void addTablesToAllowList(Set<SourceTable> tables, @Nullable List<OracleSchema> schemas) {
+    // if the stream has allow list as "*.*" , the schemas will be null
+    if (schemas == null) {
+      return;
+    }
     Map<String, Set<String>> schemaToTables = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(),
-      s -> s.getOracleTables().stream().map(o -> o.getTableName()).collect(Collectors.toSet())));
+      s -> {
+        List<OracleTable> oracleTables = s.getOracleTables();
+        // if the stream has allow list as "hr.*", then the schema name will be "hr" and oracleTables will be null
+        if (oracleTables == null) {
+          return Collections.emptySet();
+        }
+        return oracleTables.stream().map(o -> o.getTableName()).collect(Collectors.toSet());
+      }));
     Map<String, OracleSchema> nameToSchema = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s -> s));
 
     tables.forEach(table -> {
@@ -245,12 +260,11 @@ public final class Utils {
       OracleSchema oracleSchema = nameToSchema.computeIfAbsent(table.getSchema(), name -> {
         OracleSchema newSchema = new OracleSchema().setSchemaName(name);
         schemas.add(newSchema);
+        newSchema.setOracleTables(new ArrayList<>());
         return newSchema;
       });
-      if (oracleSchema.getOracleTables() == null) {
-        oracleSchema.setOracleTables(new ArrayList<>());
-      }
-      if (!oracleTables.contains(table.getTable())) {
+      // if oracleSchema.getOracleTables() is null it means it allows all tables under this schema
+      if (oracleSchema.getOracleTables() != null && !oracleTables.contains(table.getTable())) {
         oracleSchema.getOracleTables().add(new OracleTable().setTableName(table.getTable()));
         oracleTables.add(table.getTable());
       }
@@ -439,7 +453,6 @@ public final class Utils {
     addTablesToAllowList(tables, stream.getSourceConfig().getOracleSourceConfig().getAllowlist().getOracleSchemas());
   }
 
-
   /**
    * Set additional Google API version http header through http request initializer
    * @param requestInitializer the original http request initializer
@@ -460,5 +473,36 @@ public final class Utils {
         httpRequest.getHeaders().put(GOOGLE_API_VERSION_HEADER, GOOGLE_API_VERSION);
       }
     };
+
+  /**
+   * Fetch errors of a stream. If the stream has any errors, return an exception that contains error message of all
+   * the errors otherwise return null;
+   * @param datastream the Datastream client
+   * @param streamPath the full stream resource path
+   * @param logger the logger
+   * @param context the delta source context
+   * @throws Exception the exception that contains the error message of all the stream errors
+   */
+
+  public static Exception fetchErrors(DataStream datastream, String streamPath, Logger logger,
+    DeltaSourceContext context) throws IOException {
+    // check stream errors
+    Operation operation = datastream.projects().locations().streams().fetchErrors(streamPath, new FetchErrorsRequest())
+      .execute();
+    operation = Utils.waitUntilComplete(datastream, operation, logger);
+    if (operation != null) {
+      Map<String, Object> response = operation.getResponse();
+      if (response != null) {
+        List<Object> errors = (List<Object>) response.get("errors");
+        if (errors != null && !errors.isEmpty()) {
+          return Utils.handleError(logger, context, errors.stream().map(error -> {
+            Map<String, String> errorMap = (Map<String, String>) error;
+            return String.format("%s, id: %s, reason: %s", errorMap.get("message"), errorMap.get("errorUuid"),
+                                 errorMap.get("reason"));
+          }).collect(Collectors.joining("\n")), true);
+        }
+      }
+    }
+    return null;
   }
 }

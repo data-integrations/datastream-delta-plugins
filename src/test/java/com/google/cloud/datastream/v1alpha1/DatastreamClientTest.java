@@ -18,6 +18,7 @@
 package com.google.cloud.datastream.v1alpha1;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.datastream.v1alpha1.DataStream;
@@ -45,6 +46,7 @@ import com.google.api.services.datastream.v1alpha1.model.Stream;
 import com.google.auth.Credentials;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
+import io.cdap.delta.datastream.util.Utils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -128,8 +130,9 @@ public class DatastreamClientTest {
         .createScoped("https://www.googleapis.com/auth/cloud-platform");
     }
 
-    datastream = new DataStream(new NetHttpTransport(), new JacksonFactory(),
+    HttpRequestInitializer httpRequestInitializer = Utils.setAdditionalHttpRequestHeaders(
       new HttpCredentialsAdapter(credentials));
+    datastream = new DataStream(new NetHttpTransport(), new JacksonFactory(), httpRequestInitializer);
   }
 
   @Test

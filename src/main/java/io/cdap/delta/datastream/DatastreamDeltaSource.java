@@ -17,6 +17,7 @@
 package io.cdap.delta.datastream;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.datastream.v1alpha1.DataStream;
@@ -60,7 +61,6 @@ public class DatastreamDeltaSource implements DeltaSource {
   public static final String NAME = "datastream";
   private static final Logger LOGGER = LoggerFactory.getLogger(DatastreamDeltaSource.class);
   private static final String GCS_BUCKET_NAME_PREFIX = "df-rds-";
-
   private final DatastreamConfig config;
   private Storage storage;
   private DataStream datastream;
@@ -99,8 +99,9 @@ public class DatastreamDeltaSource implements DeltaSource {
   }
 
   private DataStream createDatastreamClient() throws IOException {
-    return new DataStream(new NetHttpTransport(), new JacksonFactory(),
+    HttpRequestInitializer httpRequestInitializer = Utils.setAdditionalHttpRequestHeaders(
       new HttpCredentialsAdapter(config.getDatastreamCredentials()));
+    return new DataStream(new NetHttpTransport(), new JacksonFactory(), httpRequestInitializer);
   }
 
   @Override

@@ -18,6 +18,7 @@
 package com.google.cloud.datastream.v1alpha1;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.datastream.v1alpha1.DataStream;
@@ -26,6 +27,7 @@ import com.google.api.services.datastream.v1alpha1.model.ConnectionProfile;
 import com.google.api.services.datastream.v1alpha1.model.DestinationConfig;
 import com.google.api.services.datastream.v1alpha1.model.DiscoverConnectionProfileRequest;
 import com.google.api.services.datastream.v1alpha1.model.DiscoverConnectionProfileResponse;
+import com.google.api.services.datastream.v1alpha1.model.FetchErrorsRequest;
 import com.google.api.services.datastream.v1alpha1.model.GcsDestinationConfig;
 import com.google.api.services.datastream.v1alpha1.model.GcsProfile;
 import com.google.api.services.datastream.v1alpha1.model.NoConnectivitySettings;
@@ -44,6 +46,7 @@ import com.google.api.services.datastream.v1alpha1.model.Stream;
 import com.google.auth.Credentials;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
+import io.cdap.delta.datastream.util.Utils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -130,8 +133,9 @@ public class DatastreamClientTest {
         .createScoped("https://www.googleapis.com/auth/cloud-platform");
     }
 
-    datastream = new DataStream(new NetHttpTransport(), new JacksonFactory(),
+    HttpRequestInitializer httpRequestInitializer = Utils.setAdditionalHttpRequestHeaders(
       new HttpCredentialsAdapter(credentials));
+    datastream = new DataStream(new NetHttpTransport(), new JacksonFactory(), httpRequestInitializer);
   }
 
   @Test
@@ -207,6 +211,10 @@ public class DatastreamClientTest {
     assertNull(streamStartOperation.getError());
     assertEquals("RUNNING",
       datastream.projects().locations().streams().get(streamPath).execute().getState());
+
+    Operation operation = datastream.projects().locations().streams().fetchErrors(streamPath, new FetchErrorsRequest())
+      .execute();
+    operation = waitUntilComplete(operation);
 
     Operation streamPauseOperation =
       datastream.projects().locations().streams().pause(streamPath, new PauseStreamRequest())

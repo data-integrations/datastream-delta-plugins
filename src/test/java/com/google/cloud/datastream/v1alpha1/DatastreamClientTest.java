@@ -54,11 +54,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -253,6 +256,73 @@ public class DatastreamClientTest {
       () -> datastream.projects().locations().connectionProfiles().get(buildConnectionProfilePath(destinationName))
         .execute());
     assertEquals(404, exception.getStatusCode());
+  }
+
+  @Test
+  public void testValidateStreams() throws IOException, InterruptedException {
+    String sourceName = "Datafusion-Oracle-" + UUID.randomUUID();
+    Operation sourceProfileCreationOperation = createOracleConnectionProfile(sourceName);
+
+    String destinationName = "Datafusion-GCS-" + UUID.randomUUID();
+    String originalBucket = gcsBucket;
+    gcsBucket = "non-existing";
+    Operation destinationProfileCreationOperation = createGcsConnectionProfile(destinationName);
+    gcsBucket = originalBucket;
+
+    waitUntilComplete(sourceProfileCreationOperation);
+    assertNotNull(datastream.projects().locations().connectionProfiles().get(buildConnectionProfilePath(sourceName)));
+
+    waitUntilComplete(destinationProfileCreationOperation);
+    assertNotNull(
+      datastream.projects().locations().connectionProfiles().get(buildConnectionProfilePath(destinationName)));
+
+    String streamName = "Datafusion-DS-" + UUID.randomUUID();
+    Stream steam = new Stream().setDisplayName(streamName).setDestinationConfig(
+      new DestinationConfig().setDestinationConnectionProfileName(buildConnectionProfilePath(destinationName))
+        .setGcsDestinationConfig(new GcsDestinationConfig().setAvroFileFormat(new AvroFileFormat()).setFileRotationMb(5)
+          .setFileRotationInterval("15s"))).setSourceConfig(
+      new SourceConfig().setSourceConnectionProfileName(buildConnectionProfilePath(sourceName)).setOracleSourceConfig(
+        new OracleSourceConfig().setAllowlist(new OracleRdbms()).setRejectlist(new OracleRdbms())));
+    //TODO set validateOnly to true when datastream supports validateOnly correctly.
+    DataStream.Projects.Locations.Streams.Create creatRequest =
+      datastream.projects().locations().streams().create(parent, steam).setStreamId(streamName);
+    Operation streamValidationOperation = creatRequest.execute();
+
+    streamValidationOperation = waitUntilComplete(streamValidationOperation);
+    assertNotNull(streamValidationOperation.getError());
+
+    Map<String, Object> metadata = streamValidationOperation.getMetadata();
+    assertFalse(metadata.isEmpty());
+
+    List<Object> validations = (List<Object>) ((Map<String, Object>) metadata.get("validationResult")).get(
+      "validations");
+    assertFalse(validations.isEmpty());
+    for (Object validation : validations) {
+      String code = (String) ((Map<String, Object>) validation).get("code");
+      String status = (String) ((Map<String, Object>) validation).get("status");
+      String description = (String) ((Map<String, Object>) validation).get("description");
+      assertNotNull(description);
+
+      if (code.equals("GCP_VALIDATE_PERMISSIONS")) {
+        assertEquals("FAILED", status);
+        String message =
+          (String) ((Map<String, Object>) ((List<Object>) ((Map<String, Object>) validation).get("message")).get(0))
+            .get("message");
+        assertNotNull(message);
+      } else {
+        assertEquals("PASSED", status);
+      }
+    }
+
+    Operation sourceProfileDeletionOperation =
+      datastream.projects().locations().connectionProfiles().delete(buildConnectionProfilePath(sourceName)).execute();
+
+    Operation destinationProfileDeletionOperation =
+      datastream.projects().locations().connectionProfiles().delete(buildConnectionProfilePath(destinationName))
+        .execute();
+    waitUntilComplete(sourceProfileDeletionOperation);
+    waitUntilComplete(destinationProfileDeletionOperation);
+
   }
 
   private Operation waitUntilComplete(Operation operation) throws InterruptedException, IOException {

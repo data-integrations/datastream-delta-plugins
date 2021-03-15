@@ -28,6 +28,7 @@ import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
+import com.google.gson.Gson;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Name;
 import io.cdap.cdap.api.annotation.Plugin;
@@ -38,6 +39,7 @@ import io.cdap.delta.api.EventEmitter;
 import io.cdap.delta.api.EventReaderDefinition;
 import io.cdap.delta.api.SourceConfigurer;
 import io.cdap.delta.api.SourceProperties;
+import io.cdap.delta.api.SourceTable;
 import io.cdap.delta.api.assessment.TableAssessor;
 import io.cdap.delta.api.assessment.TableDetail;
 import io.cdap.delta.api.assessment.TableRegistry;
@@ -46,6 +48,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 
 import static io.cdap.delta.datastream.util.Utils.buildOracleConnectionProfile;
 import static io.cdap.delta.datastream.util.Utils.waitUntilComplete;
@@ -60,6 +64,7 @@ public class DatastreamDeltaSource implements DeltaSource {
 
   public static final String NAME = "datastream";
   private static final Logger LOGGER = LoggerFactory.getLogger(DatastreamDeltaSource.class);
+  private static final Gson GSON = new Gson();
   private static final String GCS_BUCKET_NAME_PREFIX = "df-rds-";
   private final DatastreamConfig config;
   private Storage storage;
@@ -69,6 +74,9 @@ public class DatastreamDeltaSource implements DeltaSource {
 
   public DatastreamDeltaSource(DatastreamConfig config) {
     config.validate();
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Instantiate Datstream delta source with config {}", GSON.toJson(config));
+    }
     this.config = config;
   }
 
@@ -123,7 +131,15 @@ public class DatastreamDeltaSource implements DeltaSource {
 
   @Override
   public TableAssessor<TableDetail> createTableAssessor(Configurer configurer) throws Exception {
-    return new DatastreamTableAssessor(config);
+    return createTableAssessor(configurer, Collections.emptyList());
+  }
+
+  @Override
+  public TableAssessor<TableDetail> createTableAssessor(Configurer configurer, List<SourceTable> tables)
+    throws Exception {
+    return new DatastreamTableAssessor(config, createDatastreamClient(),
+      StorageOptions.newBuilder().setCredentials(config.getGcsCredentials()).setProjectId(config.getProject()).build()
+        .getService(), tables);
   }
 
   private void createStreamIfNotExisted(DeltaSourceContext context) throws IOException {
@@ -171,7 +187,7 @@ public class DatastreamDeltaSource implements DeltaSource {
         String bucketName = config.getGcsBucket();
         // If user doesn't provide bucketName, we assign one based on run id
         if (bucketName == null) {
-          bucketName = GCS_BUCKET_NAME_PREFIX + context.getRunId();
+          bucketName = Utils.buildBucketName(context.getRunId());
         }
         Bucket bucket = storage.get(bucketName);
         if (bucket == null) {

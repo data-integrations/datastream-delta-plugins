@@ -302,13 +302,23 @@ public class DatastreamEventReader implements EventReader {
        **/
       Stream stream = null;
       try {
-         stream = datastream.projects().locations().streams().get(streamPath).execute();
+        stream = datastream.projects().locations().streams().get(streamPath).execute();
       } catch (IOException e) {
         Utils.handleError(LOGGER, context, "Failed to get stream " + streamPath, e, true);
       }
       if (stream != null && !"RUNNING".equals(stream.getState())) {
         Utils.handleError(LOGGER, context, "Stream " + streamPath + " is in status : " + stream.getState(), true);
       } else {
+        Exception error = null;
+        try {
+           error = Utils.fetchErrors(datastream, streamPath, LOGGER, context);
+        } catch (IOException e) {
+          Utils.handleError(LOGGER, context, "Failed to fetch errors for stream " + streamPath, e, true);
+        }
+        if (error != null) {
+          throw error;
+        }
+
         try {
           context.setOK();
         } catch (IOException e) {

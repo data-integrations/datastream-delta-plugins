@@ -78,7 +78,7 @@ public final class Utils {
   private static final String STREAM_NAME_PREFIX = "DF-Stream-";
   private static final int TIMEOUT_IN_MILLISECONDS = 3 * 60000;   // 3 minutes read and connect timeout
   private static final String GOOGLE_API_VERSION_HEADER = "X-GOOG-API-FORMAT-VERSION";
-  private static final String  GOOGLE_API_VERSION = "2";
+  private static final String GOOGLE_API_VERSION = "2";
 
   private Utils() {
   }
@@ -229,8 +229,8 @@ public final class Utils {
           .setFileRotationMb(FILE_ROTATIONS_SIZE_IN_MB)
           .setFileRotationInterval(FILE_ROTATION_INTERVAL_IN_SECONDS + "s"))).setSourceConfig(
       new SourceConfig().setSourceConnectionProfileName(sourcePath)
-        .setOracleSourceConfig(new OracleSourceConfig().setAllowlist(buildAllowlist(tables)))).setBackfillAll(
-      new BackfillAllStrategy());
+        .setOracleSourceConfig(new OracleSourceConfig().setAllowlist(buildAllowlist(tables))))
+      .setBackfillAll(new BackfillAllStrategy());
   }
 
   // build an allow list of what tables to be tracked change of
@@ -245,15 +245,14 @@ public final class Utils {
     if (schemas == null) {
       return;
     }
-    Map<String, Set<String>> schemaToTables = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(),
-      s -> {
-        List<OracleTable> oracleTables = s.getOracleTables();
-        // if the stream has allow list as "hr.*", then the schema name will be "hr" and oracleTables will be null
-        if (oracleTables == null) {
-          return Collections.emptySet();
-        }
-        return oracleTables.stream().map(o -> o.getTableName()).collect(Collectors.toSet());
-      }));
+    Map<String, Set<String>> schemaToTables = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s -> {
+      List<OracleTable> oracleTables = s.getOracleTables();
+      // if the stream has allow list as "hr.*", then the schema name will be "hr" and oracleTables will be null
+      if (oracleTables == null) {
+        return Collections.emptySet();
+      }
+      return oracleTables.stream().map(o -> o.getTableName()).collect(Collectors.toSet());
+    }));
     Map<String, OracleSchema> nameToSchema = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s -> s));
 
     tables.forEach(table -> {
@@ -279,13 +278,13 @@ public final class Utils {
    * @return the refreshed operation with latest status
    */
   public static Operation waitUntilComplete(DataStream datastream, Operation operation, Logger logger) {
-   return waitUntilComplete(datastream, operation, logger, false);
+    return waitUntilComplete(datastream, operation, logger, false);
   }
 
   /**
    * Wait until the specified operation is completed.
    *
-   * @param operation the operation to wait for
+   * @param operation     the operation to wait for
    * @param suppressError whether to suppress error. When error is suppressed, exception won't be thrown.It's used for
    *                      some validation purpose , e.g. validate a stream
    * @return the refreshed operation with latest status
@@ -409,8 +408,8 @@ public final class Utils {
    * @param recoverable  whether the error is recoverable
    * @return the runtime exception constructed from the error message
    */
-  public static Exception handleError(Logger logger, DeltaSourceContext context,
-    String errorMessage, boolean recoverable) {
+  public static Exception handleError(Logger logger, DeltaSourceContext context, String errorMessage,
+    boolean recoverable) {
     Exception e;
     if (recoverable) {
       e = new DatastreamDeltaSourceException(errorMessage);
@@ -432,8 +431,8 @@ public final class Utils {
    * @param recoverable  whether the error is recoverable
    * @return the runtime exception constructed from the error message and the casue
    */
-  public static Exception handleError(Logger logger, DeltaSourceContext context,
-    String errorMessage, Exception cause, boolean recoverable) {
+  public static Exception handleError(Logger logger, DeltaSourceContext context, String errorMessage, Exception cause,
+    boolean recoverable) {
     setError(logger, context, cause);
     if (recoverable) {
       return new DatastreamDeltaSourceException(errorMessage, cause);
@@ -479,15 +478,17 @@ public final class Utils {
 
   /**
    * Builds a name for GCS bucket by prefixing the specified name with some prefix
+   *
    * @param name the name of the GCS bucket
    * @return GCS bucket name by prefixing the specified name with some prefix
    */
   public static String buildBucketName(String name) {
     return GCS_BUCKET_NAME_PREFIX + name;
   }
-  
+
   /**
    * Set additional Google API version http header through http request initializer
+   *
    * @param requestInitializer the original http request initializer
    * @return the http request initializer which set Google API version http header after applying the original
    * initializer
@@ -506,22 +507,24 @@ public final class Utils {
         httpRequest.getHeaders().put(GOOGLE_API_VERSION_HEADER, GOOGLE_API_VERSION);
       }
     };
+  }
 
   /**
-   * Fetch errors of a stream. If the stream has any errors, return an exception that contains error message of all
-   * the errors otherwise return null;
+   * Fetch errors of a stream. If the stream has any errors, return an exception that contains error message of all the
+   * errors otherwise return null;
+   *
    * @param datastream the Datastream client
    * @param streamPath the full stream resource path
-   * @param logger the logger
-   * @param context the delta source context
+   * @param logger     the logger
+   * @param context    the delta source context
    * @throws Exception the exception that contains the error message of all the stream errors
    */
 
   public static Exception fetchErrors(DataStream datastream, String streamPath, Logger logger,
     DeltaSourceContext context) throws IOException {
     // check stream errors
-    Operation operation = datastream.projects().locations().streams().fetchErrors(streamPath, new FetchErrorsRequest())
-      .execute();
+    Operation operation =
+      datastream.projects().locations().streams().fetchErrors(streamPath, new FetchErrorsRequest()).execute();
     operation = Utils.waitUntilComplete(datastream, operation, logger);
     if (operation != null) {
       Map<String, Object> response = operation.getResponse();
@@ -531,7 +534,7 @@ public final class Utils {
           return Utils.handleError(logger, context, errors.stream().map(error -> {
             Map<String, String> errorMap = (Map<String, String>) error;
             return String.format("%s, id: %s, reason: %s", errorMap.get("message"), errorMap.get("errorUuid"),
-                                 errorMap.get("reason"));
+              errorMap.get("reason"));
           }).collect(Collectors.joining("\n")), true);
         }
       }

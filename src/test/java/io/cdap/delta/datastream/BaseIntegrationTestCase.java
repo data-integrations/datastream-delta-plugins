@@ -1,13 +1,13 @@
 /*
  *
  * Copyright © 2020 Cask Data, Inc.
- *  
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- *  
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- *  
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -17,12 +17,11 @@
 
 package io.cdap.delta.datastream;
 
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.services.datastream.v1alpha1.DataStream;
-import com.google.api.services.datastream.v1alpha1.model.Operation;
-import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.api.gax.core.CredentialsProvider;
+import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.datastream.v1alpha1.DatastreamClient;
+import com.google.cloud.datastream.v1alpha1.DatastreamSettings;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -38,7 +37,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
@@ -51,7 +49,7 @@ public class BaseIntegrationTestCase {
   protected static Set<String> oracleTables;
   protected static int oraclePort;
   protected static GoogleCredentials credentials;
-  protected static DataStream datastream;
+  protected static DatastreamClient datastream;
   protected static String parentPath;
   protected static String gcsBucket;
   protected static Storage storage;
@@ -92,16 +90,14 @@ public class BaseIntegrationTestCase {
     }
 
     streamId = System.getProperty("stream.id");
-    if (streamId == null || streamId.isEmpty()) {
-      oracleHost = System.getProperty("oracle.host");
-      assumeFalse(oracleHost == null, String.format(messageTemplate, "oracle host"));
+    oracleHost = System.getProperty("oracle.host");
+    assumeFalse(oracleHost == null, String.format(messageTemplate, "oracle host"));
 
-      oracleUser = System.getProperty("oracle.user");
-      assumeFalse(oracleUser == null, String.format(messageTemplate, "oracle user"));
+    oracleUser = System.getProperty("oracle.user");
+    assumeFalse(oracleUser == null, String.format(messageTemplate, "oracle user"));
 
-      oraclePassword = System.getProperty("oracle.password", String.format(messageTemplate, "oracle password"));
-      assumeFalse(oraclePassword == null);
-    }
+    oraclePassword = System.getProperty("oracle.password", String.format(messageTemplate, "oracle password"));
+    assumeFalse(oraclePassword == null);
 
     oracleDb = System.getProperty("oracle.database");
     assumeFalse(oracleDb == null, String.format(messageTemplate, "oracle sid"));
@@ -114,8 +110,7 @@ public class BaseIntegrationTestCase {
       credentials = GoogleCredentials.fromStream(is).createScoped("https://www.googleapis.com/auth/cloud-platform");
     }
     datastream = createDatastreamClient();
-    storage = StorageOptions.newBuilder().setCredentials(credentials).setProjectId(project)
-      .build().getService();
+    storage = StorageOptions.newBuilder().setCredentials(credentials).setProjectId(project).build().getService();
 
     serviceAccountKey = new String(Files.readAllBytes(Paths.get(new File(serviceAccountFilePath).getAbsolutePath())),
       StandardCharsets.UTF_8);
@@ -125,8 +120,13 @@ public class BaseIntegrationTestCase {
 
   }
 
-  private static DataStream createDatastreamClient() {
-    return new DataStream(new NetHttpTransport(), new JacksonFactory(), new HttpCredentialsAdapter(credentials));
+  private static DatastreamClient createDatastreamClient() throws IOException {
+    return DatastreamClient.create(DatastreamSettings.newBuilder().setCredentialsProvider(new CredentialsProvider() {
+      @Override
+      public Credentials getCredentials() throws IOException {
+        return credentials;
+      }
+    }).build());
   }
 
   protected DatastreamConfig buildDatastreamConfig(boolean usingExisting) {
@@ -135,12 +135,5 @@ public class BaseIntegrationTestCase {
       gcsBucket, null, serviceAccountKey, serviceAccountKey, streamId, project);
   }
 
-  protected Operation waitUntilComplete(Operation operation) throws InterruptedException, IOException {
-    while (!operation.getDone()) {
-      TimeUnit.MILLISECONDS.sleep(200L);
-      operation = datastream.projects().locations().operations().get(operation.getName()).execute();
-    }
-    return operation;
-  }
 }
 

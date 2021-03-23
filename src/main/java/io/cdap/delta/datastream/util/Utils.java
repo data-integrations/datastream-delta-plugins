@@ -17,28 +17,36 @@
 
 package io.cdap.delta.datastream.util;
 
-import com.google.api.client.http.HttpRequest;
-import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.services.datastream.v1alpha1.DataStream;
-import com.google.api.services.datastream.v1alpha1.model.AvroFileFormat;
-import com.google.api.services.datastream.v1alpha1.model.BackfillAllStrategy;
-import com.google.api.services.datastream.v1alpha1.model.ConnectionProfile;
-import com.google.api.services.datastream.v1alpha1.model.DestinationConfig;
-import com.google.api.services.datastream.v1alpha1.model.FetchErrorsRequest;
-import com.google.api.services.datastream.v1alpha1.model.ForwardSshTunnelConnectivity;
-import com.google.api.services.datastream.v1alpha1.model.GcsDestinationConfig;
-import com.google.api.services.datastream.v1alpha1.model.GcsProfile;
-import com.google.api.services.datastream.v1alpha1.model.NoConnectivitySettings;
-import com.google.api.services.datastream.v1alpha1.model.Operation;
-import com.google.api.services.datastream.v1alpha1.model.OracleProfile;
-import com.google.api.services.datastream.v1alpha1.model.OracleRdbms;
-import com.google.api.services.datastream.v1alpha1.model.OracleSchema;
-import com.google.api.services.datastream.v1alpha1.model.OracleSourceConfig;
-import com.google.api.services.datastream.v1alpha1.model.OracleTable;
-import com.google.api.services.datastream.v1alpha1.model.SourceConfig;
-import com.google.api.services.datastream.v1alpha1.model.StaticServiceIpConnectivity;
-import com.google.api.services.datastream.v1alpha1.model.Stream;
+import com.google.api.gax.longrunning.OperationFuture;
+import com.google.cloud.datastream.v1alpha1.AvroFileFormat;
+import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
+import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
+import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
+import com.google.cloud.datastream.v1alpha1.DatastreamClient;
+import com.google.cloud.datastream.v1alpha1.DestinationConfig;
+import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileRequest;
+import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileResponse;
+import com.google.cloud.datastream.v1alpha1.Error;
+import com.google.cloud.datastream.v1alpha1.FetchErrorsRequest;
+import com.google.cloud.datastream.v1alpha1.FetchErrorsResponse;
+import com.google.cloud.datastream.v1alpha1.ForwardSshTunnelConnectivity;
+import com.google.cloud.datastream.v1alpha1.GcsDestinationConfig;
+import com.google.cloud.datastream.v1alpha1.GcsProfile;
+import com.google.cloud.datastream.v1alpha1.NoConnectivitySettings;
+import com.google.cloud.datastream.v1alpha1.OperationMetadata;
+import com.google.cloud.datastream.v1alpha1.OracleProfile;
+import com.google.cloud.datastream.v1alpha1.OracleRdbms;
+import com.google.cloud.datastream.v1alpha1.OracleSchema;
+import com.google.cloud.datastream.v1alpha1.OracleSourceConfig;
+import com.google.cloud.datastream.v1alpha1.OracleTable;
+import com.google.cloud.datastream.v1alpha1.SourceConfig;
+import com.google.cloud.datastream.v1alpha1.StaticServiceIpConnectivity;
+import com.google.cloud.datastream.v1alpha1.Stream;
+import com.google.cloud.datastream.v1alpha1.UpdateStreamRequest;
 import com.google.common.base.Joiner;
+import com.google.protobuf.Duration;
+import com.google.protobuf.Empty;
+import com.google.protobuf.FieldMask;
 import io.cdap.delta.api.DeltaFailureException;
 import io.cdap.delta.api.DeltaPipelineId;
 import io.cdap.delta.api.DeltaSourceContext;
@@ -51,12 +59,10 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.sql.SQLType;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
@@ -66,25 +72,24 @@ import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_FORW
 import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING;
 
 /**
- * Common Utils for Datastream source plugins
+ * Common Utils for DataStream source plugins
  */
 public final class Utils {
 
+  private static final String FIELD_STATE = "state";
+  private static final String FIELD_ALLOWLIST = "source_config.oracle_source_config.allowlist";
   private static final String GCS_BUCKET_NAME_PREFIX = "df-rds-";
   private static final long FILE_ROTATION_INTERVAL_IN_SECONDS = 15L;
   private static final int FILE_ROTATIONS_SIZE_IN_MB = 1;
   private static final String ORACLE_PROFILE_NAME_PREFIX = "DF-ORA-";
   private static final String GCS_PROFILE_NAME_PREFIX = "DF-GCS-";
   private static final String STREAM_NAME_PREFIX = "DF-Stream-";
-  private static final int TIMEOUT_IN_MILLISECONDS = 3 * 60000;   // 3 minutes read and connect timeout
-  private static final String GOOGLE_API_VERSION_HEADER = "X-GOOG-API-FORMAT-VERSION";
-  private static final String GOOGLE_API_VERSION = "2";
 
   private Utils() {
   }
 
   /**
-   * Convert the string oracle data type returned by Datastream to SQLType
+   * Convert the string oracle data type returned by DataStream to SQLType
    *
    * @param oracleDataType Oracle data type in form of string
    * @return corresponding SQLType of the oracle data type
@@ -165,21 +170,22 @@ public final class Utils {
   }
 
   /**
-   * Build an oracle connection profile based on Datastream delta source config
+   * Build an oracle connection profile based on DataStream delta source config
    *
    * @param name
-   * @param config Datastream delta source config
+   * @param config DataStream delta source config
    * @return the oracle connection profile
    */
   public static ConnectionProfile buildOracleConnectionProfile(@Nullable String name, DatastreamConfig config) {
-    ConnectionProfile profile = new ConnectionProfile().setOracleProfile(
-      new OracleProfile().setHostname(config.getHost()).setUsername(config.getUser()).setPassword(config.getPassword())
-        .setDatabaseService(config.getSid()).setPort(config.getPort())).setDisplayName(name);
+    ConnectionProfile.Builder profile = ConnectionProfile.newBuilder().setOracleProfile(
+      OracleProfile.newBuilder().setHostname(config.getHost()).setUsername(config.getUser())
+        .setPassword(config.getPassword()).setDatabaseService(config.getSid()).setPort(config.getPort()))
+      .setDisplayName(name);
     switch (config.getConnectivityMethod()) {
       case CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL:
-        ForwardSshTunnelConnectivity forwardSSHTunnelConnectivity =
-          new ForwardSshTunnelConnectivity().setHostname(config.getSshHost()).setPassword(config.getSshPassword())
-            .setPort(config.getSshPort()).setUsername(config.getSshUser());
+        ForwardSshTunnelConnectivity.Builder forwardSSHTunnelConnectivity =
+          ForwardSshTunnelConnectivity.newBuilder().setHostname(config.getSshHost())
+            .setPassword(config.getSshPassword()).setPort(config.getSshPort()).setUsername(config.getSshUser());
         switch (config.getSshAuthenticationMethod()) {
           case AUTHENTICATION_METHOD_PASSWORD:
             forwardSSHTunnelConnectivity.setPassword(config.getSshPassword());
@@ -191,9 +197,9 @@ public final class Utils {
             throw new IllegalArgumentException(
               "Unsupported authentication method: " + config.getSshAuthenticationMethod());
         }
-        return profile.setForwardSshConnectivity(forwardSSHTunnelConnectivity);
+        return profile.setForwardSshConnectivity(forwardSSHTunnelConnectivity).build();
       case CONNECTIVITY_METHOD_IP_ALLOWLISTING:
-        return profile.setStaticServiceIpConnectivity(new StaticServiceIpConnectivity());
+        return profile.setStaticServiceIpConnectivity(StaticServiceIpConnectivity.getDefaultInstance()).build();
       default:
         throw new IllegalArgumentException("Unsupported connectivity method: " + config.getConnectivityMethod());
     }
@@ -212,61 +218,71 @@ public final class Utils {
   }
 
   /**
-   * Build a Datastream stream config
+   * Build a DataStream stream config
    *
    * @param parentPath the parent path of the stream to be crated
    * @param name       the name of the stream to be created
    * @param sourcePath the path of the source connection profile
    * @param targetPath the path of the target connection profile
    * @param tables     tables to be tracked changes of
-   * @return the Datastream stream config
+   * @return the DataStream stream config
    */
   public static Stream buildStreamConfig(String parentPath, String name, String sourcePath, String targetPath,
     Set<SourceTable> tables) {
-    return new Stream().setDisplayName(name).setDestinationConfig(
-      new DestinationConfig().setDestinationConnectionProfileName(targetPath).setGcsDestinationConfig(
-        new GcsDestinationConfig().setAvroFileFormat(new AvroFileFormat()).setPath("/" + name)
+    return Stream.newBuilder().setDisplayName(name).setDestinationConfig(
+      DestinationConfig.newBuilder().setDestinationConnectionProfileName(targetPath).setGcsDestinationConfig(
+        GcsDestinationConfig.newBuilder().setAvroFileFormat(AvroFileFormat.getDefaultInstance()).setPath("/" + name)
           .setFileRotationMb(FILE_ROTATIONS_SIZE_IN_MB)
-          .setFileRotationInterval(FILE_ROTATION_INTERVAL_IN_SECONDS + "s"))).setSourceConfig(
-      new SourceConfig().setSourceConnectionProfileName(sourcePath)
-        .setOracleSourceConfig(new OracleSourceConfig().setAllowlist(buildAllowlist(tables))))
-      .setBackfillAll(new BackfillAllStrategy());
+          .setFileRotationInterval(Duration.newBuilder().setSeconds(FILE_ROTATION_INTERVAL_IN_SECONDS).build())))
+      .setSourceConfig(SourceConfig.newBuilder().setSourceConnectionProfileName(sourcePath)
+        .setOracleSourceConfig(OracleSourceConfig.newBuilder().setAllowlist(buildAllowlist(tables))))
+      .setBackfillAll(Stream.BackfillAllStrategy.getDefaultInstance()).build();
   }
 
   // build an allow list of what tables to be tracked change of
-  private static OracleRdbms buildAllowlist(Set<SourceTable> tables) {
-    List<OracleSchema> schemas = new ArrayList<>();
+  private static OracleRdbms.Builder buildAllowlist(Set<SourceTable> tables) {
+    List<OracleSchema.Builder> schemas = new ArrayList<>();
     addTablesToAllowList(tables, schemas);
-    return new OracleRdbms().setOracleSchemas(schemas);
+    return OracleRdbms.newBuilder()
+      .addAllOracleSchemas(schemas.stream().map(OracleSchema.Builder::build).collect(Collectors.toList()));
   }
 
-  private static void addTablesToAllowList(Set<SourceTable> tables, @Nullable List<OracleSchema> schemas) {
-    // if the stream has allow list as "*.*" , the schemas will be null
-    if (schemas == null) {
+  private static void addTablesToExistingAllowList(Set<SourceTable> tables, List<OracleSchema.Builder> schemas) {
+    // if the stream has allow list as "*.*" , the schemas list will be empty
+    if (schemas.isEmpty()) {
       return;
     }
+    addTablesToAllowList(tables, schemas);
+  }
+
+  private static void addTablesToAllowList(Set<SourceTable> tables, List<OracleSchema.Builder> schemas) {
     Map<String, Set<String>> schemaToTables = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s -> {
-      List<OracleTable> oracleTables = s.getOracleTables();
-      // if the stream has allow list as "hr.*", then the schema name will be "hr" and oracleTables will be null
-      if (oracleTables == null) {
-        return Collections.emptySet();
-      }
+      List<OracleTable> oracleTables = new ArrayList<>(s.getOracleTablesList());
+      // if the stream has allow list as "hr.*", then the schema name will be "hr" and oracleTables will be empty
       return oracleTables.stream().map(o -> o.getTableName()).collect(Collectors.toSet());
     }));
-    Map<String, OracleSchema> nameToSchema = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s -> s));
+
+    Map<String, OracleSchema.Builder> nameToSchema =
+      schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s -> s));
 
     tables.forEach(table -> {
-      Set<String> oracleTables = schemaToTables.computeIfAbsent(table.getSchema(), name -> new HashSet<>());
-      OracleSchema oracleSchema = nameToSchema.computeIfAbsent(table.getSchema(), name -> {
-        OracleSchema newSchema = new OracleSchema().setSchemaName(name);
+      Set<String> oracleTables = schemaToTables.get(table.getSchema());
+      // if oracleTables is empty , that means all tables are allowed under this schema
+      if (oracleTables != null && oracleTables.isEmpty()) {
+        return;
+      }
+      if (oracleTables == null) {
+        oracleTables = new HashSet<>();
+        schemaToTables.put(table.getSchema(), oracleTables);
+      }
+      OracleSchema.Builder oracleSchema = nameToSchema.computeIfAbsent(table.getSchema(), name -> {
+        OracleSchema.Builder newSchema = OracleSchema.newBuilder().setSchemaName(name);
         schemas.add(newSchema);
-        newSchema.setOracleTables(new ArrayList<>());
         return newSchema;
       });
-      // if oracleSchema.getOracleTables() is null it means it allows all tables under this schema
-      if (oracleSchema.getOracleTables() != null && !oracleTables.contains(table.getTable())) {
-        oracleSchema.getOracleTables().add(new OracleTable().setTableName(table.getTable()));
-        oracleTables.add(table.getTable());
+
+      if (oracleTables.add(table.getTable())) {
+        oracleSchema.addOracleTables(OracleTable.newBuilder().setTableName(table.getTable()));
       }
     });
   }
@@ -275,69 +291,40 @@ public final class Utils {
    * Wait until the specified operation is completed.
    *
    * @param operation the operation to wait for
-   * @return the refreshed operation with latest status
+   * @return the result that operation returns
    */
-  public static Operation waitUntilComplete(DataStream datastream, Operation operation, Logger logger) {
-    return waitUntilComplete(datastream, operation, logger, false);
-  }
-
-  /**
-   * Wait until the specified operation is completed.
-   *
-   * @param operation     the operation to wait for
-   * @param suppressError whether to suppress error. When error is suppressed, exception won't be thrown.It's used for
-   *                      some validation purpose , e.g. validate a stream
-   * @return the refreshed operation with latest status
-   */
-  public static Operation waitUntilComplete(DataStream datastream, Operation operation, Logger logger,
-    boolean suppressError) {
+  public static <T> T waitUntilComplete(OperationFuture<T, OperationMetadata> operation, String request,
+    Logger logger) {
     if (operation == null) {
       return null;
     }
     try {
-      while (!operation.getDone()) {
-        TimeUnit.MILLISECONDS.sleep(200L);
-        operation = datastream.projects().locations().operations().get(operation.getName()).execute();
-      }
+      return operation.get();
     } catch (Exception e) {
-      if (suppressError) {
-        logger.error(String.format("Failed to query status of operation: %s", operation.toString()), e);
-      } else {
-        throw new DatastreamDeltaSourceException(
-          String.format("Failed to query status of operation: %s", operation.toString()), e);
-      }
+      String errorMessage = String.format("Failed to query status of operation %s", request);
+      logger.error(errorMessage, e);
+      throw new DatastreamDeltaSourceException(errorMessage, e, operation.getMetadata());
     }
-    if (operation.getError() != null) {
-      if (suppressError) {
-        logger.error(String
-          .format("Operation %s failed with error code :%s and error message: %s", operation.toString(),
-            operation.getError().getCode(), operation.getError().getMessage()));
-      } else {
-        throw new DatastreamDeltaSourceException(String
-          .format("Operation %s failed with error code :%s and error message: %s", operation.toString(),
-            operation.getError().getCode(), operation.getError().getMessage()));
-      }
-    }
-    return operation;
   }
 
   /**
-   * Build a Datastream GCS connection profile
+   * Build a DataStream GCS connection profile
    *
    * @param parentPath    the parent path of the connection profile to be created
    * @param name          the name of the connection profile to be created
    * @param gcsBucket     the name of GCS bucket where the stream result will be written to
    * @param gcsPathPrefix the prefix of the path for the stream result
-   * @return the Datastream GCS connection profile
+   * @return the DataStream GCS connection profile
    */
   public static ConnectionProfile buildGcsConnectionProfile(String parentPath, String name, String gcsBucket,
     String gcsPathPrefix) {
-    return new ConnectionProfile().setDisplayName(name).setNoConnectivity(new NoConnectivitySettings())
-      .setGcsProfile(new GcsProfile().setBucketName(gcsBucket).setRootPath(gcsPathPrefix));
+    return ConnectionProfile.newBuilder().setDisplayName(name)
+      .setNoConnectivity(NoConnectivitySettings.getDefaultInstance())
+      .setGcsProfile(GcsProfile.newBuilder().setBucketName(gcsBucket).setRootPath(gcsPathPrefix)).build();
   }
 
   /**
-   * Build the path of a Datastream connection profile
+   * Build the path of a DataStream connection profile
    *
    * @param parentPath the parent path of the connection profile
    * @param name       the name of the connection profile
@@ -348,27 +335,27 @@ public final class Utils {
   }
 
   /**
-   * Build the predefined Datastream Oracle connection profile name for a replicator instance
+   * Build the predefined DataStream Oracle connection profile name for a replicator instance
    *
    * @param replicatorId the id of a replicator
-   * @return the predefined Datastream Oracle connection profile name
+   * @return the predefined DataStream Oracle connection profile name
    */
   public static String buildOracleProfileName(String replicatorId) {
     return ORACLE_PROFILE_NAME_PREFIX + replicatorId;
   }
 
   /**
-   * Build the predefined Datastream GCS connection profile name for a replicator instance
+   * Build the predefined DataStream GCS connection profile name for a replicator instance
    *
    * @param replicatorId the id of a replicator
-   * @return the predefined Datastream GCS connection profile name
+   * @return the predefined DataStream GCS connection profile name
    */
   public static String buildGcsProfileName(String replicatorId) {
     return GCS_PROFILE_NAME_PREFIX + replicatorId;
   }
 
   /**
-   * Build the path of a Datastream stream
+   * Build the path of a DataStream stream
    *
    * @param parentPath the parent path of the stream
    * @param name       the name of the stream
@@ -379,10 +366,10 @@ public final class Utils {
   }
 
   /**
-   * Build the predefined Datastream stream name for a replicator instance
+   * Build the predefined DataStream stream name for a replicator instance
    *
    * @param replicatorId the id of a replicator
-   * @return the predefined Datastream source connection profile name
+   * @return the predefined DataStream source connection profile name
    */
   public static String buildStreamName(String replicatorId) {
     return STREAM_NAME_PREFIX + replicatorId;
@@ -472,8 +459,13 @@ public final class Utils {
    * @param stream the stream the specified tables will be added to
    * @param tables the tables to be added to the allowlist of the stream
    */
-  public static void addToAllowList(Stream stream, Set<SourceTable> tables) {
-    addTablesToAllowList(tables, stream.getSourceConfig().getOracleSourceConfig().getAllowlist().getOracleSchemas());
+  public static void addToAllowList(Stream.Builder stream, Set<SourceTable> tables) {
+    OracleRdbms.Builder allowlist =
+      stream.getSourceConfigBuilder().getOracleSourceConfigBuilder().getAllowlistBuilder();
+    List<OracleSchema.Builder> oracleSchemas = new ArrayList<>(allowlist.getOracleSchemasBuilderList());
+    addTablesToAllowList(tables, oracleSchemas);
+    allowlist.clearOracleSchemas()
+      .addAllOracleSchemas(oracleSchemas.stream().map(OracleSchema.Builder::build).collect(Collectors.toList()));
   }
 
   /**
@@ -487,58 +479,244 @@ public final class Utils {
   }
 
   /**
-   * Set additional Google API version http header through http request initializer
-   *
-   * @param requestInitializer the original http request initializer
-   * @return the http request initializer which set Google API version http header after applying the original
-   * initializer
-   */
-  public static HttpRequestInitializer setAdditionalHttpRequestHeaders(
-    final HttpRequestInitializer requestInitializer) {
-    return new HttpRequestInitializer() {
-      @Override
-      public void initialize(HttpRequest httpRequest) throws IOException {
-        requestInitializer.initialize(httpRequest);
-        httpRequest.setConnectTimeout(TIMEOUT_IN_MILLISECONDS);
-        httpRequest.setReadTimeout(TIMEOUT_IN_MILLISECONDS);
-
-        // Workaround to support custom error message (for validations details)
-        // https://buganizer.corp.google.com/issues/179156441
-        httpRequest.getHeaders().put(GOOGLE_API_VERSION_HEADER, GOOGLE_API_VERSION);
-      }
-    };
-  }
-
-  /**
    * Fetch errors of a stream. If the stream has any errors, return an exception that contains error message of all the
    * errors otherwise return null;
    *
-   * @param datastream the Datastream client
+   * @param datastream the DataStream client
    * @param streamPath the full stream resource path
    * @param logger     the logger
    * @param context    the delta source context
    * @throws Exception the exception that contains the error message of all the stream errors
    */
 
-  public static Exception fetchErrors(DataStream datastream, String streamPath, Logger logger,
+  public static Exception fetchErrors(DatastreamClient datastream, String streamPath, Logger logger,
     DeltaSourceContext context) throws IOException {
     // check stream errors
-    Operation operation =
-      datastream.projects().locations().streams().fetchErrors(streamPath, new FetchErrorsRequest()).execute();
-    operation = Utils.waitUntilComplete(datastream, operation, logger);
-    if (operation != null) {
-      Map<String, Object> response = operation.getResponse();
-      if (response != null) {
-        List<Object> errors = (List<Object>) response.get("errors");
-        if (errors != null && !errors.isEmpty()) {
-          return Utils.handleError(logger, context, errors.stream().map(error -> {
-            Map<String, String> errorMap = (Map<String, String>) error;
-            return String.format("%s, id: %s, reason: %s", errorMap.get("message"), errorMap.get("errorUuid"),
-              errorMap.get("reason"));
-          }).collect(Collectors.joining("\n")), true);
-        }
+    FetchErrorsRequest request = FetchErrorsRequest.newBuilder().setStream(streamPath).build();
+    String requestStr = "FetchErrors Request:\n" + request.toString();
+    if (logger.isTraceEnabled()) {
+      logger.trace(requestStr);
+    }
+    OperationFuture<FetchErrorsResponse, OperationMetadata> operation = datastream.fetchErrorsAsync(request);
+    FetchErrorsResponse fetchErrorsResponse = Utils.waitUntilComplete(operation, requestStr, logger);
+    if (logger.isTraceEnabled()) {
+      logger.trace("FetchErrros Response:\n" + fetchErrorsResponse.toString());
+    }
+    if (fetchErrorsResponse != null) {
+      List<Error> errors = fetchErrorsResponse.getErrorsList();
+      if (!errors.isEmpty()) {
+        return Utils.handleError(logger, context, errors.stream().map(error -> {
+          return String.format("%s, id: %s, reason: %s", error.getMessage(), error.getErrorUuid(), error.getReason());
+        }).collect(Collectors.joining("\n")), true);
       }
     }
     return null;
+  }
+
+  /**
+   * Get the specified stream
+   *
+   * @param datastream DataStream client
+   * @param path       the full stream resource path
+   * @param logger     the logger
+   * @return the stream with the specified path
+   */
+  public static Stream getStream(DatastreamClient datastream, String path, Logger logger) {
+    if (logger.isDebugEnabled()) {
+      logger.debug("GetStream Request:\n" + path);
+    }
+    Stream stream = datastream.getStream(path);
+    if (logger.isDebugEnabled()) {
+      logger.debug("GetStream Response:\n" + stream.toString());
+    }
+    return stream;
+  }
+
+  /**
+   * Update the specified stream
+   *
+   * @param datastream DataStream client
+   * @param request    update stream request
+   * @param logger     the logger
+   * @return the updated stream
+   */
+  public static Stream updateStream(DatastreamClient datastream, UpdateStreamRequest request, Logger logger) {
+    String requestStr = "UpdateStream Request:\n" + request.toString();
+    if (logger.isDebugEnabled()) {
+      logger.debug(requestStr);
+    }
+    OperationFuture<Stream, OperationMetadata> operation = datastream.updateStreamAsync(request);
+    Stream stream = waitUntilComplete(operation, requestStr, logger);
+    if (logger.isDebugEnabled()) {
+      logger.debug("UpdateStream Response:\n" + stream.toString());
+    }
+    return stream;
+  }
+
+  /**
+   * Get the specified connection profile
+   *
+   * @param datastream the DataStream client
+   * @param path       the full path of the connection profile resource
+   * @param logger     the logger
+   * @return the conneciton profile with the specified path
+   */
+  public static ConnectionProfile getConnectionProfile(DatastreamClient datastream, String path, Logger logger) {
+    if (logger.isDebugEnabled()) {
+      logger.debug("GetConnectionProfile Request:\n" + path);
+    }
+    ConnectionProfile connectionProfile = datastream.getConnectionProfile(path);
+    if (logger.isDebugEnabled()) {
+      logger.debug("GetConnectionProfile Response:\n" + connectionProfile.toString());
+    }
+    return connectionProfile;
+  }
+
+  /**
+   * Create connection profile
+   *
+   * @param datastream DataStream client
+   * @param reqeust    the create conneciton profile request
+   * @param logger     the logger
+   * @return the created connection profile
+   */
+  public static ConnectionProfile createConnectionProfile(DatastreamClient datastream,
+    CreateConnectionProfileRequest reqeust, Logger logger) {
+    String createConnectionProfileRequestStr = "CreateConnectionProfile Request:\n" + reqeust.toString();
+    if (logger.isDebugEnabled()) {
+      logger.debug(createConnectionProfileRequestStr);
+    }
+    ConnectionProfile connectionProfile =
+      waitUntilComplete(datastream.createConnectionProfileAsync(reqeust), createConnectionProfileRequestStr, logger);
+    if (logger.isDebugEnabled()) {
+      logger.debug("CreateConnectionProfile Response:\n" + connectionProfile.toString());
+    }
+    return connectionProfile;
+  }
+
+  /**
+   * Create stream
+   *
+   * @param datastream          DataStream client
+   * @param createStreamRequest the create stream request
+   * @param logger              the logger
+   * @return the created stream
+   */
+  public static Stream createStream(DatastreamClient datastream, CreateStreamRequest createStreamRequest,
+    Logger logger) {
+    String createStreamRequestStr = "CreateStream Request:\n" + createStreamRequest.toString();
+    if (logger.isDebugEnabled()) {
+      logger.debug(createStreamRequestStr);
+    }
+    Stream stream =
+      waitUntilComplete(datastream.createStreamAsync(createStreamRequest), createStreamRequestStr, logger);
+    if (logger.isDebugEnabled()) {
+      logger.debug("CreateStream Response:\n" + stream.toString());
+    }
+    return stream;
+  }
+
+  /**
+   * Start the specified stream
+   *
+   * @param datastream DataStream client
+   * @param stream     the stream to be started
+   * @param logger     the logger
+   * @return the started stream
+   */
+  public static Stream startStream(DatastreamClient datastream, Stream stream, Logger logger) {
+    return updateStream(datastream, UpdateStreamRequest.newBuilder()
+      .setStream(Stream.newBuilder().setName(stream.getName()).setState(Stream.State.RUNNING))
+      .setUpdateMask(FieldMask.newBuilder().addPaths(FIELD_STATE)).build(), logger);
+  }
+
+  /**
+   * Pause the specified stream
+   *
+   * @param datastream DataStream client
+   * @param stream     the stream to be paused
+   * @param logger     the logger
+   * @return the paused stream
+   */
+  public static Stream pauseStream(DatastreamClient datastream, Stream stream, Logger logger) {
+    return updateStream(datastream, UpdateStreamRequest.newBuilder()
+      .setStream(Stream.newBuilder().setName(stream.getName()).setState(Stream.State.PAUSED))
+      .setUpdateMask(FieldMask.newBuilder().addPaths(FIELD_STATE)).build(), logger);
+  }
+
+  /**
+   * Update the allowlist of the specified stream
+   *
+   * @param datastream DataStream client
+   * @param stream     the stream to be updated
+   * @param logger     the logger
+   * @return the updated stream
+   */
+  public static Stream updateAllowlist(DatastreamClient datastream, Stream stream, Logger logger) {
+    Stream.Builder streamBuilder = Stream.newBuilder().setName(stream.getName());
+    streamBuilder.getSourceConfigBuilder().getOracleSourceConfigBuilder()
+      .setAllowlist(stream.getSourceConfig().getOracleSourceConfig().getAllowlist());
+    return updateStream(datastream, UpdateStreamRequest.newBuilder().setStream(streamBuilder)
+      .setUpdateMask(FieldMask.newBuilder().addPaths(FIELD_ALLOWLIST)).build(), logger);
+  }
+
+  /**
+   * Delete the specified stream
+   *
+   * @param datastream DataStream client
+   * @param path       the full stream resource path
+   * @param logger     the logger
+   */
+  public static void deleteStream(DatastreamClient datastream, String path, Logger logger) {
+    String requestStr = "DeleteStream Request:\n" + path;
+    if (logger.isDebugEnabled()) {
+      logger.debug(requestStr);
+    }
+    OperationFuture<Empty, OperationMetadata> operation = datastream.deleteStreamAsync(path);
+    Empty response = waitUntilComplete(operation, requestStr, logger);
+    if (logger.isDebugEnabled()) {
+      logger.debug("DeleteStream Response:\n" + response.toString());
+    }
+  }
+
+  /**
+   * Delete the specified connection profile
+   *
+   * @param datastream DataStream client
+   * @param path       the full connection profile resource path
+   * @param logger     the logger
+   */
+  public static void deleteConnectionProfile(DatastreamClient datastream, String path, Logger logger) {
+    String requestStr = "DeleteConnectionProfile Request:\n" + path;
+    if (logger.isDebugEnabled()) {
+      logger.debug(requestStr);
+    }
+    OperationFuture<Empty, OperationMetadata> operation = datastream.deleteConnectionProfileAsync(path);
+    Empty response = waitUntilComplete(operation, requestStr, logger);
+    if (logger.isDebugEnabled()) {
+      logger.debug("DeleteConnectionProfile Response:\n" + response.toString());
+    }
+  }
+
+  /**
+   * Discover connection profile
+   *
+   * @param datastream DataStream client
+   * @param request    discover connection profile request
+   * @param logger     the logger
+   * @return the discover connection profile response
+   */
+  public static DiscoverConnectionProfileResponse discoverConnectionProfile(DatastreamClient datastream,
+    DiscoverConnectionProfileRequest request, Logger logger) {
+
+    String requestStr = "DiscoverConnectionProfile Request:\n" + request.toString();
+    if (logger.isTraceEnabled()) {
+      logger.trace(requestStr);
+    }
+    DiscoverConnectionProfileResponse response = datastream.discoverConnectionProfile(request);
+    if (logger.isTraceEnabled()) {
+      logger.trace("DiscoverConnectionProfile Response:\n" + response.toString());
+    }
+    return response;
   }
 }

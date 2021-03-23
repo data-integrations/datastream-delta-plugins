@@ -17,6 +17,9 @@
 
 package io.cdap.delta.datastream.util;
 
+import com.google.api.core.ApiFuture;
+import com.google.cloud.datastream.v1alpha1.OperationMetadata;
+
 /**
  * Exception thrown by Datastream Delta Source on purpose. Such exception is thrown after Datastream Delta Source
  * detects certain errors. Such exception should be handled by restarting the Datastream Delta Source. For example,
@@ -27,11 +30,20 @@ package io.cdap.delta.datastream.util;
  * cannot be parsed.)
  */
 public class DatastreamDeltaSourceException extends RuntimeException {
-  public DatastreamDeltaSourceException(String errorMessage, Exception cause) {
-    super(errorMessage, cause);
-  }
+  private final ApiFuture<OperationMetadata> metadata;
 
+  public DatastreamDeltaSourceException(String errorMessage, Exception cause) {
+    this(errorMessage, cause, null);
+  }
+  public DatastreamDeltaSourceException(String errorMessage, Exception cause, ApiFuture<OperationMetadata> metadata) {
+    super(errorMessage, cause);
+    this.metadata = metadata;
+  }
   public DatastreamDeltaSourceException(String errorMessage) {
     super(errorMessage);
+    this.metadata = null;
+  }
+  public ApiFuture<OperationMetadata> getMetadata() {
+    return metadata;
   }
 }

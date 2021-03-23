@@ -16,14 +16,14 @@
 
 package io.cdap.delta.datastream;
 
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-import com.google.api.services.datastream.v1alpha1.DataStream;
-import com.google.api.services.datastream.v1alpha1.model.DiscoverConnectionProfileRequest;
-import com.google.api.services.datastream.v1alpha1.model.DiscoverConnectionProfileResponse;
-import com.google.api.services.datastream.v1alpha1.model.OracleColumn;
-import com.google.api.services.datastream.v1alpha1.model.OracleRdbms;
-import com.google.api.services.datastream.v1alpha1.model.OracleSchema;
-import com.google.api.services.datastream.v1alpha1.model.OracleTable;
+import com.google.api.gax.rpc.NotFoundException;
+import com.google.cloud.datastream.v1alpha1.DatastreamClient;
+import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileRequest;
+import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileResponse;
+import com.google.cloud.datastream.v1alpha1.OracleColumn;
+import com.google.cloud.datastream.v1alpha1.OracleRdbms;
+import com.google.cloud.datastream.v1alpha1.OracleSchema;
+import com.google.cloud.datastream.v1alpha1.OracleTable;
 import com.google.common.collect.Iterables;
 import com.google.gson.Gson;
 import io.cdap.cdap.api.data.schema.Schema;
@@ -56,7 +56,7 @@ public class DatastreamTableRegistry implements TableRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(DatastreamTableRegistry.class);
   private static final Gson GSON = new Gson();
   private final DatastreamConfig config;
-  private final DataStream datastream;
+  private final DatastreamClient datastream;
   // parent path of datastream resources in form of "projects/projectId/locations/region"
   private final String parentPath;
   // TODO find a better way to get system schemas for different version of Oracle.
@@ -64,11 +64,11 @@ public class DatastreamTableRegistry implements TableRegistry {
   //  1. get the version of oracle and we map it to system schemas
   //  or
   //  2. get information about whether the schema is a system schema
-  private static final Set<String> SYSTEM_SCHEMA = new HashSet<>(Arrays.asList("SYS", "SYSTEM", "CTXSYS", "XDB",
-    "MDSYS", "FLOWS_FILES", "APEX_040000", "OUTLN"));
+  private static final Set<String> SYSTEM_SCHEMA =
+    new HashSet<>(Arrays.asList("SYS", "SYSTEM", "CTXSYS", "XDB", "MDSYS", "FLOWS_FILES", "APEX_040000", "OUTLN"));
 
 
-  public DatastreamTableRegistry(DatastreamConfig config, DataStream datastream) {
+  public DatastreamTableRegistry(DatastreamConfig config, DatastreamClient datastream) {
     this.config = config;
     this.datastream = datastream;
     //TODO validate whether the region is valid
@@ -83,34 +83,26 @@ public class DatastreamTableRegistry implements TableRegistry {
     String sourceConnectionProfileName = null;
     if (config.isUsingExistingStream()) {
       sourceConnectionProfileName =
-        datastream.projects().locations().streams().get(Utils.buildStreamPath(parentPath, config.getStreamId()))
-          .execute().getSourceConfig().getSourceConnectionProfileName();
-      databaseName = datastream.projects().locations().connectionProfiles().get(sourceConnectionProfileName).execute()
-        .getOracleProfile().getDatabaseService();
+        Utils.getStream(datastream, Utils.buildStreamPath(parentPath, config.getStreamId()), LOGGER).getSourceConfig()
+          .getSourceConnectionProfileName();
+      databaseName = Utils.getConnectionProfile(datastream, sourceConnectionProfileName, LOGGER).getOracleProfile()
+        .getDatabaseService();
     } else {
       databaseName = config.getSid();
     }
-    DiscoverConnectionProfileResponse response = discover(sourceConnectionProfileName);
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Response of discovering connection profile for listing tables: {}", GSON.toJson(response));
-    }
-    if (response.getOracleRdbms().getOracleSchemas() == null) {
-      return new TableList(tables);
-    }
+    DiscoverConnectionProfileRequest request =
+      buildDiscoverConnectionProfileRequest(sourceConnectionProfileName).build();
+    DiscoverConnectionProfileResponse response = Utils.discoverConnectionProfile(datastream, request, LOGGER);
 
-    for (OracleSchema schema : response.getOracleRdbms().getOracleSchemas()) {
+    for (OracleSchema schema : response.getOracleRdbms().getOracleSchemasList()) {
       String schemaName = schema.getSchemaName();
       if (SYSTEM_SCHEMA.contains(schemaName.toUpperCase())) {
         //skip system tables
         continue;
       }
-      if (schema.getOracleTables() == null) {
-        continue;
-      }
-      for (OracleTable table : schema.getOracleTables()) {
+      for (OracleTable table : schema.getOracleTablesList()) {
         String tableName = table.getTableName();
-        tables.add(new TableSummary(databaseName, tableName,
-          table.getOracleColumns() == null ? 0 : table.getOracleColumns().size(), schemaName));
+        tables.add(new TableSummary(databaseName, tableName, table.getOracleColumnsCount(), schemaName));
       }
     }
     return new TableList(tables);
@@ -123,44 +115,40 @@ public class DatastreamTableRegistry implements TableRegistry {
     }
     DiscoverConnectionProfileResponse discoverResponse;
     try {
-      discoverResponse = discover(schema, table, config.isUsingExistingStream() ?
-        datastream.projects().locations().streams().get(Utils.buildStreamPath(parentPath, config.getStreamId()))
-          .execute().getSourceConfig().getSourceConnectionProfileName() : null);
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Response of discovering connection profile  for describing table: {}",
-                     GSON.toJson(discoverResponse));
-      }
-    } catch (GoogleJsonResponseException e) {
-      if (e.getStatusCode() == 404) {
-        throw new TableNotFoundException(db, schema, table, e.getMessage(), e);
-      }
-      throw e;
+
+      DiscoverConnectionProfileRequest request = buildDiscoverConnectionProfileRequest(config.isUsingExistingStream() ?
+        Utils.getStream(datastream, Utils.buildStreamPath(parentPath, config.getStreamId()), LOGGER).getSourceConfig()
+          .getSourceConnectionProfileName() : null).setOracleRdbms(OracleRdbms.newBuilder().addOracleSchemas(
+        OracleSchema.newBuilder().setSchemaName(schema).addOracleTables(OracleTable.newBuilder().setTableName(table))))
+        .build();
+
+      discoverResponse = Utils.discoverConnectionProfile(datastream, request, LOGGER);
+    } catch (NotFoundException e) {
+      throw new TableNotFoundException(db, schema, table, e.getMessage(), e);
     }
 
-    OracleSchema oracleSchema =
-      Iterables.getOnlyElement(discoverResponse.getOracleRdbms().getOracleSchemas());
-    OracleTable oracleTable = Iterables.getOnlyElement(oracleSchema.getOracleTables());
-    List<ColumnDetail> columns = new ArrayList<>(oracleTable.getOracleColumns().size());
+    OracleSchema oracleSchema = Iterables.getOnlyElement(discoverResponse.getOracleRdbms().getOracleSchemasList());
+    OracleTable oracleTable = Iterables.getOnlyElement(oracleSchema.getOracleTablesList());
+    List<ColumnDetail> columns = new ArrayList<>(oracleTable.getOracleColumnsCount());
     List<String> primaryKeys = new ArrayList<>();
-    for (OracleColumn column : oracleTable.getOracleColumns()) {
+    for (OracleColumn column : oracleTable.getOracleColumnsList()) {
       Map<String, String> properties = new HashMap<>();
-      if (column.getPrecision() != null) {
+      if (column.getPrecision() > 0) {
         properties.put(DatastreamTableAssessor.PRECISION, Integer.toString(column.getPrecision()));
       }
-      if (column.getScale() != null) {
+      if (column.getScale() > 0) {
         properties.put(DatastreamTableAssessor.SCALE, Integer.toString(column.getScale()));
       }
       SQLType sqlType = Utils.convertStringDataTypeToSQLType(column.getDataType());
-      columns.add(
-        new ColumnDetail(column.getColumnName(), sqlType,
-                         Boolean.TRUE.equals(column.getNullable()), properties));
+      columns
+        .add(new ColumnDetail(column.getColumnName(), sqlType, Boolean.TRUE.equals(column.getNullable()), properties));
       if (Boolean.TRUE.equals(column.getPrimaryKey())) {
         primaryKeys.add(column.getColumnName());
       }
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Found column : {}, data type : {} (converted to {}), precision: {}, scale: {} , isPrimary: {}",
-                     column.getColumnName(), column.getDataType(), sqlType, column.getPrecision(), column.getScale(),
-                     column.getPrimaryKey());
+          column.getColumnName(), column.getDataType(), sqlType, column.getPrecision(), column.getScale(),
+          column.getPrimaryKey());
       }
     }
     return new TableDetail.Builder(db, table, schema).setColumns(columns).setPrimaryKey(primaryKeys).build();
@@ -178,42 +166,21 @@ public class DatastreamTableRegistry implements TableRegistry {
     }
     Schema schema = Schema.recordOf("outputSchema", columnSchemas);
     return new StandardizedTableDetail(tableDetail.getDatabase(), tableDetail.getSchema(), tableDetail.getTable(),
-                                       tableDetail.getPrimaryKey(), schema);
+      tableDetail.getPrimaryKey(), schema);
   }
 
   @Override
   public void close() throws IOException {
   }
 
-  private DiscoverConnectionProfileResponse discover(String schema, String table, String sourceConnectionProfileName)
-    throws IOException {
-    DiscoverConnectionProfileRequest request = buildDiscoverConnectionProfileRequest(sourceConnectionProfileName)
-      .setOracleRdbms(new OracleRdbms().setOracleSchemas(Arrays.asList(new OracleSchema().setSchemaName(schema)
-        .setOracleTables(Arrays.asList(new OracleTable().setTableName(table))))));
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Discover connection profile for describing table: \n parentPath = {} \n request = {} ", parentPath,
-                   request);
-    }
-    return datastream.projects().locations().connectionProfiles().discover(parentPath, request).execute();
-  }
+  private DiscoverConnectionProfileRequest.Builder buildDiscoverConnectionProfileRequest(
+    String sourceConnectionProfileName) throws IOException {
+    DiscoverConnectionProfileRequest.Builder request =
+      DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath).setRecursive(true);
 
-  private DiscoverConnectionProfileResponse discover(String sourceConnectionProfileName) throws IOException {
-    DiscoverConnectionProfileRequest request = buildDiscoverConnectionProfileRequest(sourceConnectionProfileName);
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Discover connection profile for listing tables: \n parentPath = {} \n request = {} ", parentPath,
-                   request);
-    }
-    return datastream.projects().locations().connectionProfiles()
-      .discover(parentPath, request.setRecursive(true))
-      .execute();
-  }
-
-  private DiscoverConnectionProfileRequest buildDiscoverConnectionProfileRequest(String sourceConnectionProfileName)
-    throws IOException {
     if (sourceConnectionProfileName == null || sourceConnectionProfileName.isEmpty()) {
-      return new DiscoverConnectionProfileRequest()
-        .setConnectionProfile(Utils.buildOracleConnectionProfile(null, config));
+      return request.setConnectionProfile(Utils.buildOracleConnectionProfile("", config));
     }
-    return new DiscoverConnectionProfileRequest().setConnectionProfileName(sourceConnectionProfileName);
+    return request.setConnectionProfileName(sourceConnectionProfileName).setParent(parentPath);
   }
 }

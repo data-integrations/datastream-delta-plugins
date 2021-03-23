@@ -35,9 +35,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class DatastreamTableRegistryTest extends BaseIntegrationTestCase {
 
   @Test
-  public void testListDescribeTable_IPallowList() throws IOException, TableNotFoundException {
+  public void testListDescribeTable_new() throws IOException, TableNotFoundException {
+    testListDesribeTable(false);
+  }
+
+  private void testListDesribeTable(boolean usingExisting) throws IOException, TableNotFoundException {
     TableList tableList = null;
-    DatastreamConfig config = buildDatastreamConfig(false);
+    DatastreamConfig config = buildDatastreamConfig(usingExisting);
     try (DatastreamTableRegistry registry = new DatastreamTableRegistry(config, datastream)) {
       tableList = registry.listTables();
     }
@@ -78,5 +82,10 @@ class DatastreamTableRegistryTest extends BaseIntegrationTestCase {
         assertFalse(key.isEmpty());
       }
     }
+  }
+
+  @Test
+  public void testListDescribeTable_existing() throws IOException, TableNotFoundException {
+    testListDesribeTable(true);
   }
 }

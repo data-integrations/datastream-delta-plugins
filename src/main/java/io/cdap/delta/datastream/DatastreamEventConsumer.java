@@ -49,6 +49,7 @@ public class DatastreamEventConsumer {
 
   public static final String POSITION_STATE_KEY_SUFFIX = ".pos";
   private static final Logger LOGGER = LoggerFactory.getLogger(DatastreamEventConsumer.class);
+  private static final String SNAPSHOT_FILE_NAME = "backfill";
   private static final String ROW_ID_FIELD_NAME = "row_id";
   private static final String SOURCE_METADATA_FIELD_NAME = "source_metadata";
   private static final String CHANGE_TYPE_FIELD_NAME = "change_type";
@@ -59,7 +60,6 @@ public class DatastreamEventConsumer {
   private final DeltaSourceContext context;
   private final String currentPath;
   private final DataFileReader<GenericRecord> dataFileReader;
-  private final boolean isSnapshot;
   private final SourceTable table;
   private final Map<String, String> state;
   private final String tableName;
@@ -67,6 +67,7 @@ public class DatastreamEventConsumer {
   private long position;
   private GenericRecord record;
   private DMLEvent event;
+  private boolean isSnapshot;
 
   public DatastreamEventConsumer(byte[] content, DeltaSourceContext context, String currentPath, SourceTable table,
     long startingPosition, Map<String, String> state) throws Exception {
@@ -83,8 +84,8 @@ public class DatastreamEventConsumer {
     this.position = startingPosition;
     this.dataFileReader = parseContent();
     this.schema = schema;
-    this.isSnapshot = isDumpFile(dataFileReader.getSchema());
     this.state = state;
+    this.isSnapshot = isSnapshot(currentPath);
   }
 
   private Schema parseSchema(org.apache.avro.Schema schema) throws Exception {
@@ -199,10 +200,12 @@ public class DatastreamEventConsumer {
   }
 
   /**
+   * Check whether the given GCS file is a snapshot file
+   * @param path the GCS path of the file
    * @return whether the content being read is from a snapshot
    */
-  public boolean isSnapshot() {
-    return isSnapshot;
+  public static boolean isSnapshot(String path) {
+    return path.contains(SNAPSHOT_FILE_NAME);
   }
 
   /**

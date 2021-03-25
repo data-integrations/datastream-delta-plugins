@@ -73,6 +73,11 @@
           }
         },
         {
+          "name": "sshUser",
+          "label": "Username",
+          "widget-type": "textbox"
+        },
+        {
           "name": "sshAuthenticationMethod",
           "label": "Authentication Method",
           "widget-type": "radio-group",
@@ -90,11 +95,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "sshUser",
-          "label": "Username",
-          "widget-type": "textbox"
         },
         {
           "name": "sshPassword",
@@ -144,7 +144,7 @@
       "properties": [
         {
           "name": "user",
-          "label": "User",
+          "label": "Username",
           "widget-type": "textbox"
         },
         {
@@ -174,19 +174,9 @@
           }
         },
         {
-          "name": "gcsBucket",
-          "label": "GCS Bucket",
-          "widget-type": "textbox"
-        },
-        {
-          "name": "gcsPathPrefix",
-          "label": "Path Prefix",
-          "widget-type": "textbox"
-        },
-        {
-          "name": "gcsServiceAccountKey",
-          "label": "GCS Service Account Key",
-          "widget-type": "securekey-textarea",
+          "name": "project",
+          "label": "Project ID",
+          "widget-type": "textbox",
           "widget-attributes": {
             "default": "auto-detect"
           }
@@ -200,12 +190,22 @@
           }
         },
         {
-          "name": "project",
-          "label": "Project ID",
-          "widget-type": "textbox",
+          "name": "gcsServiceAccountKey",
+          "label": "GCS Service Account Key",
+          "widget-type": "securekey-textarea",
           "widget-attributes": {
             "default": "auto-detect"
           }
+        },
+        {
+          "name": "gcsBucket",
+          "label": "GCS Bucket",
+          "widget-type": "textbox"
+        },
+        {
+          "name": "gcsPathPrefix",
+          "label": "Path Prefix",
+          "widget-type": "textbox"
         }
       ]
     }

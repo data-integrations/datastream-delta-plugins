@@ -96,9 +96,9 @@ public class DatastreamDeltaSource implements DeltaSource {
 
   private void updateStream(DeltaSourceContext context) throws IOException {
     String streamPath = Utils.buildStreamPath(parentPath, config.getStreamId());
-    Stream.Builder stream = Utils.getStream(datastream, streamPath, LOGGER).toBuilder();
-    Utils.addToAllowList(stream, context.getAllTables());
-    Utils.updateAllowlist(datastream, stream.build(), LOGGER);
+    Stream.Builder streamBuilder = Utils.getStream(datastream, streamPath, LOGGER).toBuilder();
+    Utils.addToAllowList(streamBuilder, context.getAllTables());
+    Utils.updateAllowlist(datastream, streamBuilder.build(), LOGGER);
   }
 
 

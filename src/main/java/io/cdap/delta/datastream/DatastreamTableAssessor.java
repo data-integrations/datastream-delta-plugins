@@ -239,9 +239,9 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
       Bucket bucket = storage.get(bucketName);
       boolean bucketCreated = false;
       if (bucket == null) {
-        bucketCreated = true;
         // create corresponding GCS bucket
         bucket = storage.create(BucketInfo.newBuilder(bucketName).build());
+        bucketCreated = true;
       }
       // crete the gcs connection profile
       try {

@@ -208,7 +208,7 @@ public class DatastreamEventReader implements EventReader {
        db.created                        → whether the db is created
        ${table_name}.snapshot.done       → whether the table is dumped
        ${table_name}.processed.time      → creation time of the last processed cdc/dump file for the table
-       those files that was created before this timestamp won't be processed again
+                                           those files that was created before this timestamp won't be processed again
        ${table_name}.path                → the path of last scanned events file of the table
        ${table_name}.pos                 → the position of last scanned record in the events file
        ${table_name}.source.time         → the smallest source timestamp of the events scanned so far

@@ -67,7 +67,7 @@ public class DatastreamEventConsumer {
   private long position;
   private GenericRecord record;
   private DMLEvent event;
-  private boolean isSnapshot;
+  private final boolean isSnapshot;
 
   public DatastreamEventConsumer(byte[] content, DeltaSourceContext context, String currentPath, SourceTable table,
     long startingPosition, Map<String, String> state) throws Exception {

@@ -648,7 +648,7 @@ public final class Utils {
    * Update the allowlist of the specified stream
    *
    * @param datastream DataStream client
-   * @param stream     the stream to be updated
+   * @param stream     the builder of the stream to be updated
    * @param logger     the logger
    * @return the updated stream
    */

@@ -306,7 +306,7 @@ public final class Utils {
     try {
       return operation.get();
     } catch (Exception e) {
-      String errorMessage = String.format("Failed to query status of operation %s", request);
+      String errorMessage = String.format("Failed to query status of operation %s, error: %s", request, e.toString());
       throw new DatastreamDeltaSourceException(errorMessage, e, operation.getMetadata());
     }
   }

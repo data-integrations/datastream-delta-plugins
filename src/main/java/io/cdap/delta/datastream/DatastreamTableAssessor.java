@@ -228,7 +228,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
       } catch (Exception e) {
         throw new RuntimeException(
-          "Fail to assess replicator pipeline due to failure of creating source connection profile.", e);
+          String.format("Fail to assess replicator pipeline due to failure of creating source connection profile:\n %s"
+            , e.toString()), e);
       }
 
       String gcsProfileName = Utils.buildGcsProfileName(uuid);
@@ -251,8 +252,9 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
             .setConnectionProfileId(gcsProfileName).build();
         Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
       } catch (Exception e) {
-        throw new RuntimeException(
-          "Fail to assess replicator pipeline due to failure of creating destination connection profile.", e);
+        throw new RuntimeException(String
+          .format("Fail to assess replicator pipeline due to failure of creating destination connection profile: \n%s",
+            e.toString()), e);
       }
 
       String gcsProfilePath = Utils.buildConnectionProfilePath(parentPath, gcsProfileName);
@@ -272,7 +274,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
           e.getCause().getCause() instanceof FailedPreconditionException) {
           return buildAssessment(e.getMetadata());
         }
-        throw new RuntimeException("Fail to assess replicator pipeline due to failure of creating stream.", e);
+        throw new RuntimeException(
+          String.format("Fail to assess replicator pipeline due to failure of creating stream:\n%s", e.toString()), e);
       }
 
       //clear temporary stream
@@ -310,7 +313,9 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
     try {
       metadata = metadataFuture.get();
     } catch (Exception e) {
-      throw new RuntimeException("Fail to assess replicator pipeline due to failure of getting operation metadata", e);
+      throw new RuntimeException(String
+        .format("Fail to assess replicator pipeline due to failure of getting operation metadata:\n%s", e.toString()),
+        e);
     }
 
     List<Problem> connectivityIssues = new ArrayList<>();

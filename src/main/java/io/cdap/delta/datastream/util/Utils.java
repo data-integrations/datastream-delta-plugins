@@ -177,9 +177,11 @@ public final class Utils {
    * @return the oracle connection profile
    */
   public static ConnectionProfile buildOracleConnectionProfile(@Nullable String name, DatastreamConfig config) {
-    ConnectionProfile.Builder profile = ConnectionProfile.newBuilder().setOracleProfile(
+    OracleProfile.Builder oracleProfileBuilder =
       OracleProfile.newBuilder().setHostname(config.getHost()).setUsername(config.getUser())
-        .setPassword(config.getPassword()).setDatabaseService(config.getSid()).setPort(config.getPort()))
+        .setPassword(config.getPassword()).setDatabaseService(config.getSid()).setPort(config.getPort());
+    ConnectionProfile.Builder profile = ConnectionProfile.newBuilder().setOracleProfile(
+      oracleProfileBuilder)
       .setDisplayName(name);
     switch (config.getConnectivityMethod()) {
       case CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL:
@@ -229,13 +231,18 @@ public final class Utils {
    */
   public static Stream buildStreamConfig(String parentPath, String name, String sourcePath, String targetPath,
     Set<SourceTable> tables) {
+    OracleSourceConfig.Builder oracleSourceConfigBuilder =
+      OracleSourceConfig.newBuilder().setAllowlist(buildAllowlist(tables));
+    SourceConfig.Builder sourceConfigBuilder = SourceConfig.newBuilder().setSourceConnectionProfileName(sourcePath)
+      .setOracleSourceConfig(oracleSourceConfigBuilder);
+    Duration.Builder durationBuilder = Duration.newBuilder().setSeconds(FILE_ROTATION_INTERVAL_IN_SECONDS);
+    GcsDestinationConfig.Builder gcsDestinationConfigBuilder =
+      GcsDestinationConfig.newBuilder().setAvroFileFormat(AvroFileFormat.getDefaultInstance()).setPath("/" + name)
+        .setFileRotationMb(FILE_ROTATIONS_SIZE_IN_MB)
+        .setFileRotationInterval(durationBuilder);
     return Stream.newBuilder().setDisplayName(name).setDestinationConfig(
-      DestinationConfig.newBuilder().setDestinationConnectionProfileName(targetPath).setGcsDestinationConfig(
-        GcsDestinationConfig.newBuilder().setAvroFileFormat(AvroFileFormat.getDefaultInstance()).setPath("/" + name)
-          .setFileRotationMb(FILE_ROTATIONS_SIZE_IN_MB)
-          .setFileRotationInterval(Duration.newBuilder().setSeconds(FILE_ROTATION_INTERVAL_IN_SECONDS).build())))
-      .setSourceConfig(SourceConfig.newBuilder().setSourceConnectionProfileName(sourcePath)
-        .setOracleSourceConfig(OracleSourceConfig.newBuilder().setAllowlist(buildAllowlist(tables))))
+      DestinationConfig.newBuilder().setDestinationConnectionProfileName(targetPath)
+        .setGcsDestinationConfig(gcsDestinationConfigBuilder)).setSourceConfig(sourceConfigBuilder)
       .setBackfillAll(Stream.BackfillAllStrategy.getDefaultInstance()).build();
   }
 
@@ -256,11 +263,9 @@ public final class Utils {
   }
 
   private static void addTablesToAllowList(Set<SourceTable> tables, List<OracleSchema.Builder> schemas) {
-    Map<String, Set<String>> schemaToTables = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s -> {
-      List<OracleTable> oracleTables = new ArrayList<>(s.getOracleTablesList());
+    Map<String, Set<String>> schemaToTables = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s ->
       // if the stream has allow list as "hr.*", then the schema name will be "hr" and oracleTables will be empty
-      return oracleTables.stream().map(o -> o.getTableName()).collect(Collectors.toSet());
-    }));
+      s.getOracleTablesList().stream().map(o -> o.getTableName()).collect(Collectors.toSet())));
 
     Map<String, OracleSchema.Builder> nameToSchema =
       schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s -> s));
@@ -282,7 +287,8 @@ public final class Utils {
       });
 
       if (oracleTables.add(table.getTable())) {
-        oracleSchema.addOracleTables(OracleTable.newBuilder().setTableName(table.getTable()));
+        OracleTable.Builder oracleTableBuilder = OracleTable.newBuilder().setTableName(table.getTable());
+        oracleSchema.addOracleTables(oracleTableBuilder);
       }
     });
   }
@@ -291,18 +297,16 @@ public final class Utils {
    * Wait until the specified operation is completed.
    *
    * @param operation the operation to wait for
+   * @param request the stringfied request for this operation
+   * @param logger the logger
    * @return the result that operation returns
    */
   public static <T> T waitUntilComplete(OperationFuture<T, OperationMetadata> operation, String request,
     Logger logger) {
-    if (operation == null) {
-      return null;
-    }
     try {
       return operation.get();
     } catch (Exception e) {
       String errorMessage = String.format("Failed to query status of operation %s", request);
-      logger.error(errorMessage, e);
       throw new DatastreamDeltaSourceException(errorMessage, e, operation.getMetadata());
     }
   }
@@ -318,9 +322,11 @@ public final class Utils {
    */
   public static ConnectionProfile buildGcsConnectionProfile(String parentPath, String name, String gcsBucket,
     String gcsPathPrefix) {
+    GcsProfile.Builder setGcsProfileBuilder =
+      GcsProfile.newBuilder().setBucketName(gcsBucket).setRootPath(gcsPathPrefix);
     return ConnectionProfile.newBuilder().setDisplayName(name)
       .setNoConnectivity(NoConnectivitySettings.getDefaultInstance())
-      .setGcsProfile(GcsProfile.newBuilder().setBucketName(gcsBucket).setRootPath(gcsPathPrefix)).build();
+      .setGcsProfile(setGcsProfileBuilder).build();
   }
 
   /**
@@ -625,9 +631,7 @@ public final class Utils {
    * @return the started stream
    */
   public static Stream startStream(DatastreamClient datastream, Stream stream, Logger logger) {
-    return updateStream(datastream, UpdateStreamRequest.newBuilder()
-      .setStream(Stream.newBuilder().setName(stream.getName()).setState(Stream.State.RUNNING))
-      .setUpdateMask(FieldMask.newBuilder().addPaths(FIELD_STATE)).build(), logger);
+    return updateStreamState(datastream, stream.getName(), Stream.State.RUNNING, logger);
   }
 
   /**
@@ -639,13 +643,21 @@ public final class Utils {
    * @return the paused stream
    */
   public static Stream pauseStream(DatastreamClient datastream, Stream stream, Logger logger) {
-    return updateStream(datastream, UpdateStreamRequest.newBuilder()
-      .setStream(Stream.newBuilder().setName(stream.getName()).setState(Stream.State.PAUSED))
-      .setUpdateMask(FieldMask.newBuilder().addPaths(FIELD_STATE)).build(), logger);
+    return updateStreamState(datastream, stream.getName(), Stream.State.PAUSED, logger);
+  }
+
+  private static Stream updateStreamState(DatastreamClient datastream, String streamName, Stream.State state,
+    Logger logger) {
+    Stream.Builder streamBuilder = Stream.newBuilder().setName(streamName).setState(state);
+    FieldMask.Builder fieldMaskBuilder = FieldMask.newBuilder().addPaths(FIELD_STATE);
+    return updateStream(datastream,
+      UpdateStreamRequest.newBuilder().setStream(streamBuilder).setUpdateMask(fieldMaskBuilder).build(), logger);
   }
 
   /**
    * Update the allowlist of the specified stream
+   * allowlist is a DataStream concept which means the list of tables that DataStream will stream change events from.
+   * This method could throw runtime exception if you pass in a stream with name not existing.
    *
    * @param datastream DataStream client
    * @param stream     the builder of the stream to be updated

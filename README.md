@@ -2,18 +2,18 @@ DataStream Delta Plugin for CDAP Delta Application
 
 It invokes GCP DataStream service to generate change events of Oracle DB.
 
-Tests require an actual connection to GCP. To run the tests, set the following system properties:
-  -Dproject.id=[GCP project id]
-  Alternatively, you can set -DGCLOUD_PROJECT or -DGOOGLE_CLOUD_PROJECT for GCP project id.
-  -Dservice.account.file=[path to service account key file]
-  -Dservice.location=[region of the DataStream instance]
-  -Doracle.host=[Oracle DB ip address or hostname]
-  -Doracle.user=[Oracle DB username]
+Tests require an actual connection to GCP. To run the tests, set the following system properties:  
+  -Dproject.id=[GCP project id]  
+  Alternatively, you can set -DGCLOUD_PROJECT or -DGOOGLE_CLOUD_PROJECT for GCP project id.  
+  -Dservice.account.file=[path to service account key file]  
+  -Dservice.location=[region of the DataStream instance]  
+  -Doracle.host=[Oracle DB ip address or hostname]  
+  -Doracle.user=[Oracle DB username]  
   -Doracle.password=[Oracle DB password]
-  -Doracle.database=[Oracle DB SID]
-  -Dgcs.bucket=[GCSBucket Name for writing DataStream result]
-  -Doracle.tables=[List of tables to be replicated, separated by comma]
-  -Dstream.id =[Id of existing Datastream stream id]
+  -Doracle.database=[Oracle DB SID]  
+  -Dgcs.bucket=[GCSBucket Name for writing DataStream result]  
+  -Doracle.tables=[List of tables to be replicated, separated by comma]  
+  -Dstream.id =[Id of existing Datastream stream id]  
   
 The GCP project should already enabled DataStream API.
 

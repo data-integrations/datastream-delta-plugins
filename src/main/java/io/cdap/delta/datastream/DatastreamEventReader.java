@@ -312,23 +312,28 @@ public class DatastreamEventReader implements EventReader {
         // check whether the snapshot of the table has been done
         boolean dumped = getDumped(tableName);
         if (!dumped) {
-          // if the dump file of the table was ever scanned, path should have value
-          String path = getPath(tableName);
-          long lastProcessed = getLastProcessed(tableName);
+          if (stream.hasBackfillNone()) {
+            //snapshot is skipped
+            emitCreateTableDDL(tableName, srcTable, null);
+          } else {
+            // if the dump file of the table was ever scanned, path should have value
+            String path = getPath(tableName);
+            long lastProcessed = getLastProcessed(tableName);
 
-          // dump files are put in the folder that represents the read time
-          // don't assume dump files are under one folder, because dump can be read multiple times
-          // each time to replicate part of the dump
-          // Scan all files of that table , because events may arrive out of order, don't assume
-          // once we see dump files in a later timestamp folder, we don't need to scan earlier timestamp folder
-          Page<Blob> blobs = bucket.list(Storage.BlobListOption.prefix(prefix), Storage.BlobListOption
-            .fields(Storage.BlobField.NAME, Storage.BlobField.TIME_CREATED, Storage.BlobField.SIZE));
+            // dump files are put in the folder that represents the read time
+            // don't assume dump files are under one folder, because dump can be read multiple times
+            // each time to replicate part of the dump
+            // Scan all files of that table , because events may arrive out of order, don't assume
+            // once we see dump files in a later timestamp folder, we don't need to scan earlier timestamp folder
+            Page<Blob> blobs = bucket.list(Storage.BlobListOption.prefix(prefix), Storage.BlobListOption
+              .fields(Storage.BlobField.NAME, Storage.BlobField.TIME_CREATED, Storage.BlobField.SIZE));
 
-          scanEvents(blobs, tableName, srcTable, true, path != null);
-          // TODO use Datastream API to determine whether dump is done, below is just a workaround
-          // if new dump file found  then that means dump hasn't been completed
-          if (getPath(tableName) == null || !getPath(tableName).equals(path)) {
-            continue;
+            scanEvents(blobs, tableName, srcTable, true, path != null);
+            // TODO use Datastream API to determine whether dump is done, below is just a workaround
+            // if new dump file found  then that means dump hasn't been completed
+            if (getPath(tableName) == null || !getPath(tableName).equals(path)) {
+              continue;
+            }
           }
           // dump is finished
           dumpCompleted(tableName);
@@ -529,7 +534,9 @@ public class DatastreamEventReader implements EventReader {
     }
 
     private void saveSchemaKey(String tableName, String key) {
-      state.put(tableName + SCHEMA_KEY_STATE_KEY_SUFFIX, key);
+      if (key != null) {
+        state.put(tableName + SCHEMA_KEY_STATE_KEY_SUFFIX, key);
+      }
     }
 
     private String getSchemaKey(String tableName) {

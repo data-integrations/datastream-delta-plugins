@@ -39,6 +39,7 @@ import com.google.cloud.datastream.v1alpha1.OracleRdbms;
 import com.google.cloud.datastream.v1alpha1.OracleSchema;
 import com.google.cloud.datastream.v1alpha1.OracleSourceConfig;
 import com.google.cloud.datastream.v1alpha1.OracleTable;
+import com.google.cloud.datastream.v1alpha1.PrivateConnectivity;
 import com.google.cloud.datastream.v1alpha1.SourceConfig;
 import com.google.cloud.datastream.v1alpha1.StaticServiceIpConnectivity;
 import com.google.cloud.datastream.v1alpha1.Stream;
@@ -70,6 +71,7 @@ import static io.cdap.delta.datastream.DatastreamConfig.AUTHENTICATION_METHOD_PA
 import static io.cdap.delta.datastream.DatastreamConfig.AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY;
 import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL;
 import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING;
+import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_PRIVATE_CONNECTIVITY;
 
 /**
  * Common Utils for DataStream source plugins
@@ -180,7 +182,7 @@ public final class Utils {
     OracleProfile.Builder oracleProfileBuilder =
       OracleProfile.newBuilder().setHostname(config.getHost()).setUsername(config.getUser())
         .setPassword(config.getPassword()).setDatabaseService(config.getSid()).setPort(config.getPort());
-    ConnectionProfile.Builder profile = ConnectionProfile.newBuilder().setOracleProfile(
+    ConnectionProfile.Builder profileBuilder = ConnectionProfile.newBuilder().setOracleProfile(
       oracleProfileBuilder)
       .setDisplayName(name);
     switch (config.getConnectivityMethod()) {
@@ -199,9 +201,12 @@ public final class Utils {
             throw new IllegalArgumentException(
               "Unsupported authentication method: " + config.getSshAuthenticationMethod());
         }
-        return profile.setForwardSshConnectivity(forwardSSHTunnelConnectivity).build();
+        return profileBuilder.setForwardSshConnectivity(forwardSSHTunnelConnectivity).build();
       case CONNECTIVITY_METHOD_IP_ALLOWLISTING:
-        return profile.setStaticServiceIpConnectivity(StaticServiceIpConnectivity.getDefaultInstance()).build();
+        return profileBuilder.setStaticServiceIpConnectivity(StaticServiceIpConnectivity.getDefaultInstance()).build();
+      case CONNECTIVITY_METHOD_PRIVATE_CONNECTIVITY:
+        return profileBuilder.setPrivateConnectivity(
+          PrivateConnectivity.newBuilder().setPrivateConnectionName(config.getPrivateConnectionName())).build();
       default:
         throw new IllegalArgumentException("Unsupported connectivity method: " + config.getConnectivityMethod());
     }

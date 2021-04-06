@@ -39,6 +39,7 @@ public class DatastreamConfig extends PluginConfig {
   public static final String DEFAULT_REGION = "us-central1";
   public static final String CONNECTIVITY_METHOD_IP_ALLOWLISTING = "ip-allowlisting";
   public static final String CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL = "forward-ssh-tunnel";
+  public static final String CONNECTIVITY_METHOD_PRIVATE_CONNECTIVITY = "private-connectivity";
   public static final String AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY = "private-public-key";
   public static final String AUTHENTICATION_METHOD_PASSWORD = "password";
   public static final String DEFAULT_SID = "ORCL";
@@ -121,6 +122,12 @@ public class DatastreamConfig extends PluginConfig {
   // only required when connectivity method is  "Forward SSH Tunnel" and authentication method is
   // "Private/Public Key Pair"
   private String sshPrivateKey;
+
+  @Nullable
+  @Description("Name of the private connection.")
+  // only required when connectivity method is  "Private connectivity (VPC peering)"
+  private String privateConnectionName;
+
 
   @Nullable
   @Description("The GCS bucket that DataStream can write its output to. By default replicator " +
@@ -231,6 +238,12 @@ public class DatastreamConfig extends PluginConfig {
   }
 
   @Nullable
+  public String getPrivateConnectionName() {
+    return privateConnectionName;
+  }
+
+
+  @Nullable
   public String getGcsBucket() {
     return gcsBucket == null ? null : gcsBucket.toLowerCase();
   }
@@ -279,7 +292,8 @@ public class DatastreamConfig extends PluginConfig {
     @Nullable String connectivityMethod, @Nullable String sshHost, @Nullable Integer sshPort, @Nullable String sshUser,
     @Nullable String sshAuthenticationMethod, @Nullable String sshPassword, @Nullable String sshPrivateKey,
     @Nullable String gcsBucket, @Nullable String gcsPathPrefix, @Nullable String gcsServiceAccountKey,
-    @Nullable String dsServiceAccountKey, @Nullable String streamId, @Nullable String project) {
+    @Nullable String dsServiceAccountKey, @Nullable String streamId, @Nullable String project,
+    @Nullable String privateConnectionName) {
     this.usingExistingStream = usingExistingStream;
     this.host = host;
     this.port = port;
@@ -300,6 +314,7 @@ public class DatastreamConfig extends PluginConfig {
     this.dsServiceAccountKey = dsServiceAccountKey;
     this.streamId = streamId;
     this.project = project;
+    this.privateConnectionName = privateConnectionName;
     validate();
   }
 
@@ -323,27 +338,36 @@ public class DatastreamConfig extends PluginConfig {
       if (password == null || password.isEmpty()) {
         throw new IllegalArgumentException("Password of the database is missing!");
       }
-      if (CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL.equals(connectivityMethod)) {
-        // have to annotate sshHost as nullable otherwise we cannot hide it when
-        // IP allowlisting is selected as connectivity method
-        if (sshHost == null || sshHost.isEmpty()) {
-          throw new IllegalArgumentException("Hostname of SSH Server is missing!");
-        }
 
-        if (sshUser == null || sshUser.isEmpty()) {
-          throw new IllegalArgumentException("Username of SSH server is missing!");
-        }
+      switch (getConnectivityMethod()) {
+        case CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL:
+          // have to annotate sshHost as nullable otherwise we cannot hide it when
+          // IP allowlisting is selected as connectivity method
+          if (sshHost == null || sshHost.isEmpty()) {
+            throw new IllegalArgumentException("Hostname of SSH Server is missing!");
+          }
 
-        if (AUTHENTICATION_METHOD_PASSWORD.equals(sshAuthenticationMethod)) {
-          if (sshPassword == null || sshPassword.isEmpty()) {
-            throw new IllegalArgumentException("Password of SSH server login is missing!");
+          if (sshUser == null || sshUser.isEmpty()) {
+            throw new IllegalArgumentException("Username of SSH server is missing!");
           }
-        } else {
-          // take it as the default value  -- private/public key pair
-          if (sshPrivateKey == null || sshPrivateKey.isEmpty()) {
-            throw new IllegalArgumentException("Private key of SSH server login is missing!");
+
+          if (AUTHENTICATION_METHOD_PASSWORD.equals(sshAuthenticationMethod)) {
+            if (sshPassword == null || sshPassword.isEmpty()) {
+              throw new IllegalArgumentException("Password of SSH server login is missing!");
+            }
+          } else {
+            // take it as the default value  -- private/public key pair
+            if (sshPrivateKey == null || sshPrivateKey.isEmpty()) {
+              throw new IllegalArgumentException("Private key of SSH server login is missing!");
+            }
           }
-        }
+          break;
+        case CONNECTIVITY_METHOD_PRIVATE_CONNECTIVITY:
+          if (privateConnectionName == null || privateConnectionName.isEmpty()) {
+            throw new IllegalArgumentException("Private connection name is missing!");
+          }
+          break;
+        default:
       }
     }
   }

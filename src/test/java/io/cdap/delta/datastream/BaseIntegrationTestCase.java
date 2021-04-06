@@ -132,7 +132,7 @@ public class BaseIntegrationTestCase {
   protected DatastreamConfig buildDatastreamConfig(boolean usingExisting) {
     return new DatastreamConfig(usingExisting, oracleHost, oraclePort, oracleUser, oraclePassword, oracleDb,
       serviceLocation, DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null, null, null, null,
-      gcsBucket, null, serviceAccountKey, serviceAccountKey, streamId, project);
+      gcsBucket, null, serviceAccountKey, serviceAccountKey, streamId, project, null);
   }
 
 }

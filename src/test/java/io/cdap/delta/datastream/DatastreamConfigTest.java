@@ -31,7 +31,7 @@ class DatastreamConfigTest {
   void testDefaultValues() {
     DatastreamConfig config =
       new DatastreamConfig(false, "hostname", null, "user", "password", null, null, null, null, null, null,
-                           null, null, null, null, null, null, null, null, null);
+                           null, null, null, null, null, null, null, null, null, null);
 
     assertEquals(DatastreamConfig.DEFAULT_PORT, config.getPort());
     assertEquals(DatastreamConfig.DEFAULT_SID, config.getSid());
@@ -43,7 +43,7 @@ class DatastreamConfigTest {
     config = new DatastreamConfig(false, "hostname", null, "user", "password", null, null,
                                   DatastreamConfig.CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL,
                                   "sshHost", null, "sshUser", null, null, "sshPrivateKey", null,
-                                  null, null, null, null, null);
+                                  null, null, null, null, null, null);
     assertEquals(DatastreamConfig.DEFAULT_SSH_PORT, config.getSshPort());
     assertEquals(DatastreamConfig.AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY,
                  config.getSshAuthenticationMethod());
@@ -57,7 +57,7 @@ class DatastreamConfigTest {
     // as connectivity method.
     new DatastreamConfig(false, "hostname", null, "user", "password", null, null,
                          DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null,
-                         null, null, null, null, null, null, null, null, null).validate();
+                         null, null, null, null, null, null, null, null, null, null).validate();
 
     // sshPassowrd can be null if forward ssh tunnel is selected as connectivity method
     // and private/public key pair is selected as authentication method
@@ -65,7 +65,7 @@ class DatastreamConfigTest {
                                                    DatastreamConfig.CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL,
                                                    "sshHost", null, "sshUser",
                                                    DatastreamConfig.AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY,
-                                                   null, "sshPrivateKey", null, null, null, null, null, null);
+                                                   null, "sshPrivateKey", null, null, null, null, null, null, null);
     config.validate();
 
     // sshHost should not be null if forward ssh tunnel is selected as connectivity method
@@ -105,6 +105,15 @@ class DatastreamConfigTest {
     field.set(config, "sshPassword");
     config.validate();
 
+    //privateConnectionName should not be null if private connectivity is selected as connectivity method
+    field = DatastreamConfig.class.getDeclaredField("connectivityMethod");
+    field.setAccessible(true);
+    field.set(config, DatastreamConfig.CONNECTIVITY_METHOD_PRIVATE_CONNECTIVITY);
+    assertThrows(IllegalArgumentException.class, () -> config.validate());
 
+    field = DatastreamConfig.class.getDeclaredField("privateConnectionName");
+    field.setAccessible(true);
+    field.set(config, "vpc-peering-name");
+    config.validate();
   }
 }

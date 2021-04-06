@@ -156,9 +156,10 @@ public class DatastreamConfig extends PluginConfig {
   private String project;
 
   @Nullable
-  @Description("Whether to replicate existing data from the source database. By default, pipeline will replicate " +
-    "the existing data from source tables. If set to false, any existing data in the source " +
-    "tables will be ignored and only changes happening after the pipeline started will be replicated.")
+  @Description(
+    "Whether to replicate existing data from the source database. When false, any existing data in the source tables " +
+      "will be ignored, and only changes that happened after the pipeline started will be replicated. By default, " +
+      "existing data will be replicated.")
   private Boolean replicateExistingData;
 
   public boolean isUsingExistingStream() {
@@ -280,7 +281,7 @@ public class DatastreamConfig extends PluginConfig {
     }
   }
 
-  public boolean getReplicateExistingData() {
+  public boolean shouldReplicateExistingData() {
     return replicateExistingData == null || replicateExistingData;
   }
 

@@ -266,7 +266,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         //TODO set validate only to true when datastream supports validate only correctly
         CreateStreamRequest createStreamRequest = CreateStreamRequest.newBuilder().setParent(parentPath).setStream(
           Utils.buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, new HashSet<>(tables),
-            conf.getReplicateExistingData())).setStreamId(streamName).build();
+            conf.shouldReplicateExistingData())).setStreamId(streamName).build();
         Utils.createStream(datastream, createStreamRequest, LOGGER);
         streamCreated = true;
       } catch (DatastreamDeltaSourceException e) {

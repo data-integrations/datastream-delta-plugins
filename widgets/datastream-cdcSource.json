@@ -51,6 +51,10 @@
               {
                 "id": "forward-ssh-tunnel",
                 "label": "Forward SSH Tunnel"
+              },
+              {
+                "id": "private-connectivity",
+                "label": "Private connectivity (VPC peering)"
               }
             ]
           }
@@ -101,6 +105,11 @@
           "name": "sshPrivateKey",
           "label": "Private Key",
           "widget-type": "securekey-textarea"
+        },
+        {
+          "name": "privateConnectionName",
+          "label": "Private Connection Name",
+          "widget-type": "textbox"
         }
       ]
     },
@@ -292,6 +301,18 @@
         {
           "type": "property",
           "name": "sshPrivateKey"
+        }
+      ]
+    },
+    {
+      "name": "showPrivateConnectionName",
+      "condition": {
+        "expression": "connectivityMethod == 'private-connectivity' && usingExistingStream == false"
+      },
+      "show": [
+        {
+          "type": "property",
+          "name": "privateConnectionName"
         }
       ]
     }

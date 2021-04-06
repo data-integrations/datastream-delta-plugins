@@ -189,7 +189,7 @@ public class DatastreamTableRegistry implements TableRegistry {
       DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath).setRecursive(true);
 
     if (sourceConnectionProfileName == null || sourceConnectionProfileName.isEmpty()) {
-      return request.setConnectionProfile(Utils.buildOracleConnectionProfile("", config));
+      return request.setConnectionProfile(Utils.buildOracleConnectionProfile(parentPath, "", config));
     }
     return request.setConnectionProfileName(sourceConnectionProfileName).setParent(parentPath);
   }

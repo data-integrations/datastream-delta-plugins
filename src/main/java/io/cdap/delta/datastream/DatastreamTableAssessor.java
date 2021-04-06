@@ -223,7 +223,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         // create the oracle profile
         CreateConnectionProfileRequest createConnectionProfileRequest =
           CreateConnectionProfileRequest.newBuilder().setParent(parentPath)
-            .setConnectionProfile(buildOracleConnectionProfile(oracleProfileName, conf))
+            .setConnectionProfile(buildOracleConnectionProfile(parentPath, oracleProfileName, conf))
             .setConnectionProfileId(oracleProfileName).build();
         Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
       } catch (Exception e) {

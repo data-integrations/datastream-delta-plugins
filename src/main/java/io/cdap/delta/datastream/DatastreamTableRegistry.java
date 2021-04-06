@@ -16,6 +16,8 @@
 
 package io.cdap.delta.datastream;
 
+import com.google.api.gax.rpc.FailedPreconditionException;
+import com.google.api.gax.rpc.InvalidArgumentException;
 import com.google.api.gax.rpc.NotFoundException;
 import com.google.cloud.datastream.v1alpha1.DatastreamClient;
 import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileRequest;
@@ -92,7 +94,15 @@ public class DatastreamTableRegistry implements TableRegistry {
     }
     DiscoverConnectionProfileRequest request =
       buildDiscoverConnectionProfileRequest(sourceConnectionProfileName).build();
-    DiscoverConnectionProfileResponse response = Utils.discoverConnectionProfile(datastream, request, LOGGER);
+    DiscoverConnectionProfileResponse response;
+    try {
+      response = Utils.discoverConnectionProfile(datastream, request, LOGGER);
+    } catch (InvalidArgumentException | FailedPreconditionException e) {
+       throw new RuntimeException("Failed to connect to the database. Please double check whether the connection " +
+        "information you input is correct.", e);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to connect to the database due to below error : " + e.getMessage(), e);
+    }
 
     for (OracleSchema schema : response.getOracleRdbms().getOracleSchemasList()) {
       String schemaName = schema.getSchemaName();

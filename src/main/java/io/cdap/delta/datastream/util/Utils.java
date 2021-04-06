@@ -230,7 +230,7 @@ public final class Utils {
    * @return the DataStream stream config
    */
   public static Stream buildStreamConfig(String parentPath, String name, String sourcePath, String targetPath,
-    Set<SourceTable> tables) {
+    Set<SourceTable> tables, boolean replicateExistingData) {
     OracleSourceConfig.Builder oracleSourceConfigBuilder =
       OracleSourceConfig.newBuilder().setAllowlist(buildAllowlist(tables));
     SourceConfig.Builder sourceConfigBuilder = SourceConfig.newBuilder().setSourceConnectionProfileName(sourcePath)
@@ -240,10 +240,15 @@ public final class Utils {
       GcsDestinationConfig.newBuilder().setAvroFileFormat(AvroFileFormat.getDefaultInstance()).setPath("/" + name)
         .setFileRotationMb(FILE_ROTATIONS_SIZE_IN_MB)
         .setFileRotationInterval(durationBuilder);
-    return Stream.newBuilder().setDisplayName(name).setDestinationConfig(
+    Stream.Builder streamBuilder = Stream.newBuilder().setDisplayName(name).setDestinationConfig(
       DestinationConfig.newBuilder().setDestinationConnectionProfileName(targetPath)
-        .setGcsDestinationConfig(gcsDestinationConfigBuilder)).setSourceConfig(sourceConfigBuilder)
-      .setBackfillAll(Stream.BackfillAllStrategy.getDefaultInstance()).build();
+        .setGcsDestinationConfig(gcsDestinationConfigBuilder)).setSourceConfig(sourceConfigBuilder);
+    if (replicateExistingData) {
+      streamBuilder.setBackfillAll(Stream.BackfillAllStrategy.getDefaultInstance());
+    } else {
+      streamBuilder.setBackfillNone(Stream.BackfillNoneStrategy.getDefaultInstance());
+    }
+    return streamBuilder.build();
   }
 
   // build an allow list of what tables to be tracked change of

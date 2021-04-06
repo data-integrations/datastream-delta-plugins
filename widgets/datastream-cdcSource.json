@@ -149,6 +149,22 @@
       "label": "Advanced",
       "properties": [
         {
+          "name": "replicateExistingData",
+          "label": "Replicate Existing Data",
+          "widget-type": "toggle",
+          "widget-attributes": {
+            "on": {
+              "value": "true",
+              "label": "Yes"
+            },
+            "off": {
+              "value": "false",
+              "label": "No"
+            },
+            "default": "true"
+          }
+        },
+        {
           "name": "gcsBucket",
           "label": "GCS Bucket",
           "widget-type": "textbox"
@@ -224,6 +240,10 @@
         {
           "type": "property",
           "name": "gcsBucket"
+        },
+        {
+          "type": "property",
+          "name": "replicateExistingData"
         }
       ]
     },

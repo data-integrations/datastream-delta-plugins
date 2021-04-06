@@ -220,7 +220,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
 
       String oracleProfileName = Utils.buildOracleProfileName(uuid);
       try {
-        // crete the oracle profile
+        // create the oracle profile
         CreateConnectionProfileRequest createConnectionProfileRequest =
           CreateConnectionProfileRequest.newBuilder().setParent(parentPath)
             .setConnectionProfile(buildOracleConnectionProfile(oracleProfileName, conf))
@@ -265,8 +265,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
       try {
         //TODO set validate only to true when datastream supports validate only correctly
         CreateStreamRequest createStreamRequest = CreateStreamRequest.newBuilder().setParent(parentPath).setStream(
-          Utils.buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, new HashSet<>(tables)))
-          .setStreamId(streamName).build();
+          Utils.buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, new HashSet<>(tables),
+            conf.shouldReplicateExistingData())).setStreamId(streamName).build();
         Utils.createStream(datastream, createStreamRequest, LOGGER);
         streamCreated = true;
       } catch (DatastreamDeltaSourceException e) {

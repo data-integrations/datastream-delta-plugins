@@ -155,6 +155,13 @@ public class DatastreamConfig extends PluginConfig {
     + "'auto-detect', which will use the project of the Google Cloud Data Fusion.")
   private String project;
 
+  @Nullable
+  @Description(
+    "Whether to replicate existing data from the source database. When false, any existing data in the source tables " +
+      "will be ignored, and only changes that happened after the pipeline started will be replicated. By default, " +
+      "existing data will be replicated.")
+  private Boolean replicateExistingData;
+
   public boolean isUsingExistingStream() {
     return usingExistingStream;
   }
@@ -272,6 +279,10 @@ public class DatastreamConfig extends PluginConfig {
     } catch (IOException e) {
       throw new RuntimeException("Fail to read service account key!", e);
     }
+  }
+
+  public boolean shouldReplicateExistingData() {
+    return replicateExistingData == null || replicateExistingData;
   }
 
   public DatastreamConfig(boolean usingExistingStream, @Nullable String host, @Nullable Integer port,

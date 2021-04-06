@@ -197,9 +197,11 @@ public class DatastreamDeltaSource implements DeltaSource {
       }
 
       // Create the stream
-      CreateStreamRequest createStreamRequest = CreateStreamRequest.newBuilder().setParent(parentPath).setStream(
-        Utils.buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, context.getAllTables()))
-        .setStreamId(streamName).build();
+      Stream stream = Utils
+        .buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, context.getAllTables(),
+          config.shouldReplicateExistingData());
+      CreateStreamRequest createStreamRequest =
+        CreateStreamRequest.newBuilder().setParent(parentPath).setStream(stream).setStreamId(streamName).build();
       Utils.createStream(datastream, createStreamRequest, LOGGER);
     }
   }

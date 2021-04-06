@@ -173,12 +173,13 @@ public final class Utils {
 
   /**
    * Build an oracle connection profile based on DataStream delta source config
-   *
-   * @param name
+   * @oaran parentPath the parent path of the connection profile
+   * @param name the name of the connection profile
    * @param config DataStream delta source config
    * @return the oracle connection profile
    */
-  public static ConnectionProfile buildOracleConnectionProfile(@Nullable String name, DatastreamConfig config) {
+  public static ConnectionProfile buildOracleConnectionProfile(String parentPath, @Nullable String name,
+    DatastreamConfig config) {
     OracleProfile.Builder oracleProfileBuilder =
       OracleProfile.newBuilder().setHostname(config.getHost()).setUsername(config.getUser())
         .setPassword(config.getPassword()).setDatabaseService(config.getSid()).setPort(config.getPort());
@@ -205,8 +206,8 @@ public final class Utils {
       case CONNECTIVITY_METHOD_IP_ALLOWLISTING:
         return profileBuilder.setStaticServiceIpConnectivity(StaticServiceIpConnectivity.getDefaultInstance()).build();
       case CONNECTIVITY_METHOD_PRIVATE_CONNECTIVITY:
-        return profileBuilder.setPrivateConnectivity(
-          PrivateConnectivity.newBuilder().setPrivateConnectionName(config.getPrivateConnectionName())).build();
+        return profileBuilder.setPrivateConnectivity(PrivateConnectivity.newBuilder()
+          .setPrivateConnectionName(buildPrivateConnectionPath(parentPath, config.getPrivateConnectionName()))).build();
       default:
         throw new IllegalArgumentException("Unsupported connectivity method: " + config.getConnectivityMethod());
     }
@@ -343,6 +344,17 @@ public final class Utils {
    */
   public static String buildConnectionProfilePath(String parentPath, String name) {
     return String.format("%s/connectionProfiles/%s", parentPath, name);
+  }
+
+  /**
+   * Build the path of a DataStream private connection
+   *
+   * @param parentPath the parent path of the private connection
+   * @param name       the name of the private connection
+   * @return the path of the private connection
+   */
+  public static String buildPrivateConnectionPath(String parentPath, String name) {
+    return String.format("%s/privateConnections/%s", parentPath, name);
   }
 
   /**

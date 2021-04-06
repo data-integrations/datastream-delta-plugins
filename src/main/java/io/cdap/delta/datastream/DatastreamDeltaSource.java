@@ -163,7 +163,7 @@ public class DatastreamDeltaSource implements DeltaSource {
         // crete the oracle connection profile
         CreateConnectionProfileRequest createConnectionProfileRequest =
           CreateConnectionProfileRequest.newBuilder().setParent(parentPath)
-            .setConnectionProfile(buildOracleConnectionProfile(oracleProfileName, config))
+            .setConnectionProfile(buildOracleConnectionProfile(parentPath, oracleProfileName, config))
             .setConnectionProfileId(oracleProfileName).build();
         Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
       }

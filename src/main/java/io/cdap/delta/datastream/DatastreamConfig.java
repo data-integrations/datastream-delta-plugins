@@ -124,7 +124,8 @@ public class DatastreamConfig extends PluginConfig {
   private String sshPrivateKey;
 
   @Nullable
-  @Description("Name of the private connection.")
+  @Description("Name of the private connection. The network admins of the Google Cloud Platform project should create" +
+    " a VPC peering between the database VPC and the DataStream VPC. THis is the name of the VPC peering they created.")
   // only required when connectivity method is  "Private connectivity (VPC peering)"
   private String privateConnectionName;
 
@@ -326,17 +327,17 @@ public class DatastreamConfig extends PluginConfig {
 
     if (usingExistingStream) {
       if (streamId == null || streamId.isEmpty()) {
-        throw new IllegalArgumentException("Id of the existing Datastream stream is missing!");
+        throw new IllegalArgumentException("Id of the existing Datastream stream is missing.");
       }
     } else {
       if (host == null || host.isEmpty()) {
-        throw new IllegalArgumentException("Host of the database is missing!");
+        throw new IllegalArgumentException("Host of the database is missing.");
       }
       if (user == null || user.isEmpty()) {
-        throw new IllegalArgumentException("Username of the database is missing!");
+        throw new IllegalArgumentException("Username of the database is missing.");
       }
       if (password == null || password.isEmpty()) {
-        throw new IllegalArgumentException("Password of the database is missing!");
+        throw new IllegalArgumentException("Password of the database is missing.");
       }
 
       switch (getConnectivityMethod()) {
@@ -344,27 +345,27 @@ public class DatastreamConfig extends PluginConfig {
           // have to annotate sshHost as nullable otherwise we cannot hide it when
           // IP allowlisting is selected as connectivity method
           if (sshHost == null || sshHost.isEmpty()) {
-            throw new IllegalArgumentException("Hostname of SSH Server is missing!");
+            throw new IllegalArgumentException("Hostname of SSH Server is missing.");
           }
 
           if (sshUser == null || sshUser.isEmpty()) {
-            throw new IllegalArgumentException("Username of SSH server is missing!");
+            throw new IllegalArgumentException("Username of SSH server is missing.");
           }
 
           if (AUTHENTICATION_METHOD_PASSWORD.equals(sshAuthenticationMethod)) {
             if (sshPassword == null || sshPassword.isEmpty()) {
-              throw new IllegalArgumentException("Password of SSH server login is missing!");
+              throw new IllegalArgumentException("Password of SSH server login is missing.");
             }
           } else {
             // take it as the default value  -- private/public key pair
             if (sshPrivateKey == null || sshPrivateKey.isEmpty()) {
-              throw new IllegalArgumentException("Private key of SSH server login is missing!");
+              throw new IllegalArgumentException("Private key of SSH server login is missing.");
             }
           }
           break;
         case CONNECTIVITY_METHOD_PRIVATE_CONNECTIVITY:
           if (privateConnectionName == null || privateConnectionName.isEmpty()) {
-            throw new IllegalArgumentException("Private connection name is missing!");
+            throw new IllegalArgumentException("Private Connection Name is missing.");
           }
           break;
         default:

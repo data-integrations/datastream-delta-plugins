@@ -223,6 +223,19 @@ public class DatastreamClientTest {
 
   @Test
   public void testValidateStreams() throws IOException, InterruptedException, ExecutionException {
+
+    String streamPath = buildStreamPath("test-starting-running");
+    OperationFuture<Stream, OperationMetadata> streamStartOperation = datastream
+      .updateStreamAsync(Stream.newBuilder().setName(streamPath).setState(Stream.State.RUNNING).build(),
+        FieldMask.newBuilder().addPaths(FIELD_STATE).build());
+
+    try {
+      streamStartOperation.get().getState();
+    } catch (Exception e) {
+      System.out.println(e);
+    }
+
+
     String sourceName = "Datafusion-Oracle-" + UUID.randomUUID();
     OperationFuture<ConnectionProfile, OperationMetadata> sourceProfileCreationOperation =
       createOracleConnectionProfile(sourceName);

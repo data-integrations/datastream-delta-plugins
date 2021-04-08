@@ -48,6 +48,10 @@ import com.google.cloud.datastream.v1alpha1.SourceConfig;
 import com.google.cloud.datastream.v1alpha1.StaticServiceIpConnectivity;
 import com.google.cloud.datastream.v1alpha1.Stream;
 import com.google.cloud.datastream.v1alpha1.UpdateStreamRequest;
+import com.google.cloud.storage.Bucket;
+import com.google.cloud.storage.BucketInfo;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageException;
 import com.google.common.base.Joiner;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Empty;
@@ -91,6 +95,7 @@ public final class Utils {
   private static final String ORACLE_PROFILE_NAME_PREFIX = "DF-ORA-";
   private static final String GCS_PROFILE_NAME_PREFIX = "DF-GCS-";
   private static final String STREAM_NAME_PREFIX = "DF-Stream-";
+  private static final int GCS_ERROR_CODE_CONFLICT = 409;
   private static final int DATASTREAM_CLIENT_POOL_SIZE = 20;
   private static final float DATASTREAM_CLIENT_POOL_LOAD_FACTOR = 0.75f;
   private static final LinkedHashMap<GoogleCredentials, DatastreamClient> datastreamClientPool =
@@ -769,6 +774,32 @@ public final class Utils {
       logger.debug("DiscoverConnectionProfile Response:\n" + response.toString());
     }
     return response;
+  }
+
+  /**
+   * Create a GCS bucket if it doesn't exist
+   * @param storage the GCS client
+   * @param bucketName the name of the bucket to be created
+   * @return whether the GCS bucket is newly created by this method
+   */
+  public static boolean createBucketIfNotExisting(Storage storage, String bucketName) throws IOException {
+    Bucket bucket = storage.get(bucketName);
+    if (bucket != null) {
+      return false;
+    }
+    // create corresponding GCS bucket
+    try {
+      storage.create(BucketInfo.newBuilder(bucketName).build());
+    } catch (StorageException se) {
+      // It is possible that in multiple worker instances scenario
+      // bucket is created by another worker instance after this worker instance
+      // determined that the bucket does not exists. Ignore error if bucket already exists.
+      if (se.getCode() != GCS_ERROR_CODE_CONFLICT) {
+        throw se;
+      }
+      return false;
+    }
+    return true;
   }
 
   /**

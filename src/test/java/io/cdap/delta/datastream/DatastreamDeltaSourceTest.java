@@ -47,7 +47,6 @@ class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
     DeltaSourceContext context = new MockSourceContext(null, null, 0L, null, oracleTables, oracleDb);
     deltaSource.initialize(context);
     String streamPath = String.format("%s/streams/%s", parentPath, streamId);
-    ;
     Stream stream = datastream.getStream(streamPath);
     OracleRdbms allowlist = stream.getSourceConfig().getOracleSourceConfig().getAllowlist();
     assertTrue(allowlist.getOracleSchemasList().stream().flatMap(schema -> schema.getOracleTablesList().stream()

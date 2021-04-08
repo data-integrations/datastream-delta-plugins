@@ -16,13 +16,13 @@
 
 package io.cdap.delta.datastream;
 
+import com.google.api.gax.core.CredentialsProvider;
+import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.api.gax.rpc.NotFoundException;
 import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
 import com.google.cloud.datastream.v1alpha1.DatastreamClient;
 import com.google.cloud.datastream.v1alpha1.Stream;
-import com.google.cloud.storage.Bucket;
-import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.gson.Gson;
@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import static io.cdap.delta.datastream.util.Utils.buildOracleConnectionProfile;
 
@@ -150,7 +151,14 @@ public class DatastreamDeltaSource implements DeltaSource {
           CreateConnectionProfileRequest.newBuilder().setParent(parentPath)
             .setConnectionProfile(buildOracleConnectionProfile(parentPath, oracleProfileName, config))
             .setConnectionProfileId(oracleProfileName).build();
-        Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
+        try {
+          Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
+        } catch (Exception ce) {
+          if (!(ce.getCause() instanceof ExecutionException) ||
+            !(ce.getCause().getCause() instanceof AlreadyExistsException)) {
+            throw ce;
+          }
+        }
       }
 
 
@@ -167,18 +175,21 @@ public class DatastreamDeltaSource implements DeltaSource {
         if (bucketName == null) {
           bucketName = Utils.buildBucketName(context.getRunId());
         }
-        Bucket bucket = storage.get(bucketName);
-        if (bucket == null) {
-          // create corresponding GCS bucket
-          storage.create(BucketInfo.newBuilder(bucketName).build());
-        }
+        Utils.createBucketIfNotExisting(storage, bucketName);
 
         // crete the gcs connection profile
         CreateConnectionProfileRequest createConnectionProfileRequest =
           CreateConnectionProfileRequest.newBuilder().setParent(parentPath).setConnectionProfile(
             Utils.buildGcsConnectionProfile(parentPath, gcsProfileName, bucketName, config.getGcsPathPrefix()))
             .setConnectionProfileId(gcsProfileName).build();
-        Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
+        try {
+          Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
+        } catch (Exception ce) {
+          if (!(ce.getCause() instanceof ExecutionException) ||
+            !(ce.getCause().getCause() instanceof AlreadyExistsException)) {
+            throw ce;
+          }
+        }
       }
 
       // Create the stream
@@ -187,7 +198,14 @@ public class DatastreamDeltaSource implements DeltaSource {
           config.shouldReplicateExistingData());
       CreateStreamRequest createStreamRequest =
         CreateStreamRequest.newBuilder().setParent(parentPath).setStream(stream).setStreamId(streamName).build();
-      Utils.createStream(datastream, createStreamRequest, LOGGER);
+      try {
+        Utils.createStream(datastream, createStreamRequest, LOGGER);
+      } catch (Exception ex) {
+        if (!(ex.getCause() instanceof ExecutionException) ||
+          !(ex.getCause().getCause() instanceof AlreadyExistsException)) {
+          throw ex;
+        }
+      }
     }
   }
 }

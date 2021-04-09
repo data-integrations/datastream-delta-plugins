@@ -87,7 +87,7 @@ class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
     datastream.deleteStreamAsync(String.format("%s/streams/DF-Stream-%s", parentPath, replicatorId)).get();
     storage.delete(gcsBucket);
   }
-
+  
   private void checkStream(String replicatorId) throws IOException {
     // Check source connection profile
     String srcProfileName = String.format("DF-ORA-%s", replicatorId);

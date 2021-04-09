@@ -18,8 +18,6 @@ package io.cdap.delta.datastream;
 
 
 import com.google.api.core.ApiFuture;
-import com.google.api.gax.rpc.AlreadyExistsException;
-import com.google.api.gax.rpc.FailedPreconditionException;
 import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
 import com.google.cloud.datastream.v1alpha1.DatastreamClient;
@@ -30,6 +28,7 @@ import com.google.cloud.datastream.v1alpha1.Validation;
 import com.google.cloud.datastream.v1alpha1.ValidationMessage;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageException;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.Gson;
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.cdap.api.data.schema.Schema.LogicalType;
@@ -56,7 +55,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static io.cdap.delta.datastream.util.Utils.buildOracleConnectionProfile;
@@ -175,6 +173,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
   public Assessment assess() {
     String parentPath = Utils.buildParentPath(conf.getProject(), conf.getRegion());
     if (conf.isUsingExistingStream()) {
+      // validate stream by updating existing stream
       String streamPath = Utils.buildStreamPath(parentPath, conf.getStreamId());
       Stream.Builder stream = null;
       try {
@@ -193,8 +192,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         Utils.updateAllowlist(datastream, stream.build(), LOGGER);
         streamUpdated = true;
       } catch (DatastreamDeltaSourceException e) {
-        if (e.getCause() instanceof ExecutionException &&
-          e.getCause().getCause() instanceof FailedPreconditionException) {
+        if (Utils.isValidationFailed(e)) {
           return buildAssessment(e.getMetadata());
         }
         throw new RuntimeException(String
@@ -214,7 +212,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         }
       }
     } else {
-      // validate stream
+      // validate by creating new stream
       String oracleProfilePath = null;
       String gcsProfilePath = null;
       String streamPath = null;
@@ -222,10 +220,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
       boolean bucketCreated = false;
 
       try {
-        // creating new stream
         String uuid = UUID.randomUUID().toString() + System.currentTimeMillis();
-        String streamName = Utils.buildStreamName(uuid);
-
         String oracleProfileName = Utils.buildOracleProfileName(uuid);
         try {
           // create the oracle profile
@@ -236,8 +231,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
           Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
           oracleProfilePath = Utils.buildConnectionProfilePath(parentPath, oracleProfileName);
         } catch (Exception e) {
-          if (!(e.getCause() instanceof ExecutionException) ||
-            !(e.getCause().getCause() instanceof AlreadyExistsException)) {
+          if (!Utils.isAlreadyExisted(e)) {
             throw new RuntimeException(String
               .format("Fail to assess replicator pipeline due to failure of creating source connection profile:\n %s",
                 e.toString()), e);
@@ -255,7 +249,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
           throw new RuntimeException(String
             .format("Fail to assess replicator pipeline due to failure of creating GCS Bucket: \n%s", e.toString()), e);
         }
-        // crete the gcs connection profile
+        // create the gcs connection profile
         String gcsProfileName = Utils.buildGcsProfileName(uuid);
         try {
           CreateConnectionProfileRequest createConnectionProfileRequest =
@@ -265,8 +259,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
           Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
           gcsProfilePath = Utils.buildConnectionProfilePath(parentPath, gcsProfileName);
         } catch (Exception e) {
-          if (!(e.getCause() instanceof ExecutionException) ||
-            !(e.getCause().getCause() instanceof AlreadyExistsException)) {
+          if (!Utils.isAlreadyExisted(e)) {
             throw new RuntimeException(String.format(
               "Fail to assess replicator pipeline due to failure of creating destination connection profile: \n%s",
               e.toString()), e);
@@ -274,6 +267,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         }
 
         try {
+          String streamName = Utils.buildStreamName(uuid);
           //TODO set validate only to true when datastream supports validate only correctly
           CreateStreamRequest createStreamRequest = CreateStreamRequest.newBuilder().setParent(parentPath).setStream(
             Utils.buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, new HashSet<>(tables),
@@ -281,12 +275,10 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
           Utils.createStream(datastream, createStreamRequest, LOGGER);
           streamPath = buildStreamPath(parentPath, streamName);
         } catch (Exception e) {
-          if (e instanceof DatastreamDeltaSourceException && e.getCause() instanceof ExecutionException &&
-            e.getCause().getCause() instanceof FailedPreconditionException) {
+          if (Utils.isValidationFailed(e)) {
             return buildAssessment(((DatastreamDeltaSourceException) e).getMetadata());
           }
-          if (!(e.getCause() instanceof ExecutionException) ||
-            !(e.getCause().getCause() instanceof AlreadyExistsException)) {
+          if (!Utils.isAlreadyExisted(e)) {
             throw new RuntimeException(
               String.format("Fail to assess replicator pipeline due to failure of creating stream:\n%s", e.toString()),
               e);
@@ -318,10 +310,9 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
           }
         }
         //remove temporarily created GCS bucket
-        //TODO retry deleting if failed
         if (bucketCreated) {
           try {
-            storage.delete(bucketName);
+            Utils.deleteBucket(storage, bucketName);
           } catch (StorageException e) {
             LOGGER.warn(String.format("Fail to delete temporary GCS bucket : %s", bucketName), e);
           }
@@ -331,7 +322,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
     return new Assessment(Collections.emptyList(), Collections.emptyList());
   }
 
-  private Assessment buildAssessment(ApiFuture<OperationMetadata> metadataFuture) {
+  @VisibleForTesting
+  static Assessment buildAssessment(ApiFuture<OperationMetadata> metadataFuture) {
     OperationMetadata metadata = null;
     try {
       metadata = metadataFuture.get();
@@ -355,23 +347,23 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
             connectivityIssues.add(new Problem("Oracle Connectivity Failure",
               String.format("Issue : %s found when %s", message, description),
               "Check your Forward SSH tunnel configurations.",
-              "Cannot read any snapshot or CDC changes" + "from source database."));
+              "Cannot read any snapshot or CDC changes from source database."));
             break;
           case "ORACLE_VALIDATE_CONNECTIVITY":
             connectivityIssues.add(new Problem("Oracle Connectivity Failure",
               String.format("Issue : %s found when %s", message, description), "Check your Oracle database settings.",
-              "Cannot replicate any snapshot or CDC changes " + "from " + "source database."));
+              "Cannot replicate any snapshot or CDC changes from source database."));
             break;
           case "ORACLE_VALIDATE_LOG_MODE":
             missingFeatures.add(
-              new Problem("Incorrect Oracle settings.", String.format("Issue : %s found when %s", message, description),
-                "Check your Oracle database settings.", "Cannot replicate CDC changes from source " + "database."));
+              new Problem("Incorrect Oracle Settings", String.format("Issue : %s found when %s", message, description),
+                "Check your Oracle database settings.", "Cannot replicate CDC changes from source database."));
             break;
           case "ORACLE_VALIDATE_SUPPLEMENTAL_LOGGING":
             missingFeatures.add(
-              new Problem("Incorrect Oracle settings.", String.format("Issue : %s found when %s", message, description),
+              new Problem("Incorrect Oracle Settings", String.format("Issue : %s found when %s", message, description),
                 "Check your Oracle database settings.",
-                "Cannot replicate CDC changes of certain tables " + "from source database."));
+                "Cannot replicate CDC changes of certain tables from source database."));
             break;
           case "GCS_VALIDATE_PERMISSIONS":
             missingFeatures.add(

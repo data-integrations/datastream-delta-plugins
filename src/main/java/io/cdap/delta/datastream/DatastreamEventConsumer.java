@@ -17,6 +17,7 @@
 
 package io.cdap.delta.datastream;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.cdap.cdap.api.data.format.StructuredRecord;
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.delta.api.DMLEvent;
@@ -39,8 +40,6 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static io.cdap.delta.datastream.util.Utils.handleError;
 
 /**
  * DatastreamEventConsumer consumes the datastream cdc events and generate CDAP Delta CDC events
@@ -91,16 +90,17 @@ public class DatastreamEventConsumer {
   private Schema parseSchema(org.apache.avro.Schema schema) throws Exception {
     org.apache.avro.Schema.Field payload = schema.getField(PAYLOAD_FIELD_NAME);
     if (payload == null) {
-      throw Utils.handleError(LOGGER, context, "Failed to get payload schema from schema : " + schema, false);
+      throw Utils.buildException("Failed to get payload schema from schema : " + schema, false);
     }
     org.apache.avro.Schema payloadSchema = payload.schema();
     Set<String> columns = table.getColumns().stream().map(column -> column.getName()).collect(Collectors.toSet());
     Stream<org.apache.avro.Schema.Field> fields = columns.isEmpty() ? payloadSchema.getFields().stream() :
       payloadSchema.getFields().stream().filter(field -> columns.contains(field.name()));
-    return Schema.recordOf(payloadSchema.getName(), fields.map(this::convert).toArray(Schema.Field[]::new));
+    return Schema
+      .recordOf(payloadSchema.getName(), fields.map(DatastreamEventConsumer::convert).toArray(Schema.Field[]::new));
   }
 
-  private Schema.Field convert(org.apache.avro.Schema.Field field) {
+  private static Schema.Field convert(org.apache.avro.Schema.Field field) {
     return Schema.Field.of(field.name(), convert(field.schema()));
   }
 
@@ -109,13 +109,14 @@ public class DatastreamEventConsumer {
    * 1. Datastream has a custom logical type "varchar" we will convert it to String
    * 2. Datastream has a custom logical type "number" we will convert it to String
    */
-  private Schema convert(org.apache.avro.Schema schema) {
+  @VisibleForTesting
+  static Schema convert(org.apache.avro.Schema schema) {
     String logicalType = schema.getLogicalType() == null ? null : schema.getLogicalType().getName();
 
     switch (schema.getType()) {
       case RECORD:
-        return Schema
-          .recordOf(schema.getName(), schema.getFields().stream().map(this::convert).toArray(Schema.Field[]::new));
+        return Schema.recordOf(schema.getName(),
+          schema.getFields().stream().map(DatastreamEventConsumer::convert).toArray(Schema.Field[]::new));
       case INT:
         if ("date".equals(logicalType)) {
           return Schema.of(Schema.LogicalType.DATE);
@@ -164,7 +165,7 @@ public class DatastreamEventConsumer {
       case ARRAY:
         return Schema.arrayOf(convert(schema.getElementType()));
       case UNION:
-        return Schema.unionOf(schema.getTypes().stream().map(this::convert).toArray(Schema[]::new));
+        return Schema.unionOf(schema.getTypes().stream().map(DatastreamEventConsumer::convert).toArray(Schema[]::new));
       default:
         // should not reach here
         throw new IllegalArgumentException("Unsupported type : " + schema.getType());
@@ -178,7 +179,7 @@ public class DatastreamEventConsumer {
     try {
        reader = new DataFileReader<>(input, datumReader);
     } catch (IOException e) {
-      throw Utils.handleError(LOGGER, context, "Failed to read or parse file : " + currentPath, e, true);
+      throw Utils.buildException("Failed to read or parse file : " + currentPath, e, true);
     }
     for (int i = 0; i < position; i++) {
       if (reader.hasNext()) {
@@ -188,15 +189,6 @@ public class DatastreamEventConsumer {
       }
     }
     return reader;
-  }
-
-  private boolean isDumpFile(org.apache.avro.Schema schema) throws Exception {
-    org.apache.avro.Schema.Field metaData = schema.getField(SOURCE_METADATA_FIELD_NAME);
-    if (metaData == null) {
-      throw handleError(LOGGER, context,
-        String.format("Cannot find %s field in the schema %s", SOURCE_METADATA_FIELD_NAME, schema.toString()), false);
-    }
-    return metaData.schema().getField(CHANGE_TYPE_FIELD_NAME) == null;
   }
 
   /**
@@ -235,14 +227,23 @@ public class DatastreamEventConsumer {
       }
       GenericRecord payload = (GenericRecord) record.get(PAYLOAD_FIELD_NAME);
       StructuredRecord row = parseRecord(payload);
-      event = DMLEvent.builder().setDatabaseName(table.getDatabase()).setSchemaName(table.getSchema())
-        .setTableName(table.getTable()).setIngestTimestamp(System.currentTimeMillis()).setOperationType(
-          isSnapshot ? DMLOperation.Type.INSERT :
-            DMLOperation.Type.valueOf(sourceMetadata.get(CHANGE_TYPE_FIELD_NAME).toString())).setRow(row)
-        .setRowId(sourceMetadata.get(ROW_ID_FIELD_NAME).toString()).setTransactionId(
+
+      DMLOperation.Type operationType = isSnapshot ? DMLOperation.Type.INSERT :
+        DMLOperation.Type.valueOf(sourceMetadata.get(CHANGE_TYPE_FIELD_NAME).toString());
+
+      DMLEvent.Builder eventBuilder =
+        DMLEvent.builder().setDatabaseName(table.getDatabase()).setSchemaName(table.getSchema())
+          .setTableName(table.getTable()).setIngestTimestamp(System.currentTimeMillis()).setOperationType(operationType)
+          .setRow(row).setRowId(sourceMetadata.get(ROW_ID_FIELD_NAME).toString()).setTransactionId(
           sourceMetadata.get(TRANSACTION_ID_FIELD_NAME) == null ? null :
             sourceMetadata.get(TRANSACTION_ID_FIELD_NAME).toString()).setSnapshot(isSnapshot)
-        .setSourceTimestamp((Long) record.get(SOURCE_TIMESTAMP_FIELD_NAME)).setOffset(new Offset(state)).build();
+          .setSourceTimestamp((Long) record.get(SOURCE_TIMESTAMP_FIELD_NAME)).setOffset(new Offset(state));
+
+      // TODO below is a workaround of CDAP-17919 , remove below lines once it's fixed.
+      if (operationType == DMLOperation.Type.DELETE) {
+        eventBuilder.setPreviousRow(row);
+      }
+      event = eventBuilder.build();
       return;
     }
   }

@@ -227,7 +227,7 @@ public class DatastreamConfig extends PluginConfig {
 
   @Nullable
   public String getSshAuthenticationMethod() {
-    if (CONNECTIVITY_METHOD_IP_ALLOWLISTING.equals(connectivityMethod)) {
+    if (CONNECTIVITY_METHOD_IP_ALLOWLISTING.equals(getConnectivityMethod())) {
       return null;
     }
     //if connectivity method is forward ssh tunnel, return the default value if it's not set.

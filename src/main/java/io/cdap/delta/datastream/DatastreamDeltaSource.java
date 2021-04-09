@@ -17,7 +17,6 @@
 package io.cdap.delta.datastream;
 
 import com.google.api.gax.core.CredentialsProvider;
-import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.api.gax.rpc.NotFoundException;
 import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
@@ -47,7 +46,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 import static io.cdap.delta.datastream.util.Utils.buildOracleConnectionProfile;
 
@@ -154,8 +152,7 @@ public class DatastreamDeltaSource implements DeltaSource {
         try {
           Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
         } catch (Exception ce) {
-          if (!(ce.getCause() instanceof ExecutionException) ||
-            !(ce.getCause().getCause() instanceof AlreadyExistsException)) {
+          if (!Utils.isAlreadyExisted(ce)) {
             throw ce;
           }
         }
@@ -185,8 +182,7 @@ public class DatastreamDeltaSource implements DeltaSource {
         try {
           Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
         } catch (Exception ce) {
-          if (!(ce.getCause() instanceof ExecutionException) ||
-            !(ce.getCause().getCause() instanceof AlreadyExistsException)) {
+          if (!Utils.isAlreadyExisted(ce)) {
             throw ce;
           }
         }
@@ -201,8 +197,7 @@ public class DatastreamDeltaSource implements DeltaSource {
       try {
         Utils.createStream(datastream, createStreamRequest, LOGGER);
       } catch (Exception ex) {
-        if (!(ex.getCause() instanceof ExecutionException) ||
-          !(ex.getCause().getCause() instanceof AlreadyExistsException)) {
+        if (!Utils.isAlreadyExisted(ex)) {
           throw ex;
         }
       }

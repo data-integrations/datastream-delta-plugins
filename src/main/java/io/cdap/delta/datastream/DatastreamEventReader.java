@@ -35,7 +35,6 @@ import io.cdap.delta.api.EventEmitter;
 import io.cdap.delta.api.EventReader;
 import io.cdap.delta.api.EventReaderDefinition;
 import io.cdap.delta.api.Offset;
-import io.cdap.delta.api.ReplicationError;
 import io.cdap.delta.api.SourceTable;
 import io.cdap.delta.api.assessment.StandardizedTableDetail;
 import io.cdap.delta.api.assessment.TableDetail;
@@ -116,7 +115,7 @@ public class DatastreamEventReader implements EventReader {
     try {
       this.stream = Utils.getStream(datastream, streamPath, LOGGER);
     } catch (Exception e) {
-      throw Utils.handleError(LOGGER, context, "Failed to get stream : " + streamPath, e, true);
+      throw Utils.buildException("Failed to get stream : " + streamPath, e, true);
     }
     String oracleProfileName = this.stream.getSourceConfig().getSourceConnectionProfileName();
     try {
@@ -124,7 +123,7 @@ public class DatastreamEventReader implements EventReader {
         Utils.getConnectionProfile(datastream, oracleProfileName, LOGGER).getOracleProfile().getDatabaseService();
     } catch (Exception e) {
       throw Utils
-        .handleError(LOGGER, context, "Failed to get oracle connection profile : " + oracleProfileName, e, true);
+        .buildException("Failed to get oracle connection profile : " + oracleProfileName, e, true);
     }
     String path = this.stream.getDestinationConfig().getGcsDestinationConfig().getPath();
     this.streamGcsPathPrefix = path == null ? "" : path.startsWith("/") ? path.substring(1) : path;
@@ -135,7 +134,7 @@ public class DatastreamEventReader implements EventReader {
       path = gcsProfile.getRootPath();
       this.gcsRootPath = path.startsWith("/") ? path.substring(1) : path;
     } catch (Exception e) {
-      throw Utils.handleError(LOGGER, context, "Failed to get GCS connection profile : " + gcsProfileName, e, true);
+      throw Utils.buildException("Failed to get GCS connection profile : " + gcsProfileName, e, true);
     }
   }
 
@@ -154,7 +153,15 @@ public class DatastreamEventReader implements EventReader {
 
   public void stop() throws InterruptedException {
     executorService.shutdownNow();
-    Utils.pauseStream(datastream, stream, LOGGER);
+    // TODO change the DeltaWoker to send some signal about whether such stop is for restarting due to
+    // temporary failure or it's stopped by the end user
+    // if it's not stopped by the end user , we should not stop the stream because other workers are still working
+    // below is just a workaround to avoid changes in delta app.
+    // if the caller is from DeltaWorker.run it's a stop due to failure and don't need to stop stream
+    // otherwise it's from DeltaWorker.stop which is intended by the end user.
+    if (!new Throwable().getStackTrace()[1].getMethodName().startsWith("lambda$run")) {
+      Utils.pauseStream(datastream, stream, LOGGER);
+    }
     if (!executorService.awaitTermination(2, TimeUnit.MINUTES)) {
       LOGGER.warn("Unable to cleanly shutdown reader within the timeout.");
     }
@@ -180,17 +187,9 @@ public class DatastreamEventReader implements EventReader {
     public void run() {
       try {
         scanResults();
-      } catch (Exception e) {
-        context.notifyFailed(e);
       } catch (Throwable t) {
-        //handle un-detected errors
-        try {
-          context.setError(new ReplicationError(t));
-        } catch (IOException e) {
-          LOGGER.error(String.format("Failed to set error %s in context", t), e);
-        } finally {
-          context.notifyFailed(t);
-        }
+        Utils.handleError(LOGGER, context, t);
+        context.notifyFailed(t);
       }
     }
 
@@ -264,13 +263,13 @@ public class DatastreamEventReader implements EventReader {
        emit DML event  (table.pos = current pos , pos++)
        **/
       if (!Stream.State.RUNNING.equals(stream.getState())) {
-        Utils.handleError(LOGGER, context, "Stream " + streamPath + " is in status : " + stream.getState(), true);
+        LOGGER.warn("Stream {} is in status : {}.", streamPath, stream.getState());
       } else {
         Exception error = null;
         try {
           error = Utils.fetchErrors(datastream, streamPath, LOGGER, context);
-        } catch (IOException e) {
-          Utils.handleError(LOGGER, context, "Failed to fetch errors for stream " + streamPath, e, true);
+        } catch (Exception e) {
+          LOGGER.warn("Failed to fetch errors for stream " + streamPath, e);
         }
         if (error != null) {
           throw error;
@@ -371,7 +370,7 @@ public class DatastreamEventReader implements EventReader {
         return formatter
           .format(formatter.parse(sourceTime).getTime() - TimeUnit.MINUTES.toMillis(DATASTREAM_SLA_IN_MINUTES));
       } catch (ParseException e) {
-        throw Utils.handleError(LOGGER, context, String.format("Failed to parse date from : %s", sourceTime), e, false);
+        throw Utils.buildException(String.format("Failed to parse date from : %s", sourceTime), e, false);
       }
     }
 
@@ -395,11 +394,11 @@ public class DatastreamEventReader implements EventReader {
       try {
         tableDetail = tableRegistry.describeTable(table.getDatabase(), table.getSchema(), table.getTable());
       } catch (TableNotFoundException e) {
-        throw Utils.handleError(LOGGER, context, String
+        throw Utils.buildException(String
           .format("Cannot find the table: database: %s, schema: %s, table: %s", table.getDatabase(), table.getSchema(),
             table.getTable()), e, true);
       } catch (IOException e) {
-        throw Utils.handleError(LOGGER, context, String
+        throw Utils.buildException(String
           .format("Failed to describe the table: database: %s, schema: %s, table: %s", table.getDatabase(),
             table.getSchema(), table.getTable()), e, true);
       }
@@ -592,7 +591,7 @@ public class DatastreamEventReader implements EventReader {
       return String.format("%s/%s/", gcsRootPath, streamGcsPathPrefix);
     }
 
-    private void emitEvent(ChangeEvent event) {
+    private void emitEvent(ChangeEvent event) throws Exception {
       if (LOGGER.isTraceEnabled()) {
         LOGGER.trace("Emitting event: " + GSON.toJson(event));
       }
@@ -602,8 +601,8 @@ public class DatastreamEventReader implements EventReader {
         } else {
           emitter.emit((DDLEvent) event);
         }
-      } catch (InterruptedException e) {
-        Utils.handleError(LOGGER, context, "Failed to emit event : " + GSON.toJson(event), e, true);
+      } catch (Exception e) {
+        throw Utils.buildException("Failed to emit event : " + GSON.toJson(event), e, true);
       }
     }
   }

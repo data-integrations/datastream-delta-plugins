@@ -4,7 +4,7 @@
 Description
 -----------
 Oracle (by DataStream) CDC Source will replicate all of the row-level changes in the databases on Oracle server.
-This source plugin integrated with [DataStream](https://cloud.google.com/datastream/) to supportt this functionality. DataStream plays a role as change stream provider in the context. A DataStream stream will be created or an existing DataStream steam will be modified to provide the change stream.
+This source plugin integrated with [DataStream](https://cloud.google.com/datastream/) to support this functionality. DataStream plays a role as a change stream provider in the context. A DataStream stream will be created or an existing DataStream steam will be modified to provide the change stream.
 
 Oracle Versions Supported
 -----------
@@ -15,23 +15,23 @@ Before You Start
 #### Enable the DataStream API
 You need to enable the DataStream API for a Google Cloud project you want to use.  
 You need to give the project name to this plugin as `project` property.  
-Alternatively if you are using Data Fusion, you can leave the `project` property as default (`auto-detec`) which will default to your CLoud Data Fusion project.    
+Alternatively if you are using Data Fusion, you can leave the `project` property as default (`auto-detect`) which will default to your CLoud Data Fusion project.    
 To enable the DataStream API , please refer [here](https://cloud.google.com/datastream/docs/before-you-begin).
   
-#### Grant CDAP the permission to call DataStream API
-- You need to prepare a service account and give it to this plugin as the `DataStream Service Account Key` property. This service account will be used as the identity to call DataStream API when you create a replication draft and running the replication jobs.  
-- Alternatively, if you are using Data Fusion, you can leave the `DataStream Service Account Key` property as default ("auto-detec") which will default to Data Fusion Service account when you create a replication draft and Dataproc Service Account when you run the replication job.     
-Data Fusion Service Account is in form of `service-customer-project-number@gcp-sa- datafusion.iam.gserviceaccount.com`. This service account is used to call DataStream API when you create a replication draft.    
-Dataproc Service Account is the identity Dataproc will use to run replication jobs. By default it's the default GCE (Google Cloud Engine) service account in form of `customer-project-number- compute@developer.gserviceaccount.com`. When you create a Data Fusion instance, you can also choose a different Dataproc Service Account. This service account is used as the identity to call DataStream API when replication jobs are run.   
+#### Grant CDAP the permission to call the DataStream API
+- You need to prepare a service account and give it to this plugin as the `DataStream Service Account Key` property. This service account will be used as the identity to call the DataStream API when you create a replication draft and run the replication jobs.  
+- Alternatively, if you are using Data Fusion, you can leave the `DataStream Service Account Key` property as default ("auto-detect") which will default to Data Fusion Service account when you create a replication draft and Dataproc Service Account when you run the replication job.     
+Data Fusion Service Account is in the form: `service-customer-project-number@gcp-sa- datafusion.iam.gserviceaccount.com`. This service account is used to call the DataStream API when you create a replication draft.    
+Dataproc Service Account is the identity Dataproc will use to run replication jobs. By default it's the default GCE (Google Cloud Engine) service account in form of `customer-project-number- compute@developer.gserviceaccount.com`. When you create a Data Fusion instance, you can also choose a different Dataproc Service Account. This service account is used as the identity to call the DataStream API when replication jobs are run.   
 
-You need to grant those service accounts the "DataStream Admin" role on the project that enables the DataStream API. As for how to grant the permision , please refer [here](https://cloud.google.com/resource-manager/docs/access-control-proj).  
+You need to grant those service accounts the "DataStream Admin" role on the project that enables the DataStream API. For more information, see [Access control for projects using IAM](https://cloud.google.com/resource-manager/docs/access-control-proj).  
 Please refer [here](https://cloud.google.com/iam/docs/creating-managing-service-account-keys) for what a service account and service account key is.
 
 #### Grant CDAP the permission to access GCS (Google Cloud Storage)
 DataStream will write its output to the GCS bucket you specified as `GCS Bucket` property of this plugin. This bucket can be an existing one or non-existing one (this plugin will create one for you).  
 - You need to prepare a service account and give it to this plugin as the `GCS Service Account Key` property. This service account will be used as the identity to get and create (if you want this plugin to create a new bucket) the bucket and read the DataStream output from that bucket.  
-- Alternatively, if you are using Data Fusion, you can leave the `GCS Service Account Key` property as default ("auto-detec") which will default to Data Fusion Service account when you create a replication draft and Dataproc Service Account when you run the replication job.     
-Data Fusion Service Account is in form of `service-customer-project-number@gcp-sa- datafusion.iam.gserviceaccount.com`. This service account is used as the identity to get and create (if you want this plugin to create a new bucket) the bucket when you create a replication draft.      
+- Alternatively, if you are using Data Fusion, you can leave the `GCS Service Account Key` property as default ("auto-detect") which will default to Data Fusion Service account when you create a replication draft and Dataproc Service Account when you run the replication job.     
+Data Fusion Service Account is in form of `service-customer-project-number@gcp-sa-datafusion.iam.gserviceaccount.com`. This service account is used as the identity to get and create (if you want this plugin to create a new bucket) the bucket when you create a replication draft.      
 Dataproc Service Account is the identity Dataproc will use to run replication jobs. By default it's the default GCE (Google Cloud Engine) service account in form of `customer-project-number- compute@developer.gserviceaccount.com`. When you create a Data Fusion instance, you can also choose a different Dataproc Service Account. This service account is used as the identity to  get and create (if you want this plugin to create a new bucket) the bucket and read the DataStream result from that bucket.
 
 You need to grant below permissions to those service accounts on the project where the bucket is:
@@ -46,7 +46,7 @@ Please refer [here](https://cloud.google.com/iam/docs/creating-managing-service-
 #### Configure Oracle Database
 Please follow [Configure your source Oracle database](https://cloud.google.com/datastream/docs/configure-your-source-database).
 
-Plugin Properties
+Plugin properties
 -----------
 
 **Use an existing DataStream stream:** Whether to let this plugin create a new DataStream stream or use an existing DataStream stream. It's recommended that you only have one DataStream stream per Oracle Database for performance concerns.
@@ -57,21 +57,21 @@ Plugin Properties
 
 **Connectivity Method** How you want the DataStream to connect to your database. Please refer [https://cloud.google.com/datastream/docs/source-network-connectivity-options](https://cloud.google.com/datastream/docs/source-network-connectivity-options) about what each option means and what you need to do for your network settings.
 
-**Host (in the `Basic` section):** The hostname or IP address of your SSH tunnel bastion server. Only applicalbe when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
+**Host (in the <b>Basic</b> section):** The hostname or IP address of your SSH tunnel bastion server. Only applicalbe when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
 
-**Port (in the `Basic` section):** The port number to use to connect to your SSH tunnel bastion server. Only applicable when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
+**Port (in the <b>Basic</b> section):** The port number to use to connect to your SSH tunnel bastion server. Only applicable when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
 
-**Username (in the `Basic` section):** The username that DataStream can use to connect to your SSH tunnel bastion server. Only applicable when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
+**Username (in the <b>Basic</b> section):** The username that DataStream can use to connect to your SSH tunnel bastion server. Only applicable when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
 
 **Authentication Method:** How your SSH tunnel bastion server authenticates the user(DataStream). Only applicable when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
 
-**Password (in the `Basic` section):** The passowrd to use to connect to your SSH tunnel bastion server. Only applicable when you choose `Password` as your `Authentication Method`.
+**Password (in the <b>Basic</b> section):** The passowrd to use to connect to your SSH tunnel bastion server. Only applicable when you choose `Password` as your `Authentication Method`.
 
 **Private Key:** The private key DataStream will use to connect to your SSH tunnel bastion server that matches the public key assigned to it. Only applicable when you choose `Private/Public Key Pair` as your `Authentication Method`.
 
 **Private Connection Name:** Name of the private connection. The network admins of the Google Cloud Platform project should create a VPC peering between the database VPC and the DataStream VPC (see [Use private connectivity](https://cloud.google.com/datastream/docs/source-network-connectivity-options#privateconnectivity) for details). THis is the name of the VPC peering they created. Only applicable when you choose `Private connectivity (VPC peering)` as your `Connectivity Method`.
 
-**Host (in the `Database Location` section):** Hostname or IP address of your Oracle server to read from.
+**Host (in the <b>Database Location</b> section):** Hostname or IP address of your Oracle server to read from.
 
 **Port:** Port number to use to connect to your Oracle server.
 
@@ -85,7 +85,7 @@ Plugin Properties
 
 **project:** The Google Cloud Platform project that has enabled the DataStream API. It will default to the value of the system property `GOOGLE_CLOUD_PROJECT` or `GCLOUD_PROJECT` for CDAP and Data Fusion Project for Data Fusion. 
 
-**DataStream Service Account Key:** The service account key for the service account that will be used as the identity to call DataStream API. It will default to the content of the file referred by the system property `GOOGLE_APPLICATION_CREDENTIALS` for CDAP and Data Fusion Service Account for Data Fusion.
+**DataStream Service Account Key:** The service account key for the service account that will be used as the identity to call the DataStream API. It will default to the content of the file referred by the system property `GOOGLE_APPLICATION_CREDENTIALS` for CDAP and Data Fusion Service Account for Data Fusion.
 
 **GCS Service Account Key:** The service account key for the service account that will be used as the identity to access GCS. DataStream will write the change stream to the GCS bucket you specified as `GCS Bucket` property of this plugin. This service account will be used as the identity to get and create (if you want this plugin to create a new bucket) the bucket and read DataStream result from the bucket. It will default to the content of the file referred by the system property `GOOGLE_APPLICATION_CREDENTIALS` for CDAP and Data Fusion Service Account for Data Fusion. 
 
@@ -93,7 +93,7 @@ Plugin Properties
 
 **Path Prefix:** The GCS (Google Clous Storage) path prefix in the bucket that DataStream will write its output to. This prefix will be prefixed to the DataStream output path. It's usually used when you want DataStream to write its output to an existing bucket and you want to easily differentiate it from other existing GCS files by its path prefix.  
 
-Limitation
+Limitations
 -----------
 
 #### ROWID changes
@@ -103,6 +103,8 @@ Please refer [here](https://asktom.oracle.com/pls/apex/asktom.search?tag=when-ca
 #### Multiple updates to the same row
 Events written by DataStream may arrive out of order. BigQuery plugin cannot sort the events if multiple events happened in the same milli-second to the same row. The consequence is that target database may apply those events in the order of receiving them. But such case is very rare becasue it only happens when multiple change events against the same row are committed in the same milli-second and DataStream write them out of order.
 
-Trouble Shooting
+Trouble Shooting changes got replicated with a high latency
 -----------
-If you made some changes and didn't see them got replicated for quite long time. DataStream rely on archived Oracle redo log to stream changes, that means if the redo log was not rotated (archived) , the changes in that log could not be exposed. Make sure you have the correct configuration of redo log settings by following [Work with Oracle database redo log files](https://cloud.google.com/datastream/docs/work-with-oracle-database-redo-log-files)
+The following issue occurs when you have incorrect redo log settings on your Oracle database:
+After you make some changes and don't see them got replicated for quite long time, or those changes get replicated with a high latency.
+To resolve this issue, make sure you have the correct configuration of redo log settings by following [Work with Oracle database redo log files](https://cloud.google.com/datastream/docs/work-with-oracle-database-redo-log-files). DataStream relies on archived Oracle redo log to stream changes, if the redo log was not rotated (archived) , the changes in that log could not be streamed.

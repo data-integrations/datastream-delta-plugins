@@ -266,7 +266,7 @@ public class DatastreamConfig extends PluginConfig {
   public Credentials getGcsCredentials() {
     return getCredentials(gcsServiceAccountKey);
   }
-  public Credentials getDatastreamCredentials() {
+  public GoogleCredentials getDatastreamCredentials() {
     return getCredentials(dsServiceAccountKey);
   }
 
@@ -277,7 +277,7 @@ public class DatastreamConfig extends PluginConfig {
     return project;
   }
 
-  private Credentials getCredentials(String serviceAccountKey) {
+  private GoogleCredentials getCredentials(String serviceAccountKey) {
     if (serviceAccountKey == null || "auto-detect".equalsIgnoreCase(serviceAccountKey)) {
       try {
         return GoogleCredentials.getApplicationDefault()

@@ -16,13 +16,10 @@
 
 package io.cdap.delta.datastream;
 
-import com.google.api.gax.core.CredentialsProvider;
 import com.google.api.gax.rpc.NotFoundException;
-import com.google.auth.Credentials;
 import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
 import com.google.cloud.datastream.v1alpha1.DatastreamClient;
-import com.google.cloud.datastream.v1alpha1.DatastreamSettings;
 import com.google.cloud.datastream.v1alpha1.Stream;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
@@ -83,7 +80,7 @@ public class DatastreamDeltaSource implements DeltaSource {
     storage =
       StorageOptions.newBuilder().setCredentials(config.getGcsCredentials()).setProjectId(config.getProject()).build()
         .getService();
-    datastream = createDatastreamClient();
+    datastream = Utils.getDataStreamClient(config.getDatastreamCredentials());
     parentPath = Utils.buildParentPath(config.getProject(), config.getRegion());
 
     if (config.isUsingExistingStream()) {
@@ -101,18 +98,6 @@ public class DatastreamDeltaSource implements DeltaSource {
     Utils.updateAllowlist(datastream, streamBuilder.build(), LOGGER);
   }
 
-
-
-  private DatastreamClient createDatastreamClient() throws IOException {
-
-    return DatastreamClient.create(DatastreamSettings.newBuilder().setCredentialsProvider(new CredentialsProvider() {
-      @Override
-      public Credentials getCredentials() throws IOException {
-        return config.getDatastreamCredentials();
-      }
-    }).build());
-  }
-
   @Override
   public void configure(SourceConfigurer configurer) {
     configurer.setProperties(
@@ -127,7 +112,7 @@ public class DatastreamDeltaSource implements DeltaSource {
 
   @Override
   public TableRegistry createTableRegistry(Configurer configurer) throws Exception {
-    return new DatastreamTableRegistry(config, createDatastreamClient());
+    return new DatastreamTableRegistry(config, Utils.getDataStreamClient(config.getDatastreamCredentials()));
   }
 
   @Override
@@ -138,7 +123,7 @@ public class DatastreamDeltaSource implements DeltaSource {
   @Override
   public TableAssessor<TableDetail> createTableAssessor(Configurer configurer, List<SourceTable> tables)
     throws Exception {
-    return new DatastreamTableAssessor(config, createDatastreamClient(),
+    return new DatastreamTableAssessor(config, Utils.getDataStreamClient(config.getDatastreamCredentials()),
       StorageOptions.newBuilder().setCredentials(config.getGcsCredentials()).setProjectId(config.getProject()).build()
         .getService(), tables);
   }

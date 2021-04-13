@@ -2,7 +2,7 @@
   "metadata": {
     "spec-version": "1.5"
   },
-  "display-name": "Oracle (by DataStream)",
+  "display-name": "Oracle (by Datastream)",
   "configuration-groups": [
     {
       "label": "Basic",
@@ -10,7 +10,7 @@
         {
           "name": "usingExistingStream",
           "widget-type": "toggle",
-          "label": "Use an existing DataStream stream",
+          "label": "Use an existing Datastream stream",
           "widget-attributes": {
             "default": "false",
             "on": {
@@ -73,6 +73,11 @@
           }
         },
         {
+          "name": "sshUser",
+          "label": "Username",
+          "widget-type": "textbox"
+        },
+        {
           "name": "sshAuthenticationMethod",
           "label": "Authentication Method",
           "widget-type": "radio-group",
@@ -90,11 +95,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "sshUser",
-          "label": "Username",
-          "widget-type": "textbox"
         },
         {
           "name": "sshPassword",
@@ -144,7 +144,7 @@
       "properties": [
         {
           "name": "user",
-          "label": "User",
+          "label": "Username",
           "widget-type": "textbox"
         },
         {
@@ -174,14 +174,20 @@
           }
         },
         {
-          "name": "gcsBucket",
-          "label": "GCS Bucket",
-          "widget-type": "textbox"
+          "name": "project",
+          "label": "Project",
+          "widget-type": "textbox",
+          "widget-attributes": {
+            "default": "auto-detect"
+          }
         },
         {
-          "name": "gcsPathPrefix",
-          "label": "Path Prefix",
-          "widget-type": "textbox"
+          "name": "dsServiceAccountKey",
+          "label": "Datastream Service Account Key",
+          "widget-type": "securekey-textarea",
+          "widget-attributes": {
+            "default": "auto-detect"
+          }
         },
         {
           "name": "gcsServiceAccountKey",
@@ -192,20 +198,14 @@
           }
         },
         {
-          "name": "dsServiceAccountKey",
-          "label": "DataStream Service Account Key",
-          "widget-type": "securekey-textarea",
-          "widget-attributes": {
-            "default": "auto-detect"
-          }
+          "name": "gcsBucket",
+          "label": "GCS Bucket",
+          "widget-type": "textbox"
         },
         {
-          "name": "project",
-          "label": "Project ID",
-          "widget-type": "textbox",
-          "widget-attributes": {
-            "default": "auto-detect"
-          }
+          "name": "gcsPathPrefix",
+          "label": "Path Prefix",
+          "widget-type": "textbox"
         }
       ]
     }

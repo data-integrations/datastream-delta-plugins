@@ -175,7 +175,7 @@
         },
         {
           "name": "project",
-          "label": "Project ID",
+          "label": "Project",
           "widget-type": "textbox",
           "widget-attributes": {
             "default": "auto-detect"

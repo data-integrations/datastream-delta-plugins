@@ -2,7 +2,7 @@
   "metadata": {
     "spec-version": "1.5"
   },
-  "display-name": "Oracle (by DataStream)",
+  "display-name": "Oracle (by Datastream)",
   "configuration-groups": [
     {
       "label": "Basic",
@@ -10,7 +10,7 @@
         {
           "name": "usingExistingStream",
           "widget-type": "toggle",
-          "label": "Use an existing DataStream stream",
+          "label": "Use an existing Datastream stream",
           "widget-attributes": {
             "default": "false",
             "on": {
@@ -183,7 +183,7 @@
         },
         {
           "name": "dsServiceAccountKey",
-          "label": "DataStream Service Account Key",
+          "label": "Datastream Service Account Key",
           "widget-type": "securekey-textarea",
           "widget-attributes": {
             "default": "auto-detect"

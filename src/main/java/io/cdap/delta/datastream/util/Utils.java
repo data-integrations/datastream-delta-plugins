@@ -92,10 +92,10 @@ public final class Utils {
   private static final String GCS_PROFILE_NAME_PREFIX = "DF-GCS-";
   private static final String STREAM_NAME_PREFIX = "DF-Stream-";
   private static final int DATASTREAM_CLIENT_POOL_SIZE = 20;
-  private static final float DAASTREAM_CLIENT_POOL_LOAD_FACTOR = 0.75f;
+  private static final float DATASTREAM_CLIENT_POOL_LOAD_FACTOR = 0.75f;
   private static final LinkedHashMap<GoogleCredentials, DatastreamClient> datastreamClientPool =
     new LinkedHashMap<GoogleCredentials, DatastreamClient>(
-      (int) (DATASTREAM_CLIENT_POOL_SIZE / DAASTREAM_CLIENT_POOL_LOAD_FACTOR), DAASTREAM_CLIENT_POOL_LOAD_FACTOR,
+      (int) (DATASTREAM_CLIENT_POOL_SIZE / DATASTREAM_CLIENT_POOL_LOAD_FACTOR), DATASTREAM_CLIENT_POOL_LOAD_FACTOR,
       true) {
       @Override
       protected boolean removeEldestEntry(java.util.Map.Entry<GoogleCredentials, DatastreamClient> eldest) {

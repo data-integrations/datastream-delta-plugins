@@ -17,12 +17,16 @@
 
 package io.cdap.delta.datastream.util;
 
+import com.google.api.gax.core.CredentialsProvider;
 import com.google.api.gax.longrunning.OperationFuture;
+import com.google.auth.Credentials;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.datastream.v1alpha1.AvroFileFormat;
 import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
 import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
 import com.google.cloud.datastream.v1alpha1.DatastreamClient;
+import com.google.cloud.datastream.v1alpha1.DatastreamSettings;
 import com.google.cloud.datastream.v1alpha1.DestinationConfig;
 import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileResponse;
@@ -61,6 +65,7 @@ import java.io.IOException;
 import java.sql.SQLType;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -86,6 +91,18 @@ public final class Utils {
   private static final String ORACLE_PROFILE_NAME_PREFIX = "DF-ORA-";
   private static final String GCS_PROFILE_NAME_PREFIX = "DF-GCS-";
   private static final String STREAM_NAME_PREFIX = "DF-Stream-";
+  private static final int DATASTREAM_CLIENT_POOL_SIZE = 20;
+  private static final float DATASTREAM_CLIENT_POOL_LOAD_FACTOR = 0.75f;
+  private static final LinkedHashMap<GoogleCredentials, DatastreamClient> datastreamClientPool =
+    new LinkedHashMap<GoogleCredentials, DatastreamClient>(
+      (int) (DATASTREAM_CLIENT_POOL_SIZE / DATASTREAM_CLIENT_POOL_LOAD_FACTOR), DATASTREAM_CLIENT_POOL_LOAD_FACTOR,
+      true) {
+      @Override
+      protected boolean removeEldestEntry(java.util.Map.Entry<GoogleCredentials, DatastreamClient> eldest) {
+        // Remove the eldest element whenever size of cache exceeds the capacity
+        return (size() > DATASTREAM_CLIENT_POOL_SIZE);
+      }
+    };
 
   private Utils() {
   }
@@ -752,5 +769,34 @@ public final class Utils {
       logger.debug("DiscoverConnectionProfile Response:\n" + response.toString());
     }
     return response;
+  }
+
+  /**
+   * Get DataStream client given the credentials from the DataStream client pool
+   * @param credentials the Google credentials for the DataStream client
+   * @return the DataStream client according to the given credentials
+   */
+  public static DatastreamClient getDataStreamClient(GoogleCredentials credentials) throws IOException {
+    DatastreamClient client = datastreamClientPool.get(credentials);
+    if (client == null) {
+      synchronized (Utils.class) {
+        client = datastreamClientPool.get(credentials);
+        if (client == null) {
+          client = createDatastreamClient(credentials);
+          datastreamClientPool.put(credentials, client);
+        }
+      }
+    }
+    return client;
+  }
+
+  private static DatastreamClient createDatastreamClient(GoogleCredentials credentials) throws IOException {
+
+    return DatastreamClient.create(DatastreamSettings.newBuilder().setCredentialsProvider(new CredentialsProvider() {
+      @Override
+      public Credentials getCredentials() throws IOException {
+        return credentials;
+      }
+    }).build());
   }
 }

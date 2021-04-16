@@ -39,8 +39,14 @@ Grant the following permissions to those service accounts on the project where t
 - `storage.objects.list`
 - `storage.objects.get`
 
-As for how to grant the permision , please refer [here](https://cloud.google.com/resource-manager/docs/access-control-proj).  
-Please refer [here](https://cloud.google.com/iam/docs/creating-managing-service-account-keys) for what a service account and service account key is.
+To grant the above permissions, you need to 
+[create a custom role](https://cloud.google.com/iam/docs/creating-custom-roles#creating_a_custom_role) 
+that contains above permissions and grant that role to those service accounts. 
+See [Access control for projects using IAM](https://cloud.google.com/resource-manager/docs/access-control-proj) for details.  
+For more information about service accounts and service account keys,
+see [Creating and managing service account keys](https://cloud.google.com/iam/docs/creating-managing-service-account-keys).  
+
+Note, You don't need to grant above permissions to those service accounts if you already grant "Datastream Admin" role to them.  
 
 ### Configure Oracle Database
 See [Configure your source Oracle database](https://cloud.google.com/datastream/docs/configure-your-source-database).

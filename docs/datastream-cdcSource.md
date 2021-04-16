@@ -46,7 +46,11 @@ See [Access control for projects using IAM](https://cloud.google.com/resource-ma
 For more information about service accounts and service account keys,
 see [Creating and managing service account keys](https://cloud.google.com/iam/docs/creating-managing-service-account-keys).  
 
+<<<<<<< HEAD
 Note, You don't need to grant above permissions to those service accounts if you have already granted "Datastream Admin" role to them.  
+=======
+Note, You don't need to grant above permissions to those service accounts if you already grant "Datastream Admin" role to them.  
+>>>>>>> f8b0084 (address comments)
 
 ### Configure Oracle Database
 See [Configure your source Oracle database](https://cloud.google.com/datastream/docs/configure-your-source-database).

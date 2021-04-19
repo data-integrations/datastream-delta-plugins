@@ -45,12 +45,7 @@ that contains above permissions and grant that role to those service accounts.
 See [Access control for projects using IAM](https://cloud.google.com/resource-manager/docs/access-control-proj) for details.  
 For more information about service accounts and service account keys,
 see [Creating and managing service account keys](https://cloud.google.com/iam/docs/creating-managing-service-account-keys).  
-
-<<<<<<< HEAD
 Note, You don't need to grant above permissions to those service accounts if you have already granted "Datastream Admin" role to them.  
-=======
-Note, You don't need to grant above permissions to those service accounts if you already grant "Datastream Admin" role to them.  
->>>>>>> f8b0084 (address comments)
 
 ### Configure Oracle Database
 See [Configure your source Oracle database](https://cloud.google.com/datastream/docs/configure-your-source-database).
@@ -108,9 +103,9 @@ Limitations
 ### ROWID changes
 This plugin identifies a row by its [ROWID](https://docs.oracle.com/cd/B19306_01/server.102/b14200/pseudocolumns008.htm) which is a reference to its physical location. Any updates that cause the ROWID to change will result in a new row (with the updated values) inserted in the target database without updating the original row.  
 ROWID could change when :  
-a) you update a partition key and the row moves partitions
-b) shrink a table (10g new feature), since rows move from the bottom to the "top" of the table in anticipation of re-drawing the high water mark (ROWID has to be changed)
-c) flashback a table (10g new feature), since the flashback table command really issues a DELETE+INSERT to put the data back the way it was.
+a) you update a partition key and the row moves partitions  
+b) shrink a table (new feature in 10g), since rows move from the bottom to the "top" of the table in anticipation of re-drawing the high water mark (ROWID has to be changed)  
+c) flashback a table (new feature in 10g), since the flashback table command really issues a DELETE+INSERT to put the data back the way it was.  
 
 ### Multiple updates to the same row
 Events written by Datastream may arrive out of order. BigQuery plugin cannot sort the events if multiple events happened in the same milli-second to the same row. The consequence is that target database may apply those events in the order of receiving them. But such case is very rare becasue it only happens when multiple change events against the same row are committed in the same millisecond and Datastream write them out of order.

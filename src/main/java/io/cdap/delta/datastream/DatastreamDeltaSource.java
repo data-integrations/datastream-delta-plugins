@@ -158,9 +158,9 @@ public class DatastreamDeltaSource implements DeltaSource {
 
       // create the gcs connection profile
       createConnectionProfileRequest =
-              CreateConnectionProfileRequest.newBuilder().setParent(parentPath).setConnectionProfile(
-                      Utils.buildGcsConnectionProfile(parentPath, gcsProfileName, bucketName, config.getGcsPathPrefix()))
-                      .setConnectionProfileId(gcsProfileName).build();
+        CreateConnectionProfileRequest.newBuilder().setParent(parentPath).setConnectionProfile(
+          Utils.buildGcsConnectionProfile(parentPath, gcsProfileName, bucketName, config.getGcsPathPrefix()))
+          .setConnectionProfileId(gcsProfileName).build();
       Utils.createConnectionProfileIfNotExisting(datastream, createConnectionProfileRequest, LOGGER);
 
       // Create the stream

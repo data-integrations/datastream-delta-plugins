@@ -19,11 +19,40 @@ package io.cdap.delta.datastream.util;
 
 import com.google.api.gax.core.CredentialsProvider;
 import com.google.api.gax.longrunning.OperationFuture;
-import com.google.api.gax.rpc.*;
+import com.google.api.gax.rpc.AbortedException;
+import com.google.api.gax.rpc.AlreadyExistsException;
+import com.google.api.gax.rpc.FailedPreconditionException;
+import com.google.api.gax.rpc.InvalidArgumentException;
+import com.google.api.gax.rpc.NotFoundException;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.datastream.v1alpha1.AvroFileFormat;
+import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
+import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
+import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
+import com.google.cloud.datastream.v1alpha1.DatastreamClient;
+import com.google.cloud.datastream.v1alpha1.DatastreamSettings;
+import com.google.cloud.datastream.v1alpha1.DestinationConfig;
+import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileRequest;
+import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileResponse;
 import com.google.cloud.datastream.v1alpha1.Error;
-import com.google.cloud.datastream.v1alpha1.*;
+import com.google.cloud.datastream.v1alpha1.FetchErrorsRequest;
+import com.google.cloud.datastream.v1alpha1.FetchErrorsResponse;
+import com.google.cloud.datastream.v1alpha1.ForwardSshTunnelConnectivity;
+import com.google.cloud.datastream.v1alpha1.GcsDestinationConfig;
+import com.google.cloud.datastream.v1alpha1.GcsProfile;
+import com.google.cloud.datastream.v1alpha1.NoConnectivitySettings;
+import com.google.cloud.datastream.v1alpha1.OperationMetadata;
+import com.google.cloud.datastream.v1alpha1.OracleProfile;
+import com.google.cloud.datastream.v1alpha1.OracleRdbms;
+import com.google.cloud.datastream.v1alpha1.OracleSchema;
+import com.google.cloud.datastream.v1alpha1.OracleSourceConfig;
+import com.google.cloud.datastream.v1alpha1.OracleTable;
+import com.google.cloud.datastream.v1alpha1.PrivateConnectivity;
+import com.google.cloud.datastream.v1alpha1.SourceConfig;
+import com.google.cloud.datastream.v1alpha1.StaticServiceIpConnectivity;
+import com.google.cloud.datastream.v1alpha1.Stream;
+import com.google.cloud.datastream.v1alpha1.UpdateStreamRequest;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
@@ -32,7 +61,11 @@ import com.google.common.base.Joiner;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Empty;
 import com.google.protobuf.FieldMask;
-import io.cdap.delta.api.*;
+import io.cdap.delta.api.DeltaFailureException;
+import io.cdap.delta.api.DeltaPipelineId;
+import io.cdap.delta.api.DeltaSourceContext;
+import io.cdap.delta.api.ReplicationError;
+import io.cdap.delta.api.SourceTable;
 import io.cdap.delta.datastream.DatastreamConfig;
 import io.cdap.delta.datastream.OracleDataType;
 import net.jodah.failsafe.Failsafe;
@@ -40,16 +73,25 @@ import net.jodah.failsafe.Fallback;
 import net.jodah.failsafe.RetryPolicy;
 import org.slf4j.Logger;
 
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.sql.SQLType;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 
-import static io.cdap.delta.datastream.DatastreamConfig.*;
+import static io.cdap.delta.datastream.DatastreamConfig.AUTHENTICATION_METHOD_PASSWORD;
+import static io.cdap.delta.datastream.DatastreamConfig.AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY;
+import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL;
+import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING;
+import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_PRIVATE_CONNECTIVITY;
 
 /**
  * Common Utils for DataStream source plugins
@@ -227,7 +269,7 @@ public final class Utils {
    * @return the DataStream stream config
    */
   public static Stream buildStreamConfig(String parentPath, String name, String sourcePath, String targetPath,
-    Set<SourceTable> tables, boolean replicateExistingData) {
+                                         Set<SourceTable> tables, boolean replicateExistingData) {
     OracleSourceConfig.Builder oracleSourceConfigBuilder =
       OracleSourceConfig.newBuilder().setAllowlist(buildAllowlist(tables));
     SourceConfig.Builder sourceConfigBuilder = SourceConfig.newBuilder().setSourceConnectionProfileName(sourcePath)
@@ -620,7 +662,7 @@ public final class Utils {
    * @return whether the connection profile is actually created by this method
    */
   public static boolean createConnectionProfileIfNotExisting(DatastreamClient datastream,
-                                                                       CreateConnectionProfileRequest reqeust, Logger logger) {
+                                                             CreateConnectionProfileRequest reqeust, Logger logger) {
     String createConnectionProfileRequestStr = "CreateConnectionProfile Request:\n" + reqeust.toString();
 
     if (logger.isDebugEnabled()) {
@@ -630,9 +672,9 @@ public final class Utils {
     boolean created = true;
     try {
       connectionProfile = Failsafe.with(createDataStreamRetryPolicy()).get(
-              () -> waitUntilComplete(datastream.createConnectionProfileAsync(reqeust), createConnectionProfileRequestStr,
-                      logger));
-    }  catch (Exception ce) {
+        () -> waitUntilComplete(datastream.createConnectionProfileAsync(reqeust), createConnectionProfileRequestStr,
+                                logger));
+    } catch (Exception ce) {
       if (!isAlreadyExisted(ce)) {
         throw ce;
       }
@@ -661,8 +703,8 @@ public final class Utils {
     Stream stream = null;
     boolean created = true;
     try {
-      stream = Failsafe.with(createDataStreamRetryPolicy())
-              .get(() -> waitUntilComplete(datastream.createStreamAsync(createStreamRequest), createStreamRequestStr, logger));
+      stream = Failsafe.with(createDataStreamRetryPolicy()).get(
+        () -> waitUntilComplete(datastream.createStreamAsync(createStreamRequest), createStreamRequestStr, logger));
     } catch (Exception ex) {
       if (!Utils.isAlreadyExisted(ex)) {
         throw ex;

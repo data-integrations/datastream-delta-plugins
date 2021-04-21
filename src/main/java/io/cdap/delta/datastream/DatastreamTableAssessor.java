@@ -232,7 +232,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
             oracleProfilePath = Utils.buildConnectionProfilePath(parentPath, oracleProfileName);
           }
         } catch (Exception e) {
-          throw new RuntimeException("Fail to assess replicator pipeline due to failure of creating source connection profile.", e);
+          throw new RuntimeException(
+            "Fail to assess replicator pipeline due to failure of creating source connection profile.", e);
         }
 
         bucketName = conf.getGcsBucket();
@@ -256,7 +257,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
             gcsProfilePath = Utils.buildConnectionProfilePath(parentPath, gcsProfileName);
           }
         } catch (Exception e) {
-          throw new RuntimeException("Fail to assess replicator pipeline due to failure of creating destination connection profile.", e);
+          throw new RuntimeException(
+            "Fail to assess replicator pipeline due to failure of creating destination connection profile.", e);
         }
 
         try {

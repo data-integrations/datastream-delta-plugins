@@ -228,14 +228,11 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
             CreateConnectionProfileRequest.newBuilder().setParent(parentPath)
               .setConnectionProfile(buildOracleConnectionProfile(parentPath, oracleProfileName, conf))
               .setConnectionProfileId(oracleProfileName).build();
-          Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
-          oracleProfilePath = Utils.buildConnectionProfilePath(parentPath, oracleProfileName);
-        } catch (Exception e) {
-          if (!Utils.isAlreadyExisted(e)) {
-            throw new RuntimeException(String
-              .format("Fail to assess replicator pipeline due to failure of creating source connection profile:\n %s",
-                e.toString()), e);
+          if (Utils.createConnectionProfileIfNotExisting(datastream, createConnectionProfileRequest, LOGGER)) {
+            oracleProfilePath = Utils.buildConnectionProfilePath(parentPath, oracleProfileName);
           }
+        } catch (Exception e) {
+          throw new RuntimeException("Fail to assess replicator pipeline due to failure of creating source connection profile.", e);
         }
 
         bucketName = conf.getGcsBucket();
@@ -246,8 +243,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         try {
           bucketCreated = Utils.createBucketIfNotExisting(storage, bucketName);
         } catch (Exception e) {
-          throw new RuntimeException(String
-            .format("Fail to assess replicator pipeline due to failure of creating GCS Bucket: \n%s", e.toString()), e);
+          throw new RuntimeException("Fail to assess replicator pipeline due to failure of creating GCS Bucket.", e);
         }
         // create the gcs connection profile
         String gcsProfileName = Utils.buildGcsProfileName(uuid);
@@ -256,14 +252,11 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
             CreateConnectionProfileRequest.newBuilder().setParent(parentPath).setConnectionProfile(
               Utils.buildGcsConnectionProfile(parentPath, gcsProfileName, bucketName, conf.getGcsPathPrefix()))
               .setConnectionProfileId(gcsProfileName).build();
-          Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
-          gcsProfilePath = Utils.buildConnectionProfilePath(parentPath, gcsProfileName);
-        } catch (Exception e) {
-          if (!Utils.isAlreadyExisted(e)) {
-            throw new RuntimeException(String.format(
-              "Fail to assess replicator pipeline due to failure of creating destination connection profile: \n%s",
-              e.toString()), e);
+          if (Utils.createConnectionProfileIfNotExisting(datastream, createConnectionProfileRequest, LOGGER)) {
+            gcsProfilePath = Utils.buildConnectionProfilePath(parentPath, gcsProfileName);
           }
+        } catch (Exception e) {
+          throw new RuntimeException("Fail to assess replicator pipeline due to failure of creating destination connection profile.", e);
         }
 
         try {
@@ -272,17 +265,14 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
           CreateStreamRequest createStreamRequest = CreateStreamRequest.newBuilder().setParent(parentPath).setStream(
             Utils.buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, new HashSet<>(tables),
               conf.shouldReplicateExistingData())).setStreamId(streamName).build();
-          Utils.createStream(datastream, createStreamRequest, LOGGER);
-          streamPath = buildStreamPath(parentPath, streamName);
+          if (Utils.createStreamIfNotExisting(datastream, createStreamRequest, LOGGER)) {
+            streamPath = buildStreamPath(parentPath, streamName);
+          }
         } catch (Exception e) {
           if (Utils.isValidationFailed(e)) {
             return buildAssessment(((DatastreamDeltaSourceException) e).getMetadata());
           }
-          if (!Utils.isAlreadyExisted(e)) {
-            throw new RuntimeException(
-              String.format("Fail to assess replicator pipeline due to failure of creating stream:\n%s", e.toString()),
-              e);
-          }
+          throw new RuntimeException("Fail to assess replicator pipeline due to failure of creating stream.", e);
         }
       } finally {
         //clear temporary stream

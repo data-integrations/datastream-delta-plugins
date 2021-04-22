@@ -19,6 +19,11 @@ package io.cdap.delta.datastream.util;
 
 import com.google.api.gax.core.CredentialsProvider;
 import com.google.api.gax.longrunning.OperationFuture;
+import com.google.api.gax.rpc.AbortedException;
+import com.google.api.gax.rpc.AlreadyExistsException;
+import com.google.api.gax.rpc.FailedPreconditionException;
+import com.google.api.gax.rpc.InvalidArgumentException;
+import com.google.api.gax.rpc.NotFoundException;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.datastream.v1alpha1.AvroFileFormat;
@@ -48,6 +53,9 @@ import com.google.cloud.datastream.v1alpha1.SourceConfig;
 import com.google.cloud.datastream.v1alpha1.StaticServiceIpConnectivity;
 import com.google.cloud.datastream.v1alpha1.Stream;
 import com.google.cloud.datastream.v1alpha1.UpdateStreamRequest;
+import com.google.cloud.storage.BucketInfo;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageException;
 import com.google.common.base.Joiner;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Empty;
@@ -59,16 +67,22 @@ import io.cdap.delta.api.ReplicationError;
 import io.cdap.delta.api.SourceTable;
 import io.cdap.delta.datastream.DatastreamConfig;
 import io.cdap.delta.datastream.OracleDataType;
+import net.jodah.failsafe.Failsafe;
+import net.jodah.failsafe.Fallback;
+import net.jodah.failsafe.RetryPolicy;
 import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.sql.SQLType;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
@@ -91,6 +105,7 @@ public final class Utils {
   private static final String ORACLE_PROFILE_NAME_PREFIX = "DF-ORA-";
   private static final String GCS_PROFILE_NAME_PREFIX = "DF-GCS-";
   private static final String STREAM_NAME_PREFIX = "DF-Stream-";
+  private static final int GCS_ERROR_CODE_CONFLICT = 409;
   private static final int DATASTREAM_CLIENT_POOL_SIZE = 20;
   private static final float DATASTREAM_CLIENT_POOL_LOAD_FACTOR = 0.75f;
   private static final LinkedHashMap<GoogleCredentials, DatastreamClient> datastreamClientPool =
@@ -155,11 +170,11 @@ public final class Utils {
         return OracleDataType.INTEGER;
       case "INTERVAL DAY TO SECOND":
         return OracleDataType.INTERVAL_DAY_TO_SECOND;
-      case "INTERVAL DAY TO MONTH":
+      case "INTERVAL YEAR TO MONTH":
         return OracleDataType.INTERVAL_YEAR_TO_MONTH;
       case "LONG":
         return OracleDataType.LONG;
-      case "LONG_RAW":
+      case "LONG RAW":
         return OracleDataType.LONG_RAW;
       case "NCHAR":
         return OracleDataType.NCHAR;
@@ -253,7 +268,7 @@ public final class Utils {
    * @return the DataStream stream config
    */
   public static Stream buildStreamConfig(String parentPath, String name, String sourcePath, String targetPath,
-    Set<SourceTable> tables, boolean replicateExistingData) {
+                                         Set<SourceTable> tables, boolean replicateExistingData) {
     OracleSourceConfig.Builder oracleSourceConfigBuilder =
       OracleSourceConfig.newBuilder().setAllowlist(buildAllowlist(tables));
     SourceConfig.Builder sourceConfigBuilder = SourceConfig.newBuilder().setSourceConnectionProfileName(sourcePath)
@@ -334,7 +349,10 @@ public final class Utils {
     try {
       return operation.get();
     } catch (Exception e) {
-      String errorMessage = String.format("Failed to query status of operation %s, error: %s", request, e.toString());
+      String errorMessage = String.format("Failed to query status of operation %s.", request);
+      // log exception as debug because the operation could be retried. Let the outmost error handling code to log
+      // error level log.
+      logger.debug(errorMessage, e);
       throw new DatastreamDeltaSourceException(errorMessage, e, operation.getMetadata());
     }
   }
@@ -432,40 +450,31 @@ public final class Utils {
   }
 
   /**
-   * Log the error with corresponding error message and construct the corresponding runtime exception with this message
+   * Build the exception with error messages specified based on whether it's recoverable
    *
-   * @param logger       the logger to log the error
-   * @param context      the Delta source context
    * @param errorMessage the error message
    * @param recoverable  whether the error is recoverable
    * @return the runtime exception constructed from the error message
    */
-  public static Exception handleError(Logger logger, DeltaSourceContext context, String errorMessage,
-    boolean recoverable) {
+  public static Exception buildException(String errorMessage, boolean recoverable) {
     Exception e;
     if (recoverable) {
       e = new DatastreamDeltaSourceException(errorMessage);
     } else {
       e = new DeltaFailureException(errorMessage);
     }
-    setError(logger, context, e);
     return e;
   }
 
   /**
-   * Log the error with corresponding error message and the exception of the cause of the error and construct the
-   * runtime exception with this message and cause
+   * Build the exception with error messages and cause specified based on whether it's recoverable
    *
-   * @param logger       the logger to log the error
-   * @param context      the Delta source context
    * @param errorMessage the error message
    * @param cause        the exception for the cause of error
    * @param recoverable  whether the error is recoverable
    * @return the runtime exception constructed from the error message and the casue
    */
-  public static Exception handleError(Logger logger, DeltaSourceContext context, String errorMessage, Exception cause,
-    boolean recoverable) {
-    setError(logger, context, cause);
+  public static Exception buildException(String errorMessage, Exception cause, boolean recoverable) {
     if (recoverable) {
       return new DatastreamDeltaSourceException(errorMessage, cause);
     }
@@ -473,13 +482,14 @@ public final class Utils {
   }
 
   /**
-   * Set the error in the Delta source context
+   * Set the error in the Delta source context and the log the errors
    *
    * @param logger  the logger to log the error
    * @param context the Delta source context
    * @param cause   the exception for the cause
    */
-  public static void setError(Logger logger, DeltaSourceContext context, Exception cause) {
+  public static void handleError(Logger logger, DeltaSourceContext context, Throwable cause) {
+    logger.error("Datastream event reader encounter errors.", cause);
     try {
       context.setError(new ReplicationError(cause));
     } catch (IOException ioException) {
@@ -550,7 +560,7 @@ public final class Utils {
     if (fetchErrorsResponse != null) {
       List<Error> errors = fetchErrorsResponse.getErrorsList();
       if (!errors.isEmpty()) {
-        return Utils.handleError(logger, context, errors.stream().map(error -> {
+        return Utils.buildException(errors.stream().map(error -> {
           return String.format("%s, id: %s, reason: %s", error.getMessage(), error.getErrorUuid(), error.getReason());
         }).collect(Collectors.joining("\n")), true);
       }
@@ -570,11 +580,31 @@ public final class Utils {
     if (logger.isDebugEnabled()) {
       logger.debug("GetStream Request:\n" + path);
     }
-    Stream stream = datastream.getStream(path);
+    Stream stream =
+      Failsafe.with(Utils.<Stream>createDataStreamRetryPolicy()
+        // if a stream is being created, it will still be returned with empty stream config
+        // so need to retry until it's fully created.
+        .handleResultIf(result -> !result.hasSourceConfig())).get(() -> datastream.getStream(path));
     if (logger.isDebugEnabled()) {
       logger.debug("GetStream Response:\n" + stream.toString());
     }
     return stream;
+  }
+
+  /**
+   * Continuously to get stream until stream state equals the specified target state or max duration reached (5 minutes)
+   * @param datastream the DataStream client
+   * @param state the specified target state
+   * @param path the full resource path of the stream
+   * @param logger the logger
+   * @return the stream to get
+   */
+  public static Stream getStreamUntilStateEquals(DatastreamClient datastream, Stream.State state, String path,
+    Logger logger) {
+    return Failsafe.with(Utils.<Stream>createDataStreamRetryPolicy()
+      //no need to retry on exception
+      .handleIf(e -> false)
+      .handleResultIf(result -> result.getState() != state)).get(() -> getStream(datastream, path, logger));
   }
 
   /**
@@ -591,7 +621,8 @@ public final class Utils {
       logger.debug(requestStr);
     }
     OperationFuture<Stream, OperationMetadata> operation = datastream.updateStreamAsync(request);
-    Stream stream = waitUntilComplete(operation, requestStr, logger);
+    Stream stream =
+      Failsafe.with(createDataStreamRetryPolicy()).get(() -> waitUntilComplete(operation, requestStr, logger));
     if (logger.isDebugEnabled()) {
       logger.debug("UpdateStream Response:\n" + stream.toString());
     }
@@ -610,7 +641,11 @@ public final class Utils {
     if (logger.isDebugEnabled()) {
       logger.debug("GetConnectionProfile Request:\n" + path);
     }
-    ConnectionProfile connectionProfile = datastream.getConnectionProfile(path);
+    ConnectionProfile connectionProfile = Failsafe.with(Utils.<ConnectionProfile>createDataStreamRetryPolicy()
+      // If a connection profile is being created, it will still be return with empty profile
+      // so need to retry until conneciton profile is fully created.
+      .handleResultIf(result -> !result.hasGcsProfile() && !result.hasOracleProfile()))
+      .get(() -> datastream.getConnectionProfile(path));
     if (logger.isDebugEnabled()) {
       logger.debug("GetConnectionProfile Response:\n" + connectionProfile.toString());
     }
@@ -618,47 +653,67 @@ public final class Utils {
   }
 
   /**
-   * Create connection profile
+   * Create connection profile if not existing
    *
    * @param datastream DataStream client
    * @param reqeust    the create conneciton profile request
    * @param logger     the logger
-   * @return the created connection profile
+   * @return whether the connection profile is actually created by this method
    */
-  public static ConnectionProfile createConnectionProfile(DatastreamClient datastream,
-    CreateConnectionProfileRequest reqeust, Logger logger) {
+  public static boolean createConnectionProfileIfNotExisting(DatastreamClient datastream,
+                                                             CreateConnectionProfileRequest reqeust, Logger logger) {
     String createConnectionProfileRequestStr = "CreateConnectionProfile Request:\n" + reqeust.toString();
+
     if (logger.isDebugEnabled()) {
       logger.debug(createConnectionProfileRequestStr);
     }
-    ConnectionProfile connectionProfile =
-      waitUntilComplete(datastream.createConnectionProfileAsync(reqeust), createConnectionProfileRequestStr, logger);
-    if (logger.isDebugEnabled()) {
-      logger.debug("CreateConnectionProfile Response:\n" + connectionProfile.toString());
+    ConnectionProfile connectionProfile = null;
+    boolean created = true;
+    try {
+      connectionProfile = Failsafe.with(createDataStreamRetryPolicy()).get(
+        () -> waitUntilComplete(datastream.createConnectionProfileAsync(reqeust), createConnectionProfileRequestStr,
+                                logger));
+    } catch (Exception ce) {
+      if (!isAlreadyExisted(ce)) {
+        throw ce;
+      }
+      created = false;
     }
-    return connectionProfile;
+    if (logger.isDebugEnabled()) {
+      logger.debug("CreateConnectionProfile Response:\n" + connectionProfile);
+    }
+    return created;
   }
 
   /**
-   * Create stream
+   * Create stream if not existing
    *
    * @param datastream          DataStream client
    * @param createStreamRequest the create stream request
    * @param logger              the logger
-   * @return the created stream
+   * @return whether the stream is actually created by this method
    */
-  public static Stream createStream(DatastreamClient datastream, CreateStreamRequest createStreamRequest,
-    Logger logger) {
+  public static boolean createStreamIfNotExisting(DatastreamClient datastream, CreateStreamRequest createStreamRequest,
+                                                 Logger logger) {
     String createStreamRequestStr = "CreateStream Request:\n" + createStreamRequest.toString();
     if (logger.isDebugEnabled()) {
       logger.debug(createStreamRequestStr);
     }
-    Stream stream =
-      waitUntilComplete(datastream.createStreamAsync(createStreamRequest), createStreamRequestStr, logger);
-    if (logger.isDebugEnabled()) {
-      logger.debug("CreateStream Response:\n" + stream.toString());
+    Stream stream = null;
+    boolean created = true;
+    try {
+      stream = Failsafe.with(createDataStreamRetryPolicy()).get(
+        () -> waitUntilComplete(datastream.createStreamAsync(createStreamRequest), createStreamRequestStr, logger));
+    } catch (Exception ex) {
+      if (!Utils.isAlreadyExisted(ex)) {
+        throw ex;
+      }
+      created = false;
     }
-    return stream;
+    if (logger.isDebugEnabled()) {
+      logger.debug("CreateStream Response:\n" + stream);
+    }
+    return created;
   }
 
   /**
@@ -689,8 +744,22 @@ public final class Utils {
     Logger logger) {
     Stream.Builder streamBuilder = Stream.newBuilder().setName(streamName).setState(state);
     FieldMask.Builder fieldMaskBuilder = FieldMask.newBuilder().addPaths(FIELD_STATE);
-    return updateStream(datastream,
-      UpdateStreamRequest.newBuilder().setStream(streamBuilder).setUpdateMask(fieldMaskBuilder).build(), logger);
+
+    // TODO below is a workaround for datastream not supprting idempotent operation and only supporting 1 queued
+    //  operation. once the issue is resolve we can remove those workaround
+    // a predicate that indicate that we try to start/pause a stream when it is already in the progress of
+    // starting/pausing
+    Predicate<? extends Throwable> streamBeingChangedPredicate = t -> t.getCause() instanceof ExecutionException &&
+      // If it's already in the progress of starting/pausing, an IllegalArgumentException will be thrown
+      (t.getCause().getCause() instanceof InvalidArgumentException ||
+      // If there is already an operation queued, an AbortedException will be thrown
+      t.getCause().getCause() instanceof AbortedException);
+
+    return Failsafe.with(
+      // fall back to get stream until stream state reaches target state
+      Fallback.of(() -> getStreamUntilStateEquals(datastream, state, streamName, logger))
+        .handleIf(streamBeingChangedPredicate)).get(() -> updateStream(datastream,
+      UpdateStreamRequest.newBuilder().setStream(streamBuilder).setUpdateMask(fieldMaskBuilder).build(), logger));
   }
 
   /**
@@ -724,9 +793,15 @@ public final class Utils {
       logger.debug(requestStr);
     }
     OperationFuture<Empty, OperationMetadata> operation = datastream.deleteStreamAsync(path);
-    Empty response = waitUntilComplete(operation, requestStr, logger);
+    Empty response = null;
+    try {
+      response =
+        Failsafe.with(createDataStreamRetryPolicy()).get(() -> waitUntilComplete(operation, requestStr, logger));
+    } catch (NotFoundException e) {
+      logger.warn("Stream {} to be deleted does not exit.", path);
+    }
     if (logger.isDebugEnabled()) {
-      logger.debug("DeleteStream Response:\n" + response.toString());
+      logger.debug("DeleteStream Response:\n" + response);
     }
   }
 
@@ -743,9 +818,15 @@ public final class Utils {
       logger.debug(requestStr);
     }
     OperationFuture<Empty, OperationMetadata> operation = datastream.deleteConnectionProfileAsync(path);
-    Empty response = waitUntilComplete(operation, requestStr, logger);
+    Empty response = null;
+    try {
+      response =
+        Failsafe.with(createDataStreamRetryPolicy()).get(() -> waitUntilComplete(operation, requestStr, logger));
+    } catch (NotFoundException e) {
+      logger.warn("ConnectionProfile {} to be deleted does not exit.", path);
+    }
     if (logger.isDebugEnabled()) {
-      logger.debug("DeleteConnectionProfile Response:\n" + response.toString());
+      logger.debug("DeleteConnectionProfile Response:\n" + response);
     }
   }
 
@@ -764,11 +845,101 @@ public final class Utils {
       String requestStr = "DiscoverConnectionProfile Request:\n" + request.toString();
       logger.debug(requestStr);
     }
-    DiscoverConnectionProfileResponse response = datastream.discoverConnectionProfile(request);
+    DiscoverConnectionProfileResponse response =
+      Failsafe.with(createDataStreamRetryPolicy()).get(() -> datastream.discoverConnectionProfile(request));
     if (logger.isDebugEnabled()) {
       logger.debug("DiscoverConnectionProfile Response:\n" + response.toString());
     }
     return response;
+  }
+
+  /**
+   * Create a GCS bucket if it doesn't exist
+   * @param storage the GCS client
+   * @param bucketName the name of the bucket to be created
+   * @return whether the GCS bucket is newly created by this method
+   */
+  public static boolean createBucketIfNotExisting(Storage storage, String bucketName) throws IOException {
+    // create corresponding GCS bucket
+    try {
+      Failsafe.with(createRetryPolicy()
+        .abortOn(t -> t instanceof StorageException && ((StorageException) t).getCode() == GCS_ERROR_CODE_CONFLICT))
+        .run(() -> storage.create(BucketInfo.newBuilder(bucketName).build()));
+    } catch (StorageException se) {
+      // It is possible that in multiple worker instances scenario
+      // bucket is created by another worker instance after this worker instance
+      // determined that the bucket does not exists. Ignore error if bucket already exists.
+      if (se.getCode() != GCS_ERROR_CODE_CONFLICT) {
+        throw se;
+      }
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Delete the specified GCS bucket
+   * @param storage the GCS client
+   * @param bucketName the name of the GCS bucket to be deleted
+   */
+  public static void deleteBucket(Storage storage, String bucketName) {
+    Failsafe.with(createRetryPolicy()).run(() -> storage.delete(bucketName));
+  }
+
+  private static <T> RetryPolicy<T> createDataStreamRetryPolicy() {
+    return Utils.<T>createRetryPolicy()
+      .abortOn(t ->
+        t instanceof NotFoundException ||
+        t instanceof InvalidArgumentException ||
+        t.getCause() instanceof ExecutionException && (
+        // connection profile already exists
+        t.getCause().getCause() instanceof AlreadyExistsException ||
+        // create argument is not correct
+        t.getCause().getCause() instanceof IllegalArgumentException ||
+        // validation failed
+        t.getCause().getCause() instanceof FailedPreconditionException));
+  }
+
+  private static <T> RetryPolicy<T> createRetryPolicy() {
+    return new RetryPolicy<T>().withMaxAttempts(Integer.MAX_VALUE)
+      .withMaxDuration(java.time.Duration.of(5, ChronoUnit.MINUTES)).withBackoff(1, 60, ChronoUnit.SECONDS);
+  }
+
+  /**
+   * Check whether the exception was thrown due to validation failure
+   * @param e the exception to be checked
+   * @return true if the exception was thrown due to validation failure
+   */
+  public static boolean isValidationFailed(Throwable e) {
+    while (e != null) {
+      if (e instanceof FailedPreconditionException) {
+        return true;
+      }
+      if (e == e.getCause()) {
+        return false;
+      }
+      e = e.getCause();
+    }
+    return false;
+  }
+
+
+  /**
+   * Check whether the exception was thrown due to resource already existed
+   * @param e the exception to be checked
+   * @return true if the exception was thrown due to resource already existed
+   */
+  public static boolean isAlreadyExisted(Throwable e) {
+    while (e != null) {
+      if (e instanceof AlreadyExistsException) {
+        return true;
+      }
+      if (e == e.getCause()) {
+        return false;
+      }
+      e = e.getCause();
+    }
+    return false;
   }
 
   /**

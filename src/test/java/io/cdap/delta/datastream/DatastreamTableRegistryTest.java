@@ -20,11 +20,10 @@ package io.cdap.delta.datastream;
 import io.cdap.delta.api.assessment.ColumnDetail;
 import io.cdap.delta.api.assessment.TableDetail;
 import io.cdap.delta.api.assessment.TableList;
-import io.cdap.delta.api.assessment.TableNotFoundException;
+import io.cdap.delta.api.assessment.TableRegistry;
 import io.cdap.delta.api.assessment.TableSummary;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -35,14 +34,19 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class DatastreamTableRegistryTest extends BaseIntegrationTestCase {
 
   @Test
-  public void testListDescribeTable_new() throws IOException, TableNotFoundException {
+  public void testListDescribeTableNew() throws Exception {
     testListDesribeTable(false);
   }
 
-  private void testListDesribeTable(boolean usingExisting) throws IOException, TableNotFoundException {
+  @Test
+  public void testListDescribeTableExisting() throws Exception {
+    testListDesribeTable(true);
+  }
+
+  private void testListDesribeTable(boolean usingExisting) throws Exception {
     TableList tableList = null;
-    DatastreamConfig config = buildDatastreamConfig(usingExisting);
-    try (DatastreamTableRegistry registry = new DatastreamTableRegistry(config, datastream)) {
+    DatastreamDeltaSource deltaSource = createDeltaSource(usingExisting);
+    try (TableRegistry registry = deltaSource.createTableRegistry(null)) {
       tableList = registry.listTables();
     }
     assertNotNull(tableList);
@@ -59,7 +63,7 @@ class DatastreamTableRegistryTest extends BaseIntegrationTestCase {
       assertNotNull(tableName);
       System.out.println(String.format("table : %s.%s", schema, tableName));
       TableDetail tableDetail = null;
-      try (DatastreamTableRegistry registry = new DatastreamTableRegistry(config, datastream)) {
+      try (TableRegistry registry = deltaSource.createTableRegistry(null)) {
         tableDetail = registry.describeTable(oracleDb, schema, tableName);
       }
       assertNotNull(tableDetail);
@@ -82,10 +86,5 @@ class DatastreamTableRegistryTest extends BaseIntegrationTestCase {
         assertFalse(key.isEmpty());
       }
     }
-  }
-
-  @Test
-  public void testListDescribeTable_existing() throws IOException, TableNotFoundException {
-    testListDesribeTable(true);
   }
 }

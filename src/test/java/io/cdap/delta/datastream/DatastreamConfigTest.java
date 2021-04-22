@@ -22,7 +22,11 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 class DatastreamConfigTest {
@@ -33,21 +37,43 @@ class DatastreamConfigTest {
       new DatastreamConfig(false, "hostname", null, "user", "password", null, null, null, null, null, null,
                            null, null, null, null, null, null, null, null, null, null);
 
+    assertFalse(config.isUsingExistingStream());
+    assertEquals("hostname", config.getHost());
     assertEquals(DatastreamConfig.DEFAULT_PORT, config.getPort());
+    assertEquals("user", config.getUser());
+    assertEquals("password", config.getPassword());
     assertEquals(DatastreamConfig.DEFAULT_SID, config.getSid());
     assertEquals(DatastreamConfig.DEFAULT_REGION, config.getRegion());
     assertEquals(DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING,
                  config.getConnectivityMethod());
+    assertNull(config.getSshAuthenticationMethod());
+    assertNull(config.getStreamId());
+    assertNull(config.getGcsBucket());
+    assertEquals("/", config.getGcsPathPrefix());
+    assertNotNull(config.getDatastreamCredentials());
+    assertNotNull(config.getGcsCredentials());
+    assertNotNull(config.getProject());
+    assertTrue(config.shouldReplicateExistingData());
 
     // forward ssh tunnel as connectivity method
     config = new DatastreamConfig(false, "hostname", null, "user", "password", null, null,
                                   DatastreamConfig.CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL,
-                                  "sshHost", null, "sshUser", null, null, "sshPrivateKey", null,
-                                  null, null, null, null, null, null);
+                                  "sshHost", null, "sshUser", null, null, "sshPrivateKey", "bucket",
+                                  "prefix", "gcs-key", "datastream-key", null, "project", null);
+    assertEquals("sshHost", config.getSshHost());
     assertEquals(DatastreamConfig.DEFAULT_SSH_PORT, config.getSshPort());
+    assertEquals("sshUser", config.getSshUser());
     assertEquals(DatastreamConfig.AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY,
                  config.getSshAuthenticationMethod());
-
+    assertEquals("sshPrivateKey", config.getSshPrivateKey());
+    assertNull(config.getSshPassword());
+    assertNull(config.getPrivateConnectionName());
+    assertEquals("bucket", config.getGcsBucket());
+    assertEquals("/prefix", config.getGcsPathPrefix());
+    DatastreamConfig conf = config;
+    assertThrows(IllegalArgumentException.class, () -> conf.getDatastreamCredentials());
+    assertThrows(IllegalArgumentException.class, () -> conf.getGcsCredentials());
+    assertEquals("project", config.getProject());
   }
 
   @Test
@@ -67,9 +93,29 @@ class DatastreamConfigTest {
                                                    DatastreamConfig.AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY,
                                                    null, "sshPrivateKey", null, null, null, null, null, null, null);
     config.validate();
+    // host should not be null
+    Field field = DatastreamConfig.class.getDeclaredField("host");
+    field.setAccessible(true);
+    field.set(config, null);
+    assertThrows(IllegalArgumentException.class, () -> config.validate());
+    field.set(config, "hostname");
+
+    // username should not be null
+    field = DatastreamConfig.class.getDeclaredField("user");
+    field.setAccessible(true);
+    field.set(config, null);
+    assertThrows(IllegalArgumentException.class, () -> config.validate());
+    field.set(config, "user");
+
+    // password should not be null
+    field = DatastreamConfig.class.getDeclaredField("password");
+    field.setAccessible(true);
+    field.set(config, null);
+    assertThrows(IllegalArgumentException.class, () -> config.validate());
+    field.set(config, "password");
 
     // sshHost should not be null if forward ssh tunnel is selected as connectivity method
-    Field field = DatastreamConfig.class.getDeclaredField("sshHost");
+    field = DatastreamConfig.class.getDeclaredField("sshHost");
     field.setAccessible(true);
     field.set(config, null);
     assertThrows(IllegalArgumentException.class, () -> config.validate());
@@ -115,5 +161,11 @@ class DatastreamConfigTest {
     field.setAccessible(true);
     field.set(config, "vpc-peering-name");
     config.validate();
+
+    field = DatastreamConfig.class.getDeclaredField("usingExistingStream");
+    field.setAccessible(true);
+    field.set(config, true);
+    assertThrows(IllegalArgumentException.class, () -> config.validate());
+
   }
 }

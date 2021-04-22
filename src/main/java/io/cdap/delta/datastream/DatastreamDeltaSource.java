@@ -21,8 +21,6 @@ import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
 import com.google.cloud.datastream.v1alpha1.DatastreamClient;
 import com.google.cloud.datastream.v1alpha1.Stream;
-import com.google.cloud.storage.Bucket;
-import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.gson.Gson;
@@ -140,54 +138,38 @@ public class DatastreamDeltaSource implements DeltaSource {
       // stream does not exist
       String oracleProfileName = Utils.buildOracleProfileName(replicatorId);
       String oracleProfilePath = Utils.buildConnectionProfilePath(parentPath, oracleProfileName);
-      try {
-        // try to check whether the oracle connection profile was already created
-        Utils.getConnectionProfile(datastream, oracleProfilePath, LOGGER);
-      } catch (NotFoundException ex) {
-        // oracle connection profile does not exist
-        // crete the oracle connection profile
-        CreateConnectionProfileRequest createConnectionProfileRequest =
-          CreateConnectionProfileRequest.newBuilder().setParent(parentPath)
-            .setConnectionProfile(buildOracleConnectionProfile(parentPath, oracleProfileName, config))
-            .setConnectionProfileId(oracleProfileName).build();
-        Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
-      }
 
+      // crete the oracle connection profile if not existing
+      CreateConnectionProfileRequest createConnectionProfileRequest =
+              CreateConnectionProfileRequest.newBuilder().setParent(parentPath)
+                      .setConnectionProfile(buildOracleConnectionProfile(parentPath, oracleProfileName, config))
+                      .setConnectionProfileId(oracleProfileName).build();
+      Utils.createConnectionProfileIfNotExisting(datastream, createConnectionProfileRequest, LOGGER);
 
       String gcsProfileName = Utils.buildGcsProfileName(replicatorId);
       String gcsProfilePath = Utils.buildConnectionProfilePath(parentPath, gcsProfileName);
-      try {
-        // try to check whether the gcs connection profile was already created
-        Utils.getConnectionProfile(datastream, gcsProfilePath, LOGGER);
-      } catch (NotFoundException ex) {
-        // gcs connection profile does not exist
-        // check whether GCS Bucket exists first
-        String bucketName = config.getGcsBucket();
-        // If user doesn't provide bucketName, we assign one based on run id
-        if (bucketName == null) {
-          bucketName = Utils.buildBucketName(context.getRunId());
-        }
-        Bucket bucket = storage.get(bucketName);
-        if (bucket == null) {
-          // create corresponding GCS bucket
-          storage.create(BucketInfo.newBuilder(bucketName).build());
-        }
-
-        // crete the gcs connection profile
-        CreateConnectionProfileRequest createConnectionProfileRequest =
-          CreateConnectionProfileRequest.newBuilder().setParent(parentPath).setConnectionProfile(
-            Utils.buildGcsConnectionProfile(parentPath, gcsProfileName, bucketName, config.getGcsPathPrefix()))
-            .setConnectionProfileId(gcsProfileName).build();
-        Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
+      // check whether GCS Bucket exists first
+      String bucketName = config.getGcsBucket();
+      // If user doesn't provide bucketName, we assign one based on run id
+      if (bucketName == null) {
+        bucketName = Utils.buildBucketName(context.getRunId());
       }
+      Utils.createBucketIfNotExisting(storage, bucketName);
+
+      // create the gcs connection profile
+      createConnectionProfileRequest =
+        CreateConnectionProfileRequest.newBuilder().setParent(parentPath).setConnectionProfile(
+          Utils.buildGcsConnectionProfile(parentPath, gcsProfileName, bucketName, config.getGcsPathPrefix()))
+          .setConnectionProfileId(gcsProfileName).build();
+      Utils.createConnectionProfileIfNotExisting(datastream, createConnectionProfileRequest, LOGGER);
 
       // Create the stream
       Stream stream = Utils
-        .buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, context.getAllTables(),
-          config.shouldReplicateExistingData());
+              .buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, context.getAllTables(),
+                      config.shouldReplicateExistingData());
       CreateStreamRequest createStreamRequest =
-        CreateStreamRequest.newBuilder().setParent(parentPath).setStream(stream).setStreamId(streamName).build();
-      Utils.createStream(datastream, createStreamRequest, LOGGER);
+              CreateStreamRequest.newBuilder().setParent(parentPath).setStream(stream).setStreamId(streamName).build();
+      Utils.createStreamIfNotExisting(datastream, createStreamRequest, LOGGER);
     }
   }
 }

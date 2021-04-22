@@ -24,6 +24,7 @@ import com.google.cloud.datastream.v1alpha1.DatastreamClient;
 import com.google.cloud.datastream.v1alpha1.DatastreamSettings;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
+import io.cdap.delta.api.SourceTable;
 import org.junit.jupiter.api.BeforeAll;
 
 import java.io.File;
@@ -37,6 +38,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
@@ -133,6 +135,18 @@ public class BaseIntegrationTestCase {
     return new DatastreamConfig(usingExisting, oracleHost, oraclePort, oracleUser, oraclePassword, oracleDb,
       serviceLocation, DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null, null, null, null,
       gcsBucket, null, serviceAccountKey, serviceAccountKey, streamId, project, null);
+  }
+
+  protected Set<SourceTable> getSourceTables() {
+    return oracleTables.stream().map(table -> new SourceTable(oracleDb, table.substring(table.indexOf(".") + 1),
+      table.substring(0, table.indexOf(".")), Collections.emptySet(), Collections.emptySet(), Collections.emptySet()))
+      .collect(Collectors.toSet());
+  }
+
+  protected DatastreamDeltaSource createDeltaSource(boolean usingExisting) throws Exception {
+    DatastreamConfig config = buildDatastreamConfig(usingExisting);
+    DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
+    return deltaSource;
   }
 
 }

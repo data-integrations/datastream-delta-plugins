@@ -18,7 +18,6 @@ package io.cdap.delta.datastream;
 
 
 import com.google.api.core.ApiFuture;
-import com.google.api.gax.rpc.FailedPreconditionException;
 import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
 import com.google.cloud.datastream.v1alpha1.DatastreamClient;
@@ -27,9 +26,9 @@ import com.google.cloud.datastream.v1alpha1.OracleRdbms;
 import com.google.cloud.datastream.v1alpha1.Stream;
 import com.google.cloud.datastream.v1alpha1.Validation;
 import com.google.cloud.datastream.v1alpha1.ValidationMessage;
-import com.google.cloud.storage.Bucket;
-import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageException;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.Gson;
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.cdap.api.data.schema.Schema.LogicalType;
@@ -56,7 +55,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static io.cdap.delta.datastream.util.Utils.buildOracleConnectionProfile;
@@ -175,6 +173,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
   public Assessment assess() {
     String parentPath = Utils.buildParentPath(conf.getProject(), conf.getRegion());
     if (conf.isUsingExistingStream()) {
+      // validate stream by updating existing stream
       String streamPath = Utils.buildStreamPath(parentPath, conf.getStreamId());
       Stream.Builder stream = null;
       try {
@@ -193,122 +192,135 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         Utils.updateAllowlist(datastream, stream.build(), LOGGER);
         streamUpdated = true;
       } catch (DatastreamDeltaSourceException e) {
-        if (e.getCause() instanceof ExecutionException &&
-          e.getCause().getCause() instanceof FailedPreconditionException) {
+        if (Utils.isValidationFailed(e)) {
           return buildAssessment(e.getMetadata());
         }
         throw new RuntimeException(String
           .format("Fail to assess replicator pipeline due to failure of updating existing stream %s ", streamPath), e);
-      }
-
-      // rollback changes of the update which was for validation if the stream was updated
-      //TODO below rollback logic can be removed once datastream supports validate only correctly
-      if (streamUpdated) {
-        stream.getSourceConfigBuilder().getOracleSourceConfigBuilder().setAllowlist(originalAllowList);
-        try {
-          Utils.updateAllowlist(datastream, stream.build(), LOGGER);
-        } catch (Exception e) {
-          LOGGER
-            .error(String.format("Fail to rollback the update of existing stream %s after validating", streamPath), e);
+      } finally {
+        // rollback changes of the update which was for validation if the stream was updated
+        //TODO below rollback logic can be removed once datastream supports validate only correctly
+        if (streamUpdated) {
+          stream.getSourceConfigBuilder().getOracleSourceConfigBuilder().setAllowlist(originalAllowList);
+          try {
+            Utils.updateAllowlist(datastream, stream.build(), LOGGER);
+          } catch (Exception e) {
+            LOGGER
+              .error(String.format("Fail to rollback the update of existing stream %s after validating", streamPath),
+                e);
+          }
         }
-
       }
     } else {
-      // creating new stream
-      String uuid = UUID.randomUUID().toString() + System.currentTimeMillis();
-      String streamName = Utils.buildStreamName(uuid);
-
-      String oracleProfileName = Utils.buildOracleProfileName(uuid);
-      try {
-        // create the oracle profile
-        CreateConnectionProfileRequest createConnectionProfileRequest =
-          CreateConnectionProfileRequest.newBuilder().setParent(parentPath)
-            .setConnectionProfile(buildOracleConnectionProfile(parentPath, oracleProfileName, conf))
-            .setConnectionProfileId(oracleProfileName).build();
-        Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
-      } catch (Exception e) {
-        throw new RuntimeException(
-          String.format("Fail to assess replicator pipeline due to failure of creating source connection profile:\n %s"
-            , e.toString()), e);
-      }
-
-      String gcsProfileName = Utils.buildGcsProfileName(uuid);
-      String bucketName = conf.getGcsBucket();
-      if (bucketName == null) {
-        bucketName = Utils.buildBucketName(uuid);
-      }
-      Bucket bucket = storage.get(bucketName);
+      // validate by creating new stream
+      String oracleProfilePath = null;
+      String gcsProfilePath = null;
+      String streamPath = null;
+      String bucketName = null;
       boolean bucketCreated = false;
-      if (bucket == null) {
-        // create corresponding GCS bucket
-        bucket = storage.create(BucketInfo.newBuilder(bucketName).build());
-        bucketCreated = true;
-      }
-      // crete the gcs connection profile
+
       try {
-        CreateConnectionProfileRequest createConnectionProfileRequest =
-          CreateConnectionProfileRequest.newBuilder().setParent(parentPath).setConnectionProfile(
-            Utils.buildGcsConnectionProfile(parentPath, gcsProfileName, bucketName, conf.getGcsPathPrefix()))
-            .setConnectionProfileId(gcsProfileName).build();
-        Utils.createConnectionProfile(datastream, createConnectionProfileRequest, LOGGER);
-      } catch (Exception e) {
-        throw new RuntimeException(String
-          .format("Fail to assess replicator pipeline due to failure of creating destination connection profile: \n%s",
-            e.toString()), e);
-      }
-
-      String gcsProfilePath = Utils.buildConnectionProfilePath(parentPath, gcsProfileName);
-      String oracleProfilePath = Utils.buildConnectionProfilePath(parentPath, oracleProfileName);
-
-      // validate stream
-      boolean streamCreated = false;
-      try {
-        //TODO set validate only to true when datastream supports validate only correctly
-        CreateStreamRequest createStreamRequest = CreateStreamRequest.newBuilder().setParent(parentPath).setStream(
-          Utils.buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, new HashSet<>(tables),
-            conf.shouldReplicateExistingData())).setStreamId(streamName).build();
-        Utils.createStream(datastream, createStreamRequest, LOGGER);
-        streamCreated = true;
-      } catch (DatastreamDeltaSourceException e) {
-        if (e.getCause() instanceof ExecutionException &&
-          e.getCause().getCause() instanceof FailedPreconditionException) {
-          return buildAssessment(e.getMetadata());
-        }
-        throw new RuntimeException(
-          String.format("Fail to assess replicator pipeline due to failure of creating stream:\n%s", e.toString()), e);
-      }
-
-      //clear temporary stream
-      //TODO below logic for clearing temporary stream can be removed once datastream supports validate only correctly
-      if (streamCreated) {
-        String streamPath = buildStreamPath(parentPath, streamName);
+        String uuid = UUID.randomUUID().toString() + System.currentTimeMillis();
+        String oracleProfileName = Utils.buildOracleProfileName(uuid);
         try {
-          Utils.deleteStream(datastream, streamPath, LOGGER);
+          // create the oracle profile
+          CreateConnectionProfileRequest createConnectionProfileRequest =
+            CreateConnectionProfileRequest.newBuilder().setParent(parentPath)
+              .setConnectionProfile(buildOracleConnectionProfile(parentPath, oracleProfileName, conf))
+              .setConnectionProfileId(oracleProfileName).build();
+          if (Utils.createConnectionProfileIfNotExisting(datastream, createConnectionProfileRequest, LOGGER)) {
+            oracleProfilePath = Utils.buildConnectionProfilePath(parentPath, oracleProfileName);
+          }
         } catch (Exception e) {
-          LOGGER.warn(String.format("Fail to delete temporary stream : %s", streamPath), e);
+          throw new RuntimeException(
+            "Fail to assess replicator pipeline due to failure of creating source connection profile.", e);
         }
-      }
-      //clear temporary connectionProfile
-      try {
-        Utils.deleteStream(datastream, oracleProfilePath, LOGGER);
-      } catch (Exception e) {
-        LOGGER.warn(String.format("Fail to delete temporary connection profile : %s", oracleProfilePath), e);
-      }
-      try {
-        Utils.deleteStream(datastream, gcsProfilePath, LOGGER);
-      } catch (Exception e) {
-        LOGGER.warn(String.format("Fail to delete temporary connection profile : %s", gcsProfilePath), e);
-      }
-      //remove temporarily created GCS bucket
-      //TODO retry deleting if failed
-      if (bucketCreated) {
-        bucket.delete();
+
+        bucketName = conf.getGcsBucket();
+        if (bucketName == null) {
+          bucketName = Utils.buildBucketName(uuid);
+        }
+        // create corresponding GCS bucket
+        try {
+          bucketCreated = Utils.createBucketIfNotExisting(storage, bucketName);
+        } catch (Exception e) {
+          throw new RuntimeException("Fail to assess replicator pipeline due to failure of creating GCS Bucket.", e);
+        }
+        // create the gcs connection profile
+        String gcsProfileName = Utils.buildGcsProfileName(uuid);
+        try {
+          CreateConnectionProfileRequest createConnectionProfileRequest =
+            CreateConnectionProfileRequest.newBuilder().setParent(parentPath).setConnectionProfile(
+              Utils.buildGcsConnectionProfile(parentPath, gcsProfileName, bucketName, conf.getGcsPathPrefix()))
+              .setConnectionProfileId(gcsProfileName).build();
+          if (Utils.createConnectionProfileIfNotExisting(datastream, createConnectionProfileRequest, LOGGER)) {
+            gcsProfilePath = Utils.buildConnectionProfilePath(parentPath, gcsProfileName);
+          }
+        } catch (Exception e) {
+          throw new RuntimeException(
+            "Fail to assess replicator pipeline due to failure of creating destination connection profile.", e);
+        }
+
+        try {
+          String streamName = Utils.buildStreamName(uuid);
+          //TODO set validate only to true when datastream supports validate only correctly
+          CreateStreamRequest createStreamRequest = CreateStreamRequest.newBuilder().setParent(parentPath).setStream(
+            Utils.buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, new HashSet<>(tables),
+              conf.shouldReplicateExistingData())).setStreamId(streamName).build();
+          if (Utils.createStreamIfNotExisting(datastream, createStreamRequest, LOGGER)) {
+            streamPath = buildStreamPath(parentPath, streamName);
+          }
+        } catch (Exception e) {
+          if (Utils.isValidationFailed(e)) {
+            return buildAssessment(((DatastreamDeltaSourceException) e).getMetadata());
+          }
+          throw new RuntimeException("Fail to assess replicator pipeline due to failure of creating stream.", e);
+        }
+      } finally {
+        clearTempResources(oracleProfilePath, gcsProfilePath, streamPath, bucketName, bucketCreated);
       }
     }
     return new Assessment(Collections.emptyList(), Collections.emptyList());
   }
 
-  private Assessment buildAssessment(ApiFuture<OperationMetadata> metadataFuture) {
+  private void clearTempResources(String oracleProfilePath, String gcsProfilePath, String streamPath, String bucketName,
+    boolean bucketCreated) {
+    //clear temporary stream
+    //TODO below logic for clearing temporary stream can be removed once datastream supports validate only correctly
+    if (streamPath != null) {
+      try {
+        Utils.deleteStream(datastream, streamPath, LOGGER);
+      } catch (Exception e) {
+        LOGGER.warn(String.format("Fail to delete temporary stream : %s", streamPath), e);
+      }
+    }
+    //clear temporary connectionProfile
+    if (oracleProfilePath != null) {
+      try {
+        Utils.deleteConnectionProfile(datastream, oracleProfilePath, LOGGER);
+      } catch (Exception e) {
+        LOGGER.warn(String.format("Fail to delete temporary connection profile : %s", oracleProfilePath), e);
+      }
+    }
+    if (gcsProfilePath != null) {
+      try {
+        Utils.deleteConnectionProfile(datastream, gcsProfilePath, LOGGER);
+      } catch (Exception e) {
+        LOGGER.warn(String.format("Fail to delete temporary connection profile : %s", gcsProfilePath), e);
+      }
+    }
+    //remove temporarily created GCS bucket
+    if (bucketCreated) {
+      try {
+        Utils.deleteBucket(storage, bucketName);
+      } catch (StorageException e) {
+        LOGGER.warn(String.format("Fail to delete temporary GCS bucket : %s", bucketName), e);
+      }
+    }
+  }
+
+  @VisibleForTesting
+  static Assessment buildAssessment(ApiFuture<OperationMetadata> metadataFuture) {
     OperationMetadata metadata = null;
     try {
       metadata = metadataFuture.get();
@@ -332,23 +344,23 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
             connectivityIssues.add(new Problem("Oracle Connectivity Failure",
               String.format("Issue : %s found when %s", message, description),
               "Check your Forward SSH tunnel configurations.",
-              "Cannot read any snapshot or CDC changes" + "from source database."));
+              "Cannot read any snapshot or CDC changes from source database."));
             break;
           case "ORACLE_VALIDATE_CONNECTIVITY":
             connectivityIssues.add(new Problem("Oracle Connectivity Failure",
               String.format("Issue : %s found when %s", message, description), "Check your Oracle database settings.",
-              "Cannot replicate any snapshot or CDC changes " + "from " + "source database."));
+              "Cannot replicate any snapshot or CDC changes from source database."));
             break;
           case "ORACLE_VALIDATE_LOG_MODE":
             missingFeatures.add(
-              new Problem("Incorrect Oracle settings.", String.format("Issue : %s found when %s", message, description),
-                "Check your Oracle database settings.", "Cannot replicate CDC changes from source " + "database."));
+              new Problem("Incorrect Oracle Settings", String.format("Issue : %s found when %s", message, description),
+                "Check your Oracle database settings.", "Cannot replicate CDC changes from source database."));
             break;
           case "ORACLE_VALIDATE_SUPPLEMENTAL_LOGGING":
             missingFeatures.add(
-              new Problem("Incorrect Oracle settings.", String.format("Issue : %s found when %s", message, description),
+              new Problem("Incorrect Oracle Settings", String.format("Issue : %s found when %s", message, description),
                 "Check your Oracle database settings.",
-                "Cannot replicate CDC changes of certain tables " + "from source database."));
+                "Cannot replicate CDC changes of certain tables from source database."));
             break;
           case "GCS_VALIDATE_PERMISSIONS":
             missingFeatures.add(

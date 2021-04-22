@@ -24,14 +24,11 @@ import io.cdap.delta.api.DeltaSourceContext;
 import io.cdap.delta.api.EventEmitter;
 import io.cdap.delta.api.EventReaderDefinition;
 import io.cdap.delta.api.Offset;
-import io.cdap.delta.api.SourceTable;
 import io.cdap.delta.datastream.util.MockSourceContext;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 public class DatastreamEventReaderTest extends BaseIntegrationTestCase {
 
@@ -40,25 +37,19 @@ public class DatastreamEventReaderTest extends BaseIntegrationTestCase {
   @Test
   public void testStart() throws Exception {
 
-    DatastreamConfig config = buildDatastreamConfig(true);
-    DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
+    DatastreamDeltaSource deltaSource = createDeltaSource(true);
     DeltaSourceContext context =  new MockSourceContext();
     deltaSource.initialize(context);
+
     EventEmitter emitter = createEmitter();
     DatastreamEventReader reader = deltaSource.createReader(buildDefinition(), context, emitter);
     reader.start(createOffset());
-    TimeUnit.MINUTES.sleep(30);
+    TimeUnit.MINUTES.sleep(10);
     reader.stop();
   }
 
   private EventReaderDefinition buildDefinition() {
     return new EventReaderDefinition(getSourceTables(), Collections.emptySet(), Collections.emptySet());
-  }
-
-  private Set<SourceTable> getSourceTables() {
-    return oracleTables.stream().map(table -> new SourceTable(oracleDb, table.substring(table.indexOf(".") + 1),
-      table.substring(0, table.indexOf(".")), Collections.emptySet(), Collections.emptySet(), Collections.emptySet()))
-      .collect(Collectors.toSet());
   }
 
   private EventEmitter createEmitter() {

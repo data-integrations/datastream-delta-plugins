@@ -53,22 +53,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class DatastreamAsessorTest extends BaseIntegrationTestCase {
   @Test
-  public void testAssess_new() throws Exception {
+  public void testAssessNew() throws Exception {
     testAssess(false);
   }
 
   @Test
-  public void testAssess_existing() throws Exception {
+  public void testAssessExisting() throws Exception {
     testAssess(true);
   }
 
   @Test
-  public void testAssessTable_new() throws Exception {
+  public void testAssessTableNew() throws Exception {
     testAssessTable(false);
   }
 
   @Test
-  public void testAssessTable_existing() throws Exception {
+  public void testAssessTableExisting() throws Exception {
     testAssessTable(true);
   }
 

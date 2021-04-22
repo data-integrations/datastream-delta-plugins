@@ -350,9 +350,9 @@ public final class Utils {
       return operation.get();
     } catch (Exception e) {
       String errorMessage = String.format("Failed to query status of operation %s.", request);
-      // log exception as warning because the operation could be retried. Let the outmost error handling code to log
+      // log exception as debug because the operation could be retried. Let the outmost error handling code to log
       // error level log.
-      logger.warn(errorMessage, e);
+      logger.debug(errorMessage, e);
       throw new DatastreamDeltaSourceException(errorMessage, e, operation.getMetadata());
     }
   }

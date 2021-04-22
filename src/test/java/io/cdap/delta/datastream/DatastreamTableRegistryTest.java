@@ -34,12 +34,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class DatastreamTableRegistryTest extends BaseIntegrationTestCase {
 
   @Test
-  public void testListDescribeTable_new() throws Exception {
+  public void testListDescribeTableNew() throws Exception {
     testListDesribeTable(false);
   }
 
   @Test
-  public void testListDescribeTable_existing() throws Exception {
+  public void testListDescribeTableExisting() throws Exception {
     testListDesribeTable(true);
   }
 

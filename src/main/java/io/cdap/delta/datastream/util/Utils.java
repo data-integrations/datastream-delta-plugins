@@ -53,7 +53,6 @@ import com.google.cloud.datastream.v1alpha1.SourceConfig;
 import com.google.cloud.datastream.v1alpha1.StaticServiceIpConnectivity;
 import com.google.cloud.datastream.v1alpha1.Stream;
 import com.google.cloud.datastream.v1alpha1.UpdateStreamRequest;
-import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageException;
@@ -861,10 +860,6 @@ public final class Utils {
    * @return whether the GCS bucket is newly created by this method
    */
   public static boolean createBucketIfNotExisting(Storage storage, String bucketName) throws IOException {
-    Bucket bucket = storage.get(bucketName);
-    if (bucket != null) {
-      return false;
-    }
     // create corresponding GCS bucket
     try {
       Failsafe.with(createRetryPolicy()

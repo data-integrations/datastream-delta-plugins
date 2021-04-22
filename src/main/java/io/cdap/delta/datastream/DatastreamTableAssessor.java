@@ -277,41 +277,46 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
           throw new RuntimeException("Fail to assess replicator pipeline due to failure of creating stream.", e);
         }
       } finally {
-        //clear temporary stream
-        //TODO below logic for clearing temporary stream can be removed once datastream supports validate only correctly
-        if (streamPath != null) {
-          try {
-            Utils.deleteStream(datastream, streamPath, LOGGER);
-          } catch (Exception e) {
-            LOGGER.warn(String.format("Fail to delete temporary stream : %s", streamPath), e);
-          }
-        }
-        //clear temporary connectionProfile
-        if (oracleProfilePath != null) {
-          try {
-            Utils.deleteConnectionProfile(datastream, oracleProfilePath, LOGGER);
-          } catch (Exception e) {
-            LOGGER.warn(String.format("Fail to delete temporary connection profile : %s", oracleProfilePath), e);
-          }
-        }
-        if (gcsProfilePath != null) {
-          try {
-            Utils.deleteConnectionProfile(datastream, gcsProfilePath, LOGGER);
-          } catch (Exception e) {
-            LOGGER.warn(String.format("Fail to delete temporary connection profile : %s", gcsProfilePath), e);
-          }
-        }
-        //remove temporarily created GCS bucket
-        if (bucketCreated) {
-          try {
-            Utils.deleteBucket(storage, bucketName);
-          } catch (StorageException e) {
-            LOGGER.warn(String.format("Fail to delete temporary GCS bucket : %s", bucketName), e);
-          }
-        }
+        clearTempResources(oracleProfilePath, gcsProfilePath, streamPath, bucketName, bucketCreated);
       }
     }
     return new Assessment(Collections.emptyList(), Collections.emptyList());
+  }
+
+  private void clearTempResources(String oracleProfilePath, String gcsProfilePath, String streamPath, String bucketName,
+    boolean bucketCreated) {
+    //clear temporary stream
+    //TODO below logic for clearing temporary stream can be removed once datastream supports validate only correctly
+    if (streamPath != null) {
+      try {
+        Utils.deleteStream(datastream, streamPath, LOGGER);
+      } catch (Exception e) {
+        LOGGER.warn(String.format("Fail to delete temporary stream : %s", streamPath), e);
+      }
+    }
+    //clear temporary connectionProfile
+    if (oracleProfilePath != null) {
+      try {
+        Utils.deleteConnectionProfile(datastream, oracleProfilePath, LOGGER);
+      } catch (Exception e) {
+        LOGGER.warn(String.format("Fail to delete temporary connection profile : %s", oracleProfilePath), e);
+      }
+    }
+    if (gcsProfilePath != null) {
+      try {
+        Utils.deleteConnectionProfile(datastream, gcsProfilePath, LOGGER);
+      } catch (Exception e) {
+        LOGGER.warn(String.format("Fail to delete temporary connection profile : %s", gcsProfilePath), e);
+      }
+    }
+    //remove temporarily created GCS bucket
+    if (bucketCreated) {
+      try {
+        Utils.deleteBucket(storage, bucketName);
+      } catch (StorageException e) {
+        LOGGER.warn(String.format("Fail to delete temporary GCS bucket : %s", bucketName), e);
+      }
+    }
   }
 
   @VisibleForTesting

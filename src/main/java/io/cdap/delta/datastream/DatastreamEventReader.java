@@ -18,6 +18,7 @@
 package io.cdap.delta.datastream;
 
 import com.google.api.gax.paging.Page;
+import com.google.api.gax.rpc.NotFoundException;
 import com.google.cloud.datastream.v1alpha1.DatastreamClient;
 import com.google.cloud.datastream.v1alpha1.GcsProfile;
 import com.google.cloud.datastream.v1alpha1.Stream;
@@ -160,7 +161,11 @@ public class DatastreamEventReader implements EventReader {
     // if the caller is from DeltaWorker.run it's a stop due to failure and don't need to stop stream
     // otherwise it's from DeltaWorker.stop which is intended by the end user.
     if (!new Throwable().getStackTrace()[1].getMethodName().startsWith("lambda$run")) {
-      Utils.pauseStream(datastream, stream, LOGGER);
+      try {
+        Utils.pauseStream(datastream, stream, LOGGER);
+      } catch (NotFoundException e) {
+        //it's possible that the stream was not created successfully when the pipeline is stopped.
+      }
     }
     if (!executorService.awaitTermination(2, TimeUnit.MINUTES)) {
       LOGGER.warn("Unable to cleanly shutdown reader within the timeout.");

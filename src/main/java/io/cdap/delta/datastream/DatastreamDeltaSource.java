@@ -56,7 +56,7 @@ import static io.cdap.delta.datastream.util.Utils.buildOracleConnectionProfile;
 @Description("Delta source for Datastream.")
 public class DatastreamDeltaSource implements DeltaSource {
 
-  public static final String NAME = "datastream";
+  public static final String NAME = "OracleDatastream";
   private static final Logger LOGGER = LoggerFactory.getLogger(DatastreamDeltaSource.class);
   private static final Gson GSON = new Gson();
   private final DatastreamConfig config;

@@ -93,7 +93,7 @@ import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_IP_A
 import static io.cdap.delta.datastream.DatastreamConfig.CONNECTIVITY_METHOD_PRIVATE_CONNECTIVITY;
 
 /**
- * Common Utils for DataStream source plugins
+ * Common Utils for Datastream source plugins
  */
 public final class Utils {
 
@@ -123,7 +123,7 @@ public final class Utils {
   }
 
   /**
-   * Convert the string oracle data type returned by DataStream to SQLType
+   * Convert the string oracle data type returned by Datastream to SQLType
    *
    * @param oracleDataType Oracle data type in form of string
    * @return corresponding SQLType of the oracle data type
@@ -204,10 +204,10 @@ public final class Utils {
   }
 
   /**
-   * Build an oracle connection profile based on DataStream delta source config
+   * Build an oracle connection profile based on Datastream delta source config
    * @oaran parentPath the parent path of the connection profile
    * @param name the name of the connection profile
-   * @param config DataStream delta source config
+   * @param config Datastream delta source config
    * @return the oracle connection profile
    */
   public static ConnectionProfile buildOracleConnectionProfile(String parentPath, @Nullable String name,
@@ -258,14 +258,14 @@ public final class Utils {
   }
 
   /**
-   * Build a DataStream stream config
+   * Build a Datastream stream config
    *
    * @param parentPath the parent path of the stream to be crated
    * @param name       the name of the stream to be created
    * @param sourcePath the path of the source connection profile
    * @param targetPath the path of the target connection profile
    * @param tables     tables to be tracked changes of
-   * @return the DataStream stream config
+   * @return the Datastream stream config
    */
   public static Stream buildStreamConfig(String parentPath, String name, String sourcePath, String targetPath,
                                          Set<SourceTable> tables, boolean replicateExistingData) {
@@ -358,13 +358,13 @@ public final class Utils {
   }
 
   /**
-   * Build a DataStream GCS connection profile
+   * Build a Datastream GCS connection profile
    *
    * @param parentPath    the parent path of the connection profile to be created
    * @param name          the name of the connection profile to be created
    * @param gcsBucket     the name of GCS bucket where the stream result will be written to
    * @param gcsPathPrefix the prefix of the path for the stream result
-   * @return the DataStream GCS connection profile
+   * @return the Datastream GCS connection profile
    */
   public static ConnectionProfile buildGcsConnectionProfile(String parentPath, String name, String gcsBucket,
     String gcsPathPrefix) {
@@ -376,7 +376,7 @@ public final class Utils {
   }
 
   /**
-   * Build the path of a DataStream connection profile
+   * Build the path of a Datastream connection profile
    *
    * @param parentPath the parent path of the connection profile
    * @param name       the name of the connection profile
@@ -387,7 +387,7 @@ public final class Utils {
   }
 
   /**
-   * Build the path of a DataStream private connection
+   * Build the path of a Datastream private connection
    *
    * @param parentPath the parent path of the private connection
    * @param name       the name of the private connection
@@ -398,27 +398,27 @@ public final class Utils {
   }
 
   /**
-   * Build the predefined DataStream Oracle connection profile name for a replicator instance
+   * Build the predefined Datastream Oracle connection profile name for a replicator instance
    *
    * @param replicatorId the id of a replicator
-   * @return the predefined DataStream Oracle connection profile name
+   * @return the predefined Datastream Oracle connection profile name
    */
   public static String buildOracleProfileName(String replicatorId) {
     return ORACLE_PROFILE_NAME_PREFIX + replicatorId;
   }
 
   /**
-   * Build the predefined DataStream GCS connection profile name for a replicator instance
+   * Build the predefined Datastream GCS connection profile name for a replicator instance
    *
    * @param replicatorId the id of a replicator
-   * @return the predefined DataStream GCS connection profile name
+   * @return the predefined Datastream GCS connection profile name
    */
   public static String buildGcsProfileName(String replicatorId) {
     return GCS_PROFILE_NAME_PREFIX + replicatorId;
   }
 
   /**
-   * Build the path of a DataStream stream
+   * Build the path of a Datastream stream
    *
    * @param parentPath the parent path of the stream
    * @param name       the name of the stream
@@ -429,10 +429,10 @@ public final class Utils {
   }
 
   /**
-   * Build the predefined DataStream stream name for a replicator instance
+   * Build the predefined Datastream stream name for a replicator instance
    *
    * @param replicatorId the id of a replicator
-   * @return the predefined DataStream source connection profile name
+   * @return the predefined Datastream source connection profile name
    */
   public static String buildStreamName(String replicatorId) {
     return STREAM_NAME_PREFIX + replicatorId;
@@ -537,7 +537,7 @@ public final class Utils {
    * Fetch errors of a stream. If the stream has any errors, return an exception that contains error message of all the
    * errors otherwise return null;
    *
-   * @param datastream the DataStream client
+   * @param datastream the Datastream client
    * @param streamPath the full stream resource path
    * @param logger     the logger
    * @param context    the delta source context
@@ -571,7 +571,7 @@ public final class Utils {
   /**
    * Get the specified stream
    *
-   * @param datastream DataStream client
+   * @param datastream Datastream client
    * @param path       the full stream resource path
    * @param logger     the logger
    * @return the stream with the specified path
@@ -593,7 +593,7 @@ public final class Utils {
 
   /**
    * Continuously to get stream until stream state equals the specified target state or max duration reached (5 minutes)
-   * @param datastream the DataStream client
+   * @param datastream the Datastream client
    * @param state the specified target state
    * @param path the full resource path of the stream
    * @param logger the logger
@@ -610,7 +610,7 @@ public final class Utils {
   /**
    * Update the specified stream
    *
-   * @param datastream DataStream client
+   * @param datastream Datastream client
    * @param request    update stream request
    * @param logger     the logger
    * @return the updated stream
@@ -632,7 +632,7 @@ public final class Utils {
   /**
    * Get the specified connection profile
    *
-   * @param datastream the DataStream client
+   * @param datastream the Datastream client
    * @param path       the full path of the connection profile resource
    * @param logger     the logger
    * @return the conneciton profile with the specified path
@@ -655,7 +655,7 @@ public final class Utils {
   /**
    * Create connection profile if not existing
    *
-   * @param datastream DataStream client
+   * @param datastream Datastream client
    * @param reqeust    the create conneciton profile request
    * @param logger     the logger
    * @return whether the connection profile is actually created by this method
@@ -688,7 +688,7 @@ public final class Utils {
   /**
    * Create stream if not existing
    *
-   * @param datastream          DataStream client
+   * @param datastream          Datastream client
    * @param createStreamRequest the create stream request
    * @param logger              the logger
    * @return whether the stream is actually created by this method
@@ -719,7 +719,7 @@ public final class Utils {
   /**
    * Start the specified stream
    *
-   * @param datastream DataStream client
+   * @param datastream Datastream client
    * @param stream     the stream to be started
    * @param logger     the logger
    * @return the started stream
@@ -731,7 +731,7 @@ public final class Utils {
   /**
    * Pause the specified stream
    *
-   * @param datastream DataStream client
+   * @param datastream Datastream client
    * @param stream     the stream to be paused
    * @param logger     the logger
    * @return the paused stream
@@ -764,10 +764,10 @@ public final class Utils {
 
   /**
    * Update the allowlist of the specified stream
-   * allowlist is a DataStream concept which means the list of tables that DataStream will stream change events from.
+   * allowlist is a Datastream concept which means the list of tables that Datastream will stream change events from.
    * This method could throw runtime exception if you pass in a stream with name not existing.
    *
-   * @param datastream DataStream client
+   * @param datastream Datastream client
    * @param stream     the builder of the stream to be updated
    * @param logger     the logger
    * @return the updated stream
@@ -783,7 +783,7 @@ public final class Utils {
   /**
    * Delete the specified stream
    *
-   * @param datastream DataStream client
+   * @param datastream Datastream client
    * @param path       the full stream resource path
    * @param logger     the logger
    */
@@ -808,7 +808,7 @@ public final class Utils {
   /**
    * Delete the specified connection profile
    *
-   * @param datastream DataStream client
+   * @param datastream Datastream client
    * @param path       the full connection profile resource path
    * @param logger     the logger
    */
@@ -833,7 +833,7 @@ public final class Utils {
   /**
    * Discover connection profile
    *
-   * @param datastream DataStream client
+   * @param datastream Datastream client
    * @param request    discover connection profile request
    * @param logger     the logger
    * @return the discover connection profile response
@@ -943,9 +943,9 @@ public final class Utils {
   }
 
   /**
-   * Get DataStream client given the credentials from the DataStream client pool
-   * @param credentials the Google credentials for the DataStream client
-   * @return the DataStream client according to the given credentials
+   * Get Datastream client given the credentials from the Datastream client pool
+   * @param credentials the Google credentials for the Datastream client
+   * @return the Datastream client according to the given credentials
    */
   public static DatastreamClient getDataStreamClient(GoogleCredentials credentials) throws IOException {
     DatastreamClient client = datastreamClientPool.get(credentials);

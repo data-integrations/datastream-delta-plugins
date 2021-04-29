@@ -84,7 +84,7 @@ public class DatastreamConfig extends PluginConfig {
   private String region;
 
   @Nullable
-  @Description("The way DataStream will connect to Oracle. See \"Documentation\" tab for details.")
+  @Description("The way Datastream will connect to Oracle. See \"Documentation\" tab for details.")
   private String connectivityMethod;
 
   @Nullable
@@ -125,25 +125,25 @@ public class DatastreamConfig extends PluginConfig {
 
   @Nullable
   @Description("Name of the private connection. The network admins of the Google Cloud Platform project should create" +
-    " a VPC peering between the database VPC and the DataStream VPC. THis is the name of the VPC peering they created.")
+    " a VPC peering between the database VPC and the Datastream VPC. THis is the name of the VPC peering they created.")
   // only required when connectivity method is  "Private connectivity (VPC peering)"
   private String privateConnectionName;
 
 
   @Nullable
-  @Description("The GCS bucket that DataStream can write its output to. By default replicator " +
+  @Description("The GCS bucket that Datastream can write its output to. By default replicator " +
     "application will create one for you. See \"Documentation\" tab for details")
   private String gcsBucket;
 
   @Nullable
-  @Description("The optional path prefix of the path where DataStream will write its output to.")
+  @Description("The optional path prefix of the path where Datastream will write its output to.")
   private String gcsPathPrefix;
 
 
   @Macro
   @Nullable
   @Description("The service account key of the service account that will be used to read " +
-    "DataStream results from GCS Bucket. By default Dataproc service account will be used.")
+    "Datastream results from GCS Bucket. By default Dataproc service account will be used.")
   private String gcsServiceAccountKey;
 
   @Nullable
@@ -153,7 +153,7 @@ public class DatastreamConfig extends PluginConfig {
 
   @Macro
   @Nullable
-  @Description("The service account key of the service account that will be used to create or query DataStream stream" +
+  @Description("The service account key of the service account that will be used to create or query Datastream stream" +
     ". By default Cloud Data Fusion service account will be used when you create a replicator and Dataproc service " +
     "account will be used when replicator pipeline is running.")
   private String dsServiceAccountKey;

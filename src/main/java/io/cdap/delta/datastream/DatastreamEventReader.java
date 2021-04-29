@@ -20,6 +20,7 @@ package io.cdap.delta.datastream;
 import com.google.api.gax.paging.Page;
 import com.google.api.gax.rpc.NotFoundException;
 import com.google.cloud.datastream.v1alpha1.DatastreamClient;
+import com.google.cloud.datastream.v1alpha1.Error;
 import com.google.cloud.datastream.v1alpha1.GcsProfile;
 import com.google.cloud.datastream.v1alpha1.Stream;
 import com.google.cloud.storage.Blob;
@@ -57,6 +58,7 @@ import java.util.TimeZone;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static io.cdap.delta.datastream.DatastreamEventConsumer.POSITION_STATE_KEY_SUFFIX;
 
@@ -97,7 +99,7 @@ public class DatastreamEventReader implements EventReader {
   // The GCS bucket in which datastream result is written to
   private final String bucketName;
   private final String databaseName;
-  private final Stream stream;
+  private Stream stream;
 
   public DatastreamEventReader(DatastreamConfig config, EventReaderDefinition definition, DeltaSourceContext context,
     EventEmitter emitter, DatastreamClient datastream, Storage storage) throws Exception {
@@ -271,24 +273,29 @@ public class DatastreamEventReader implements EventReader {
        Read events from file from pos + 1
        emit DML event  (table.pos = current pos , pos++)
        **/
-      if (!Stream.State.RUNNING.equals(stream.getState())) {
-        LOGGER.warn("Stream {} is in status : {}.", streamPath, stream.getState());
-      } else {
+      try {
+        stream = Utils.getStream(datastream, streamPath, LOGGER);
         Exception error = null;
-        try {
-          error = Utils.fetchErrors(datastream, streamPath, LOGGER, context);
-        } catch (Exception e) {
-          LOGGER.warn("Failed to fetch errors for stream " + streamPath, e);
+        List<Error> errors = stream.getErrorsList();
+        if (!errors.isEmpty()) {
+          error = Utils.buildException(errors.stream()
+            .map(e -> String.format("%s, id: %s, reason: %s", e.getMessage(), e.getErrorUuid(), e.getReason()))
+            .collect(Collectors.joining("\n")), true);
         }
         if (error != null) {
           throw error;
         }
-
-        try {
-          context.setOK();
-        } catch (IOException e) {
-          LOGGER.warn("Unable to set source state to OK.", e);
+        if (!Stream.State.RUNNING.equals(stream.getState())) {
+          LOGGER.warn("Stream {} is in status : {}.", streamPath, stream.getState());
+        } else {
+          try {
+            context.setOK();
+          } catch (IOException e) {
+            LOGGER.warn("Unable to set source state to OK.", e);
+          }
         }
+      } catch (Exception e) {
+        LOGGER.warn("Failed to get the stream", e);
       }
 
       boolean dbCreated = Boolean.parseBoolean(state.getOrDefault(DB_CREATED_STATE_KEY, "false"));

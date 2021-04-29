@@ -35,9 +35,6 @@ import com.google.cloud.datastream.v1alpha1.DatastreamSettings;
 import com.google.cloud.datastream.v1alpha1.DestinationConfig;
 import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileRequest;
 import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileResponse;
-import com.google.cloud.datastream.v1alpha1.Error;
-import com.google.cloud.datastream.v1alpha1.FetchErrorsRequest;
-import com.google.cloud.datastream.v1alpha1.FetchErrorsResponse;
 import com.google.cloud.datastream.v1alpha1.ForwardSshTunnelConnectivity;
 import com.google.cloud.datastream.v1alpha1.GcsDestinationConfig;
 import com.google.cloud.datastream.v1alpha1.GcsProfile;
@@ -531,41 +528,6 @@ public final class Utils {
    */
   public static String buildBucketName(String name) {
     return GCS_BUCKET_NAME_PREFIX + name;
-  }
-
-  /**
-   * Fetch errors of a stream. If the stream has any errors, return an exception that contains error message of all the
-   * errors otherwise return null;
-   *
-   * @param datastream the Datastream client
-   * @param streamPath the full stream resource path
-   * @param logger     the logger
-   * @param context    the delta source context
-   * @throws Exception the exception that contains the error message of all the stream errors
-   */
-
-  public static Exception fetchErrors(DatastreamClient datastream, String streamPath, Logger logger,
-    DeltaSourceContext context) throws IOException {
-    // check stream errors
-    FetchErrorsRequest request = FetchErrorsRequest.newBuilder().setStream(streamPath).build();
-    String requestStr = "FetchErrors Request:\n" + request.toString();
-    if (logger.isTraceEnabled()) {
-      logger.trace(requestStr);
-    }
-    OperationFuture<FetchErrorsResponse, OperationMetadata> operation = datastream.fetchErrorsAsync(request);
-    FetchErrorsResponse fetchErrorsResponse = Utils.waitUntilComplete(operation, requestStr, logger);
-    if (logger.isTraceEnabled()) {
-      logger.trace("FetchErrros Response:\n" + fetchErrorsResponse.toString());
-    }
-    if (fetchErrorsResponse != null) {
-      List<Error> errors = fetchErrorsResponse.getErrorsList();
-      if (!errors.isEmpty()) {
-        return Utils.buildException(errors.stream().map(error -> {
-          return String.format("%s, id: %s, reason: %s", error.getMessage(), error.getErrorUuid(), error.getReason());
-        }).collect(Collectors.joining("\n")), true);
-      }
-    }
-    return null;
   }
 
   /**

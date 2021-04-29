@@ -160,7 +160,11 @@ public class DatastreamEventReader implements EventReader {
     // below is just a workaround to avoid changes in delta app.
     // if the caller is from DeltaWorker.run it's a stop due to failure and don't need to stop stream
     // otherwise it's from DeltaWorker.stop which is intended by the end user.
-    if (!new Throwable().getStackTrace()[1].getMethodName().startsWith("lambda$run")) {
+    String callerMethod = new Throwable().getStackTrace()[1].getMethodName();
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Stop method is called from {}", callerMethod);
+    }
+    if (!callerMethod.startsWith("lambda$run")) {
       try {
         Utils.pauseStream(datastream, stream, LOGGER);
       } catch (NotFoundException e) {

@@ -90,6 +90,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
     String precision = properties.get(PRECISION);
     String scale = properties.get(SCALE);
 
+    // convert oracle data type to CDAP schema
+    // ref: https://cloud.google.com/datastream/docs/unified-types
     switch (oracleDataType) {
       case BFILE:
       case CHAR:
@@ -134,11 +136,20 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         if (precision == null || precision.isEmpty()) {
           schema = Schema.of(Type.STRING);
         } else {
-          if (scale == null || scale.isEmpty() || parseInt(oracleDataType, "scale", scale) == 0) {
-            schema = Schema.of(Type.LONG);
+          if (scale == null || scale.isEmpty() || parseInt(oracleDataType, "scale", scale) <= 0) {
+            if ("*".equals(precision) || parseInt(oracleDataType, "precision", precision) > 18) {
+              schema = Schema.of(Type.STRING);
+            } else {
+              schema = Schema.of(Type.LONG);
+            }
           } else {
-            schema = Schema
-              .decimalOf(parseInt(oracleDataType, "precision", precision), parseInt(oracleDataType, "scale", scale));
+            if ("*".equals(precision)) {
+              schema = Schema
+                .decimalOf(38, parseInt(oracleDataType, "scale", scale));
+            } else {
+              schema = Schema
+                .decimalOf(parseInt(oracleDataType, "precision", precision), parseInt(oracleDataType, "scale", scale));
+            }
           }
         }
         break;

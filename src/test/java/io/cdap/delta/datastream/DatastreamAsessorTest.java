@@ -335,7 +335,22 @@ public class DatastreamAsessorTest extends BaseIntegrationTestCase {
     assertNull(assessment.getSuggestion());
 
     properties = new HashMap<>();
-    properties.put("PRECISION", "7");
+    properties.put("PRECISION", "19");
+    properties.put("SCALE", "0");
+    column = new ColumnDetail("NUMBER_STRING", OracleDataType.NUMBER, false, properties);
+    evaluation = DatastreamTableAssessor.evaluateColumn(column);
+    field = evaluation.getField();
+    assertEquals("NUMBER_STRING", field.getName());
+    assertEquals(Schema.of(Schema.Type.STRING), field.getSchema());
+    assessment = evaluation.getAssessment();
+    assertEquals("NUMBER_STRING", assessment.getName());
+    assertEquals(OracleDataType.NUMBER.getName(), assessment.getType());
+    assertNull(assessment.getSourceName());
+    assertEquals(YES, assessment.getSupport());
+    assertNull(assessment.getSuggestion());
+
+    properties = new HashMap<>();
+    properties.put("PRECISION", "18");
     column = new ColumnDetail("NUMBER_LONG", OracleDataType.NUMBER, false, properties);
     evaluation = DatastreamTableAssessor.evaluateColumn(column);
     field = evaluation.getField();
@@ -356,6 +371,21 @@ public class DatastreamAsessorTest extends BaseIntegrationTestCase {
     field = evaluation.getField();
     assertEquals("NUMBER_DECIMAL", field.getName());
     assertEquals(Schema.decimalOf(5, 3), field.getSchema());
+    assessment = evaluation.getAssessment();
+    assertEquals("NUMBER_DECIMAL", assessment.getName());
+    assertEquals(OracleDataType.NUMBER.getName(), assessment.getType());
+    assertNull(assessment.getSourceName());
+    assertEquals(YES, assessment.getSupport());
+    assertNull(assessment.getSuggestion());
+
+    properties = new HashMap<>();
+    properties.put("PRECISION", "*");
+    properties.put("SCALE", "3");
+    column = new ColumnDetail("NUMBER_DECIMAL", OracleDataType.NUMBER, false, properties);
+    evaluation = DatastreamTableAssessor.evaluateColumn(column);
+    field = evaluation.getField();
+    assertEquals("NUMBER_DECIMAL", field.getName());
+    assertEquals(Schema.decimalOf(38, 3), field.getSchema());
     assessment = evaluation.getAssessment();
     assertEquals("NUMBER_DECIMAL", assessment.getName());
     assertEquals(OracleDataType.NUMBER.getName(), assessment.getType());

@@ -304,6 +304,73 @@ class DatastreamEventConsumerTest {
   }
 
   @Test
+  public void testUpdatePrimaryKey() throws Exception {
+    byte[] content = ByteStreams.toByteArray(this.getClass().getClassLoader().getResourceAsStream("update-pk.avro"));
+    String path = "current_path";
+    Map<String, String> state = new HashMap<>();
+    String database = "xe";
+    String schema = "HR";
+    String table = "EMPLOYEES";
+    int startingPosition = 0;
+    DatastreamEventConsumer consumer = new DatastreamEventConsumer(content, new MockSourceContext(), path,
+                                                                   new SourceTable(database, table, schema,
+                                                                                   Collections.emptySet(),
+                                                                                   Collections.emptySet(),
+                                                                                   Collections.emptySet()),
+                                                                   startingPosition, state);
+    int count = 0;
+    long startTime = System.currentTimeMillis();
+    while (consumer.hasNextEvent()) {
+      DMLEvent event = consumer.nextEvent();
+      DMLOperation operation = event.getOperation();
+      assertEquals(database, operation.getDatabaseName());
+      assertEquals(schema, operation.getSchemaName());
+      assertEquals(table, operation.getTableName());
+
+      assertTrue(operation.getIngestTimestampMillis() >= startTime);
+      assertFalse(event.getRowId().isEmpty());
+      assertTrue(event.getIngestTimestampMillis() >= startTime);
+      assertNotNull(event.getTransactionId());
+      HashMap<String, String> newState = new HashMap<>(state);
+      newState.put(schema + "_" + table + ".pos", String.valueOf(startingPosition + count));
+      assertEquals(new Offset(newState), event.getOffset());
+      StructuredRecord row = event.getRow();
+
+      if (count == 0) {
+        //first event is an update-delete
+        assertEquals(DMLOperation.Type.DELETE, operation.getType());
+        //TODO once CDAP-17919 is fixed we should expect previous row to be null for delete event
+        // this is just a workaround for the issue.
+        assertNotNull(event.getPreviousRow());
+        assertEquals(210L, row.<Long>get("EMPLOYEE_ID"));
+        assertTrue(operation.getSizeInBytes() == 0);
+      } else {
+        //second event is an update-insert
+        assertEquals(DMLOperation.Type.INSERT, operation.getType());
+        assertNull(event.getPreviousRow());
+        assertEquals(211L, row.<Long>get("EMPLOYEE_ID"));
+        assertTrue(operation.getSizeInBytes() > 0);
+      }
+
+      assertEquals("Sean", row.<String>get("FIRST_NAME"));
+      assertEquals("Zhou", row.<String>get("LAST_NAME"));
+      assertEquals("seanzhou@google.com", row.<String>get("EMAIL"));
+      SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+      sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+      assertEquals("2020-01-09T00:00:00Z",
+                   sdf.format(new java.util.Date(row.<Long>get("HIRE_DATE").longValue() / 1000)));
+      assertEquals("AD_PRES", row.<String>get("JOB_ID"));
+      assertEquals(new BigDecimal(BigInteger.valueOf(1213100L), 2),
+                   convert(row.<ByteBuffer>get("SALARY"), Schema.decimalOf(8, 2)));
+      assertNull(row.<ByteBuffer>get("COMMISSION_PCT"));
+      assertEquals(205L, row.<Long>get("MANAGER_ID"));
+      assertEquals(110L, row.<Long>get("DEPARTMENT_ID"));
+      count++;
+    }
+    assertEquals(2, count);
+  }
+
+  @Test
   public void testConvert() {
     org.apache.avro.Schema decimalBytes = org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES);
     decimalBytes.addProp("precision", 5);

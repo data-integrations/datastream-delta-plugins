@@ -55,6 +55,8 @@ public class DatastreamEventConsumer {
   private static final String TRANSACTION_ID_FIELD_NAME = "tx_id";
   private static final String SOURCE_TIMESTAMP_FIELD_NAME = "source_timestamp";
   private static final String PAYLOAD_FIELD_NAME = "payload";
+  private static final String CHANGE_TYPE_UPDATE_DELETE = "UPDATE-DELETE";
+  private static final String CHANGE_TYPE_UPDATE_INSERT = "UPDATE-INSERT";
   private final byte[] content;
   private final DeltaSourceContext context;
   private final String currentPath;
@@ -216,20 +218,19 @@ public class DatastreamEventConsumer {
       record = dataFileReader.next();
       savePosition();
       GenericRecord sourceMetadata = (GenericRecord) record.get(SOURCE_METADATA_FIELD_NAME);
-      DMLOperation.Type eventType = DMLOperation.Type.INSERT;
-      // if it's not snapshot , get the actual event type
+      DMLOperation.Type operationType = DMLOperation.Type.INSERT;
+
       if (!isSnapshot) {
-        eventType = DMLOperation.Type.valueOf(sourceMetadata.get(CHANGE_TYPE_FIELD_NAME).toString());
+        // if it's not snapshot , get the actual event type
+        String changeType = sourceMetadata.get(CHANGE_TYPE_FIELD_NAME).toString();
+        operationType = getOperationType(changeType);
         // if the event type is in the black list , skip this event
-        if (table.getDmlBlacklist().contains(eventType)) {
+        if (table.getDmlBlacklist().contains(operationType)) {
           continue;
         }
       }
       GenericRecord payload = (GenericRecord) record.get(PAYLOAD_FIELD_NAME);
       StructuredRecord row = parseRecord(payload);
-
-      DMLOperation.Type operationType = isSnapshot ? DMLOperation.Type.INSERT :
-        DMLOperation.Type.valueOf(sourceMetadata.get(CHANGE_TYPE_FIELD_NAME).toString());
 
       DMLEvent.Builder eventBuilder =
         DMLEvent.builder().setDatabaseName(table.getDatabase()).setSchemaName(table.getSchema())
@@ -245,6 +246,17 @@ public class DatastreamEventConsumer {
       }
       event = eventBuilder.build();
       return;
+    }
+  }
+
+  private DMLOperation.Type getOperationType(String changeType) {
+    switch (changeType) {
+      case CHANGE_TYPE_UPDATE_DELETE:
+        return DMLOperation.Type.DELETE;
+      case CHANGE_TYPE_UPDATE_INSERT:
+        return DMLOperation.Type.INSERT;
+      default:
+        return DMLOperation.Type.valueOf(changeType);
     }
   }
 

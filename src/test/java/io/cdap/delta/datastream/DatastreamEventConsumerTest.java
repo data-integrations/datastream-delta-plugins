@@ -170,7 +170,7 @@ class DatastreamEventConsumerTest {
       assertEquals(210L, row.<Long>get("EMPLOYEE_ID"));
       assertEquals("Sean", row.<String>get("FIRST_NAME"));
       assertEquals("Zhou", row.<String>get("LAST_NAME"));
-      assertEquals("fake@google.com", row.<String>get("EMAIL"));
+      assertEquals("seanzhou@google.com", row.<String>get("EMAIL"));
       SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
       sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
       assertEquals("2020-01-09T00:00:00Z",
@@ -235,7 +235,7 @@ class DatastreamEventConsumerTest {
       assertEquals(210L, row.<Long>get("EMPLOYEE_ID"));
       assertEquals("Sean", row.<String>get("FIRST_NAME"));
       assertEquals("Zhou", row.<String>get("LAST_NAME"));
-      assertEquals("fake@google.com", row.<String>get("EMAIL"));
+      assertEquals("seanzhou@google.com", row.<String>get("EMAIL"));
       SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
       sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
       assertEquals("2020-01-09T00:00:00Z",
@@ -287,7 +287,7 @@ class DatastreamEventConsumerTest {
       assertEquals(210L, row.<Long>get("EMPLOYEE_ID"));
       assertEquals("Sean", row.<String>get("FIRST_NAME"));
       assertEquals("Zhou", row.<String>get("LAST_NAME"));
-      assertEquals("fake@google.com", row.<String>get("EMAIL"));
+      assertEquals("seanzhou@google.com", row.<String>get("EMAIL"));
       SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
       sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
       assertEquals("2020-01-09T00:00:00Z",
@@ -354,7 +354,7 @@ class DatastreamEventConsumerTest {
 
       assertEquals("Sean", row.<String>get("FIRST_NAME"));
       assertEquals("Zhou", row.<String>get("LAST_NAME"));
-      assertEquals("fake@google.com", row.<String>get("EMAIL"));
+      assertEquals("seanzhou@google.com", row.<String>get("EMAIL"));
       SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
       sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
       assertEquals("2020-01-09T00:00:00Z",

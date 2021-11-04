@@ -250,6 +250,8 @@ public class DatastreamEventConsumer {
   }
 
   private DMLOperation.Type getOperationType(String changeType) {
+    // Datastream splits an update event that modifies the primary keys into an delete (UPDATE-DELETE) and insert
+    // (UPDATE-INSERT) event
     switch (changeType) {
       case CHANGE_TYPE_UPDATE_DELETE:
         return DMLOperation.Type.DELETE;

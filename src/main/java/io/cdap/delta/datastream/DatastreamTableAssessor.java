@@ -187,8 +187,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         stream = Utils.getStream(datastream, streamPath, LOGGER).toBuilder();
       } catch (Exception e) {
         throw new RuntimeException(
-          String.format("Fail to assess replicator pipeline due to failure of getting existing stream %s ", streamPath),
-          e);
+          String.format("Fail to assess replicator pipeline due to failure of getting existing stream %s:\n%s",
+                        streamPath, e.getLocalizedMessage()), e);
       }
 
       OracleRdbms originalAllowList = stream.getSourceConfig().getOracleSourceConfig().getAllowlist();
@@ -202,8 +202,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         if (Utils.isValidationFailed(e)) {
           return buildAssessment(e.getMetadata());
         }
-        throw new RuntimeException(String
-          .format("Fail to assess replicator pipeline due to failure of updating existing stream %s ", streamPath), e);
+        throw new RuntimeException(String.format("Fail to assess replicator pipeline due to failure of updating " +
+                                                   "existing stream %s:\n%s", streamPath, e.getLocalizedMessage()), e);
       } finally {
         // rollback changes of the update which was for validation if the stream was updated
         //TODO below rollback logic can be removed once datastream supports validate only correctly
@@ -239,8 +239,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
             oracleProfilePath = Utils.buildConnectionProfilePath(parentPath, oracleProfileName);
           }
         } catch (Exception e) {
-          throw new RuntimeException(
-            "Fail to assess replicator pipeline due to failure of creating source connection profile.", e);
+          throw new RuntimeException(String.format("Fail to assess replicator pipeline due to failure of creating " +
+                                                     "source connection profile:\n%s", e.getLocalizedMessage()), e);
         }
 
         bucketName = conf.getGcsBucket();
@@ -251,7 +251,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         try {
           bucketCreated = Utils.createBucketIfNotExisting(storage, bucketName);
         } catch (Exception e) {
-          throw new RuntimeException("Fail to assess replicator pipeline due to failure of creating GCS Bucket.", e);
+          throw new RuntimeException(String.format("Fail to assess replicator pipeline due to failure of creating GCS" +
+                                                     " Bucket:\n%s.", e.getLocalizedMessage()), e);
         }
         // create the gcs connection profile
         String gcsProfileName = Utils.buildGcsProfileName(uuid);
@@ -265,7 +266,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
           }
         } catch (Exception e) {
           throw new RuntimeException(
-            "Fail to assess replicator pipeline due to failure of creating destination connection profile.", e);
+            String.format("Fail to assess replicator pipeline due to failure of creating destination connection " +
+                            "profile:\n%s", e.getLocalizedMessage()), e);
         }
 
         try {
@@ -281,7 +283,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
           if (Utils.isValidationFailed(e)) {
             return buildAssessment(((DatastreamDeltaSourceException) e).getMetadata());
           }
-          throw new RuntimeException("Fail to assess replicator pipeline due to failure of creating stream.", e);
+          throw new RuntimeException(String.format("Fail to assess replicator pipeline due to failure of creating " +
+                                                     "stream:\n%s", e.getLocalizedMessage()), e);
         }
       } finally {
         clearTempResources(oracleProfilePath, gcsProfilePath, streamPath, bucketName, bucketCreated);
@@ -332,9 +335,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
     try {
       metadata = metadataFuture.get();
     } catch (Exception e) {
-      throw new RuntimeException(String
-        .format("Fail to assess replicator pipeline due to failure of getting operation metadata:\n%s", e.toString()),
-        e);
+      throw new RuntimeException(String.format("Fail to assess replicator pipeline due to failure of getting " +
+                                                 "operation metadata:\n%s", e.getLocalizedMessage()), e);
     }
 
     List<Problem> connectivityIssues = new ArrayList<>();

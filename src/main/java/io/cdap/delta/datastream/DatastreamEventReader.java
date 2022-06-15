@@ -19,10 +19,13 @@ package io.cdap.delta.datastream;
 
 import com.google.api.gax.paging.Page;
 import com.google.api.gax.rpc.NotFoundException;
-import com.google.cloud.datastream.v1alpha1.DatastreamClient;
-import com.google.cloud.datastream.v1alpha1.Error;
-import com.google.cloud.datastream.v1alpha1.GcsProfile;
-import com.google.cloud.datastream.v1alpha1.Stream;
+import com.google.cloud.datastream.v1.BackfillJob;
+import com.google.cloud.datastream.v1.BackfillJob.State;
+import com.google.cloud.datastream.v1.DatastreamClient;
+import com.google.cloud.datastream.v1.Error;
+import com.google.cloud.datastream.v1.GcsProfile;
+import com.google.cloud.datastream.v1.Stream;
+import com.google.cloud.datastream.v1.StreamObject;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.Storage;
@@ -120,7 +123,7 @@ public class DatastreamEventReader implements EventReader {
     } catch (Exception e) {
       throw Utils.buildException("Failed to get stream : " + streamPath, e, true);
     }
-    String oracleProfileName = this.stream.getSourceConfig().getSourceConnectionProfileName();
+    String oracleProfileName = this.stream.getSourceConfig().getSourceConnectionProfile();
     try {
       this.databaseName =
         Utils.getConnectionProfile(datastream, oracleProfileName, LOGGER).getOracleProfile().getDatabaseService();
@@ -130,10 +133,10 @@ public class DatastreamEventReader implements EventReader {
     }
     String path = this.stream.getDestinationConfig().getGcsDestinationConfig().getPath();
     this.streamGcsPathPrefix = path == null ? "" : path.startsWith("/") ? path.substring(1) : path;
-    String gcsProfileName = this.stream.getDestinationConfig().getDestinationConnectionProfileName();
+    String gcsProfileName = this.stream.getDestinationConfig().getDestinationConnectionProfile();
     try {
       GcsProfile gcsProfile = Utils.getConnectionProfile(datastream, gcsProfileName, LOGGER).getGcsProfile();
-      this.bucketName = gcsProfile.getBucketName();
+      this.bucketName = gcsProfile.getBucket();
       path = gcsProfile.getRootPath();
       this.gcsRootPath = path.startsWith("/") ? path.substring(1) : path;
     } catch (Exception e) {
@@ -299,8 +302,6 @@ public class DatastreamEventReader implements EventReader {
         LOGGER.warn("Failed to get the stream", e);
       }
 
-
-
       boolean dbCreated = Boolean.parseBoolean(state.getOrDefault(DB_CREATED_STATE_KEY, "false"));
       // Emit DDL for DB creation if DB not created yet
       if (!dbCreated) {
@@ -349,9 +350,15 @@ public class DatastreamEventReader implements EventReader {
             scanEvents(blobs, tableName, srcTable, true, path != null);
             // TODO use Datastream API to determine whether dump is done, below is just a workaround
             // if new dump file found  then that means dump hasn't been completed
+
+            if (!isBackfillJobDone()) {
+              continue;
+            }
+            /*
             if (getPath(tableName) == null || !getPath(tableName).equals(path)) {
               continue;
             }
+             */
           }
           // dump is finished
           dumpCompleted(tableName);
@@ -369,6 +376,13 @@ public class DatastreamEventReader implements EventReader {
         scanEvents(bucket.list(listOptions.toArray(new Storage.BlobListOption[listOptions.size()])), tableName,
           srcTable, false, true);
       }
+    }
+
+    private boolean isBackfillJobDone() {
+      StreamObject streamObject = datastream.getStreamObject(""); //to do - put int stream name?
+      BackfillJob.State state =  streamObject.getBackfillJob().getState();
+      return state.equals(State.COMPLETED) || state.equals(State.FAILED)
+          || state.equals(State.UNRECOGNIZED) || state.equals(State.UNSUPPORTED);
     }
 
     private void dumpCompleted(String tableName) {

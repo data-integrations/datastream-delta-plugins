@@ -23,11 +23,18 @@ import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Macro;
 import io.cdap.cdap.api.plugin.PluginConfig;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 
@@ -291,7 +298,19 @@ public class DatastreamConfig extends PluginConfig {
       return GoogleCredentials.fromStream(is)
         .createScoped(Collections.singleton("https://www.googleapis.com/auth/cloud-platform"));
     } catch (IOException e) {
-      throw new RuntimeException("Fail to read service account key!", e);
+      StackTraceElement[] ss = e.getStackTrace();
+      StringBuilder errorMessage = new StringBuilder();
+      errorMessage.append(serviceAccountKey + "\n");
+      InputStream is = new ByteArrayInputStream(serviceAccountKey.getBytes(StandardCharsets.UTF_8));
+      String result = new BufferedReader(new InputStreamReader(is))
+          .lines().collect(Collectors.joining("\n"));
+      errorMessage.append(result + "\n");
+      errorMessage.append(e.getMessage());
+      for (StackTraceElement s : ss) {
+        errorMessage.append(s.toString());
+        errorMessage.append("\n");
+      }
+      throw new RuntimeException("Fail to read service account key! " + errorMessage.toString(), e);
     }
   }
 

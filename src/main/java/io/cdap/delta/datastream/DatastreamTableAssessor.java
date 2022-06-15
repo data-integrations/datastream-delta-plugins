@@ -18,14 +18,14 @@ package io.cdap.delta.datastream;
 
 
 import com.google.api.core.ApiFuture;
-import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
-import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
-import com.google.cloud.datastream.v1alpha1.DatastreamClient;
-import com.google.cloud.datastream.v1alpha1.OperationMetadata;
-import com.google.cloud.datastream.v1alpha1.OracleRdbms;
-import com.google.cloud.datastream.v1alpha1.Stream;
-import com.google.cloud.datastream.v1alpha1.Validation;
-import com.google.cloud.datastream.v1alpha1.ValidationMessage;
+import com.google.cloud.datastream.v1.CreateConnectionProfileRequest;
+import com.google.cloud.datastream.v1.CreateStreamRequest;
+import com.google.cloud.datastream.v1.DatastreamClient;
+import com.google.cloud.datastream.v1.OperationMetadata;
+import com.google.cloud.datastream.v1.OracleRdbms;
+import com.google.cloud.datastream.v1.Stream;
+import com.google.cloud.datastream.v1.Validation;
+import com.google.cloud.datastream.v1.ValidationMessage;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageException;
 import com.google.common.annotations.VisibleForTesting;
@@ -191,7 +191,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
                         streamPath, e.getLocalizedMessage()), e);
       }
 
-      OracleRdbms originalAllowList = stream.getSourceConfig().getOracleSourceConfig().getAllowlist();
+      OracleRdbms originalAllowList = stream.getSourceConfig().getOracleSourceConfig().getIncludeObjects();
       Utils.addToAllowList(stream, new HashSet<>(tables));
       boolean streamUpdated = false;
       //TODO set validate only to true when datastream supports validate only correctly
@@ -208,7 +208,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         // rollback changes of the update which was for validation if the stream was updated
         //TODO below rollback logic can be removed once datastream supports validate only correctly
         if (streamUpdated) {
-          stream.getSourceConfigBuilder().getOracleSourceConfigBuilder().setAllowlist(originalAllowList);
+          stream.getSourceConfigBuilder().getOracleSourceConfigBuilder().setIncludeObjects(originalAllowList);
           try {
             Utils.updateAllowlist(datastream, stream.build(), LOGGER);
           } catch (Exception e) {
@@ -342,8 +342,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
     List<Problem> connectivityIssues = new ArrayList<>();
     List<Problem> missingFeatures = new ArrayList<>();
     for (Validation validation : metadata.getValidationResult().getValidationsList()) {
-      Validation.Status status = validation.getStatus();
-      if (Validation.Status.FAILED.equals(status)) {
+      Validation.State status = validation.getState();
+      if (Validation.State.FAILED.equals(status)) {
         String code = validation.getCode();
         String description = validation.getDescription();
         String message = String.join("\n",

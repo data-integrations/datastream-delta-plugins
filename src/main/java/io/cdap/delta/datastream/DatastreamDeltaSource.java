@@ -99,7 +99,7 @@ public class DatastreamDeltaSource implements DeltaSource {
   @Override
   public void configure(SourceConfigurer configurer) {
     configurer.setProperties(
-      new SourceProperties.Builder().setRowIdSupported(true).setOrdering(SourceProperties.Ordering.UN_ORDERED).build());
+      new SourceProperties.Builder().setOrdering(SourceProperties.Ordering.UN_ORDERED).build());
   }
 
   @Override

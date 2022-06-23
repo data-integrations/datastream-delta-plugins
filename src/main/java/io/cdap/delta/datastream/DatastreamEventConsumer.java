@@ -240,10 +240,13 @@ public class DatastreamEventConsumer {
             sourceMetadata.get(TRANSACTION_ID_FIELD_NAME).toString()).setSnapshot(isSnapshot)
           .setSourceTimestamp((Long) record.get(SOURCE_TIMESTAMP_FIELD_NAME)).setOffset(new Offset(state));
 
-      // TODO below is a workaround of CDAP-17919 , remove below lines once it's fixed.
-      if (operationType == DMLOperation.Type.DELETE) {
+      // The datastream doesn't provide with previous row details, But we need to add the previous row details in order
+      // to support merging with Primary key. we can set current row as previous row is because we assume primary key
+      // is not changed for UPDATE event(if PK is changed, datastream will generate an UPDATE_DELETE and UPDATE_INSERT)
+      if (operationType == DMLOperation.Type.UPDATE) {
         eventBuilder.setPreviousRow(row);
       }
+
       event = eventBuilder.build();
       return;
     }
@@ -256,7 +259,7 @@ public class DatastreamEventConsumer {
       case CHANGE_TYPE_UPDATE_DELETE:
         return DMLOperation.Type.DELETE;
       case CHANGE_TYPE_UPDATE_INSERT:
-        return DMLOperation.Type.INSERT;
+        return DMLOperation.Type.UPDATE;
       default:
         return DMLOperation.Type.valueOf(changeType);
     }

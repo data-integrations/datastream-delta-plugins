@@ -215,7 +215,7 @@ class DatastreamEventConsumerTest {
       assertTrue(operation.getSizeInBytes() > 0);
       assertFalse(event.getRowId().isEmpty());
       assertTrue(event.getIngestTimestampMillis() >= startTime);
-      assertNull(event.getPreviousRow());
+      assertNotNull(event.getPreviousRow());
       assertNotNull(event.getTransactionId());
       HashMap<String, String> newState = new HashMap<>(state);
       newState.put(schema + "_" + table + ".pos", String.valueOf(startingPosition + count));
@@ -276,9 +276,7 @@ class DatastreamEventConsumerTest {
       assertTrue(operation.getSizeInBytes() == 0);
       assertFalse(event.getRowId().isEmpty());
       assertTrue(event.getIngestTimestampMillis() >= startTime);
-      //TODO once CDAP-17919 is fixed we should expect previous row to be null for delete event
-      // this is just a workaround for the issue.
-      assertNotNull(event.getPreviousRow());
+      assertNull(event.getPreviousRow());
       assertNotNull(event.getTransactionId());
       HashMap<String, String> newState = new HashMap<>(state);
       newState.put(schema + "_" + table + ".pos", String.valueOf(startingPosition + count));
@@ -339,15 +337,12 @@ class DatastreamEventConsumerTest {
       if (count == 0) {
         //first event is an update-delete
         assertEquals(DMLOperation.Type.DELETE, operation.getType());
-        //TODO once CDAP-17919 is fixed we should expect previous row to be null for delete event
-        // this is just a workaround for the issue.
-        assertNotNull(event.getPreviousRow());
         assertEquals(210L, row.<Long>get("EMPLOYEE_ID"));
         assertTrue(operation.getSizeInBytes() == 0);
       } else {
         //second event is an update-insert
-        assertEquals(DMLOperation.Type.INSERT, operation.getType());
-        assertNull(event.getPreviousRow());
+        assertEquals(DMLOperation.Type.UPDATE, operation.getType());
+        assertNotNull(event.getPreviousRow());
         assertEquals(211L, row.<Long>get("EMPLOYEE_ID"));
         assertTrue(operation.getSizeInBytes() > 0);
       }

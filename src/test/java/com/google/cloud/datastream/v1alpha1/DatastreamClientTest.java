@@ -252,9 +252,12 @@ public class DatastreamClientTest {
           .setRejectlist(OracleRdbms.getDefaultInstance())))
       .setBackfillAll(Stream.BackfillAllStrategy.getDefaultInstance());
 
-    //TODO set validate_only to true when it works
     OperationFuture<Stream, OperationMetadata> streamValidationOperation = datastream.createStreamAsync(
-      CreateStreamRequest.newBuilder().setParent(parent).setStream(streamBuilder).setStreamId(streamName).build());
+      CreateStreamRequest.newBuilder().setParent(parent)
+              .setStream(streamBuilder)
+              .setStreamId(streamName)
+              .setValidateOnly(true)
+              .build());
     ExecutionException exception = assertThrows(ExecutionException.class, () -> streamValidationOperation.get());
     assertTrue(exception.getCause() instanceof FailedPreconditionException);
     ValidationResult validationResult = streamValidationOperation.getMetadata().get().getValidationResult();

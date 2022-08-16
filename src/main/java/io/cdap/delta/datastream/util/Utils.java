@@ -731,15 +731,19 @@ public final class Utils {
    *
    * @param datastream Datastream client
    * @param stream     the builder of the stream to be updated
+   * @param validateOnly only validate the changes to the stream
    * @param logger     the logger
    * @return the updated stream
    */
-  public static Stream updateAllowlist(DatastreamClient datastream, Stream stream, Logger logger) {
+  public static Stream updateAllowlist(DatastreamClient datastream, Stream stream, boolean validateOnly,
+                                        Logger logger) {
     Stream.Builder streamBuilder = Stream.newBuilder().setName(stream.getName());
     streamBuilder.getSourceConfigBuilder().getOracleSourceConfigBuilder()
       .setAllowlist(stream.getSourceConfig().getOracleSourceConfig().getAllowlist());
-    return updateStream(datastream, UpdateStreamRequest.newBuilder().setStream(streamBuilder)
-      .setUpdateMask(FieldMask.newBuilder().addPaths(FIELD_ALLOWLIST)).build(), logger);
+    UpdateStreamRequest request = UpdateStreamRequest.newBuilder().setStream(streamBuilder)
+            .setUpdateMask(FieldMask.newBuilder().addPaths(FIELD_ALLOWLIST))
+            .setValidateOnly(validateOnly).build();
+    return updateStream(datastream, request, logger);
   }
 
   /**

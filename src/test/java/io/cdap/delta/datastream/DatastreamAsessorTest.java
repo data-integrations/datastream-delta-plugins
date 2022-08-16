@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import static io.cdap.delta.api.assessment.ColumnSupport.YES;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,15 +57,32 @@ public class DatastreamAsessorTest extends BaseIntegrationTestCase {
     testAssessTable(true);
   }
 
+  @Test
+  public void testAssessWithInvalidCredentials() throws Exception {
+    String invalidOracleUser = "dummy" + new Random().nextInt();
+
+    DatastreamConfig datastreamConfig = new DatastreamConfig(false, oracleHost, oraclePort,
+            invalidOracleUser, oraclePassword, oracleDb, serviceLocation,
+            DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null, null, null, null,
+            gcsBucket, null, serviceAccountKey, serviceAccountKey, streamId, project, null);
+    DatastreamDeltaSource deltaSource = createDeltaSource(datastreamConfig);
+    List<SourceTable> tables = new ArrayList<>(getSourceTables());
+    try (TableAssessor<TableDetail> assessor = deltaSource.createTableAssessor(null, tables)) {
+      Assessment assessment = assessor.assess();
+      assertEquals(1, assessment.getConnectivity().size());
+      assertTrue(assessment.getFeatures().isEmpty());
+    }
+  }
+
   private void testAssessTable(boolean usingExisting) throws Exception {
 
     DatastreamDeltaSource deltaSource = createDeltaSource(usingExisting);
     List<SourceTable> tables = new ArrayList<>(getSourceTables());
     try (TableAssessor<TableDetail> assessor = deltaSource.createTableAssessor(null, tables);
-      TableRegistry registry = deltaSource.createTableRegistry(null)) {
+         TableRegistry registry = deltaSource.createTableRegistry(null)) {
       for (SourceTable srcTable : tables) {
         TableDetail tableDetail =
-          registry.describeTable(srcTable.getDatabase(), srcTable.getSchema(), srcTable.getTable());
+                registry.describeTable(srcTable.getDatabase(), srcTable.getSchema(), srcTable.getTable());
         TableAssessment assessment = assessor.assess(tableDetail);
         assertEquals(tableDetail.getFeatures(), assessment.getFeatureProblems());
         List<ColumnAssessment> columnAssessments = assessment.getColumns();

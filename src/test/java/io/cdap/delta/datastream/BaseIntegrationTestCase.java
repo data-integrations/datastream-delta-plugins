@@ -143,11 +143,14 @@ public class BaseIntegrationTestCase {
       .collect(Collectors.toSet());
   }
 
-  protected DatastreamDeltaSource createDeltaSource(boolean usingExisting) throws Exception {
+  protected DatastreamDeltaSource createDeltaSource(boolean usingExisting) {
     DatastreamConfig config = buildDatastreamConfig(usingExisting);
     DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
     return deltaSource;
   }
 
+  protected DatastreamDeltaSource createDeltaSource(DatastreamConfig config) {
+    return new DatastreamDeltaSource(config);
+  }
 }
 

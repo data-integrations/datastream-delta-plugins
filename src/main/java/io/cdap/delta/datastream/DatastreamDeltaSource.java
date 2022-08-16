@@ -93,7 +93,7 @@ public class DatastreamDeltaSource implements DeltaSource {
     String streamPath = Utils.buildStreamPath(parentPath, config.getStreamId());
     Stream.Builder streamBuilder = Utils.getStream(datastream, streamPath, LOGGER).toBuilder();
     Utils.addToAllowList(streamBuilder, context.getAllTables());
-    Utils.updateAllowlist(datastream, streamBuilder.build(), LOGGER);
+    Utils.updateAllowlist(datastream, streamBuilder.build(), false, LOGGER);
   }
 
   @Override

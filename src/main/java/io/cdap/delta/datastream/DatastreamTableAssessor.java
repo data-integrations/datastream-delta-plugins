@@ -244,7 +244,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         }
 
         bucketName = conf.getGcsBucket();
-        if (bucketName == null) {
+        if (bucketName == null || bucketName.trim().isEmpty()) {
           bucketName = Utils.buildBucketName(uuid);
         }
         // create corresponding GCS bucket

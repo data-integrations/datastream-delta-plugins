@@ -103,6 +103,7 @@ public final class Utils {
   private static final String GCS_PROFILE_NAME_PREFIX = "DF-GCS-";
   private static final String STREAM_NAME_PREFIX = "DF-Stream-";
   private static final int GCS_ERROR_CODE_CONFLICT = 409;
+  private static final int GCS_ERROR_CODE_INVALID_REQUEST = 400;
   private static final int DATASTREAM_CLIENT_POOL_SIZE = 20;
   private static final float DATASTREAM_CLIENT_POOL_LOAD_FACTOR = 0.75f;
   private static final LinkedHashMap<GoogleCredentials, DatastreamClient> datastreamClientPool =
@@ -825,7 +826,10 @@ public final class Utils {
     // create corresponding GCS bucket
     try {
       Failsafe.with(createRetryPolicy()
-        .abortOn(t -> t instanceof StorageException && ((StorageException) t).getCode() == GCS_ERROR_CODE_CONFLICT))
+                      .abortOn(t -> t instanceof StorageException && (
+                          ((StorageException) t).getCode() == GCS_ERROR_CODE_CONFLICT ||
+                          ((StorageException) t).getCode() == GCS_ERROR_CODE_INVALID_REQUEST)
+                      ))
         .run(() -> storage.create(BucketInfo.newBuilder(bucketName).build()));
     } catch (StorageException se) {
       // It is possible that in multiple worker instances scenario
@@ -864,7 +868,7 @@ public final class Utils {
 
   private static <T> RetryPolicy<T> createRetryPolicy() {
     return new RetryPolicy<T>().withMaxAttempts(Integer.MAX_VALUE)
-      .withMaxDuration(java.time.Duration.of(5, ChronoUnit.MINUTES)).withBackoff(1, 60, ChronoUnit.SECONDS);
+            .withMaxDuration(java.time.Duration.of(5, ChronoUnit.MINUTES)).withBackoff(1, 60, ChronoUnit.SECONDS);
   }
 
   /**

@@ -193,30 +193,14 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
 
       OracleRdbms originalAllowList = stream.getSourceConfig().getOracleSourceConfig().getAllowlist();
       Utils.addToAllowList(stream, new HashSet<>(tables));
-      boolean streamUpdated = false;
-      //TODO set validate only to true when datastream supports validate only correctly
       try {
-        Utils.updateAllowlist(datastream, stream.build(), LOGGER);
-        streamUpdated = true;
+        Utils.updateAllowlist(datastream, stream.build(), true, LOGGER);
       } catch (DatastreamDeltaSourceException e) {
         if (Utils.isValidationFailed(e)) {
           return buildAssessment(e.getMetadata());
         }
         throw new RuntimeException(String.format("Fail to assess replicator pipeline due to failure of updating " +
                                                    "existing stream %s:\n%s", streamPath, e.getLocalizedMessage()), e);
-      } finally {
-        // rollback changes of the update which was for validation if the stream was updated
-        //TODO below rollback logic can be removed once datastream supports validate only correctly
-        if (streamUpdated) {
-          stream.getSourceConfigBuilder().getOracleSourceConfigBuilder().setAllowlist(originalAllowList);
-          try {
-            Utils.updateAllowlist(datastream, stream.build(), LOGGER);
-          } catch (Exception e) {
-            LOGGER
-              .error(String.format("Fail to rollback the update of existing stream %s after validating", streamPath),
-                e);
-          }
-        }
       }
     } else {
       // validate by creating new stream
@@ -272,10 +256,11 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
 
         try {
           String streamName = Utils.buildStreamName(uuid);
-          //TODO set validate only to true when datastream supports validate only correctly
           CreateStreamRequest createStreamRequest = CreateStreamRequest.newBuilder().setParent(parentPath).setStream(
             Utils.buildStreamConfig(parentPath, streamName, oracleProfilePath, gcsProfilePath, new HashSet<>(tables),
-              conf.shouldReplicateExistingData())).setStreamId(streamName).build();
+              conf.shouldReplicateExistingData()))
+                  .setValidateOnly(true)
+                  .setStreamId(streamName).build();
           if (Utils.createStreamIfNotExisting(datastream, createStreamRequest, LOGGER)) {
             streamPath = buildStreamPath(parentPath, streamName);
           }
@@ -295,15 +280,6 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
 
   private void clearTempResources(String oracleProfilePath, String gcsProfilePath, String streamPath, String bucketName,
     boolean bucketCreated) {
-    //clear temporary stream
-    //TODO below logic for clearing temporary stream can be removed once datastream supports validate only correctly
-    if (streamPath != null) {
-      try {
-        Utils.deleteStream(datastream, streamPath, LOGGER);
-      } catch (Exception e) {
-        LOGGER.warn(String.format("Fail to delete temporary stream : %s", streamPath), e);
-      }
-    }
     //clear temporary connectionProfile
     if (oracleProfilePath != null) {
       try {

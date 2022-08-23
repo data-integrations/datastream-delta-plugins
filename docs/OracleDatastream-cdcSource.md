@@ -53,49 +53,49 @@ See [Configure your source Oracle database](https://cloud.google.com/datastream/
 Plugin properties
 -----------
 
-**Use an existing Datastream stream:** Whether to let this plugin create a new Datastream stream or use an existing Datastream stream. It's recommended that you only have one Datastream stream per Oracle Database for performance concerns.
+**Use an existing Datastream stream**: Whether to let this plugin create a new Datastream stream or use an existing Datastream stream. It's recommended that you only have one Datastream stream per Oracle Database for performance concerns.
 
-**Region:** The region of the Datastream stream. Supported regions can be found [here](https://cloud.google.com/datastream/docs/ip-allowlists-and-regions).
+**Region**: The region of the Datastream stream. Supported regions can be found [here](https://cloud.google.com/datastream/docs/ip-allowlists-and-regions).
 
-**Stream ID:** The ID of the existing Datastream stream. Only applicable when you want to use an existing Datastream stream.
+**Stream ID**: The ID of the existing Datastream stream. Only applicable when you want to use an existing Datastream stream.
 
-**Connectivity Method** How you want the Datastream to connect to your database. See [Source network connectivity options](https://cloud.google.com/datastream/docs/source-network-connectivity-options) about what each option means and what you need to do for your network settings.
+**Connectivity Method**: How you want the Datastream to connect to your database. See [Source network connectivity options](https://cloud.google.com/datastream/docs/source-network-connectivity-options) about what each option means and what you need to do for your network settings.
 
-**Host (in the <b>Basic</b> section):** The hostname or IP address of your SSH tunnel bastion server. Only applicalbe when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
+**Host**(in the **Basic** section): The hostname or IP address of your SSH tunnel bastion server. Only applicalbe when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
 
-**Port (in the <b>Basic</b> section):** The port number to use to connect to your SSH tunnel bastion server. Only applicable when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
+**Port**(in the **Basic** section): The port number to use to connect to your SSH tunnel bastion server. Only applicable when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
 
-**Username (in the <b>Basic</b> section):** The username that Datastream can use to connect to your SSH tunnel bastion server. Only applicable when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
+**Username**(in the **Basic** section): The username that Datastream can use to connect to your SSH tunnel bastion server. Only applicable when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
 
-**Authentication Method:** How your SSH tunnel bastion server authenticates the user (Datastream). Only applicable when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
+**Authentication Method**: How your SSH tunnel bastion server authenticates the user (Datastream). Only applicable when you choose `Forward SSH Tunnel` as your `Connectivity Method`.
 
-**Password (in the <b>Basic</b> section):** The passowrd to use to connect to your SSH tunnel bastion server. Only applicable when you choose `Password` as your `Authentication Method`.
+**Password**(in the **Basic** section): The passowrd to use to connect to your SSH tunnel bastion server. Only applicable when you choose `Password` as your `Authentication Method`.
 
-**Private Key:** The private key Datastream will use to connect to your SSH tunnel bastion server that matches the public key assigned to it. Only applicable when you choose `Private/Public Key Pair` as your `Authentication Method`.
+**Private Key**: The private key Datastream will use to connect to your SSH tunnel bastion server that matches the public key assigned to it. Only applicable when you choose `Private/Public Key Pair` as your `Authentication Method`.
 
-**Private Connection Name:** Name of the private connection. The network admins of the Google Cloud Platform project should create a VPC peering between the database VPC and the Datastream VPC (see [Use private connectivity](https://cloud.google.com/datastream/docs/source-network-connectivity-options#privateconnectivity) for details). THis is the name of the VPC peering they created. Only applicable when you choose `Private connectivity (VPC peering)` as your `Connectivity Method`.
+**Private Connection Name**: Name of the private connection. The network admins of the Google Cloud Platform project should create a VPC peering between the database VPC and the Datastream VPC (see [Use private connectivity](https://cloud.google.com/datastream/docs/source-network-connectivity-options#privateconnectivity) for details). THis is the name of the VPC peering they created. Only applicable when you choose `Private connectivity (VPC peering)` as your `Connectivity Method`.
 
-**Host (in the <b>Database Location</b> section):** Hostname or IP address of your Oracle server to read from.
+**Host**(in the **Database Location** section): Hostname or IP address of your Oracle server to read from.
 
-**Port:** Port number to use to connect to your Oracle server.
+**Port**: Port number to use to connect to your Oracle server.
 
-**System Identifier (SID):** The system identifier(SID) of the oracle database you want to replicate data from.
+**System Identifier (SID)**: The system identifier(SID) of the oracle database you want to replicate data from.
 
-**Username:** Username to use to connect to your Oracle server. 
+**Username**: Username to use to connect to your Oracle server. 
 
-**Password:** Password to use to connect to your Oracle server.
+**Password**: Password to use to connect to your Oracle server.
 
-**Replicate Existing Data:** Whether to replicate existing data from the source database. When false, any existing data in the source tables will be ignored, and only changes that happened after the pipeline started will be replicated. By default, existing data will be replicated. 
+**Replicate Existing Data**: Whether to replicate existing data from the source database. When false, any existing data in the source tables will be ignored, and only changes that happened after the pipeline started will be replicated. By default, existing data will be replicated. 
 
-**Project:** The Google Cloud Platform project that has enabled the Datastream API. It will default to the value of the system property `GOOGLE_CLOUD_PROJECT` or `GCLOUD_PROJECT` for CDAP and Data Fusion Project for Data Fusion. 
+**Project**: The Google Cloud Platform project that has enabled the Datastream API. It will default to the value of the system property `GOOGLE_CLOUD_PROJECT` or `GCLOUD_PROJECT` for CDAP and Data Fusion Project for Data Fusion. 
 
-**Datastream Service Account Key:** The service account key for the service account that will be used as the identity to call the Datastream API. It will default to the content of the file referred by the system property `GOOGLE_APPLICATION_CREDENTIALS` for CDAP and Data Fusion Service Account for Data Fusion.
+**Datastream Service Account Key**: The service account key for the service account that will be used as the identity to call the Datastream API. It will default to the content of the file referred by the system property `GOOGLE_APPLICATION_CREDENTIALS` for CDAP and Data Fusion Service Account for Data Fusion.
 
-**GCS Service Account Key:** The service account key for the service account that will be used as the identity to access GCS. Datastream will write the change stream to the GCS bucket you specified as the `GCS Bucket` property of this plugin. This service account will be used as the identity to get and create (if you want this plugin to create a new bucket) the bucket and read Datastream result from the bucket. It will default to the content of the file referred by the system property `GOOGLE_APPLICATION_CREDENTIALS` for CDAP and Data Fusion Service Account for Data Fusion. 
+**GCS Service Account Key**: The service account key for the service account that will be used as the identity to access GCS. Datastream will write the change stream to the GCS bucket you specified as the `GCS Bucket` property of this plugin. This service account will be used as the identity to get and create (if you want this plugin to create a new bucket) the bucket and read Datastream result from the bucket. It will default to the content of the file referred by the system property `GOOGLE_APPLICATION_CREDENTIALS` for CDAP and Data Fusion Service Account for Data Fusion. 
 
-**GCS Bucket:** The GCS (Google Cloud Storage) bucket that Datastream will write its output to. If the bucket you provide doesn't exist or you leave it as empty, this plugin will create a new one in the `Project` you specified in this plugin. 
+**GCS Bucket**: The GCS (Google Cloud Storage) bucket that Datastream will write its output to. If the bucket you provide doesn't exist or you leave it as empty, this plugin will create a new one in the `Project` you specified in this plugin. 
 
-**Path Prefix:** The GCS (Google Cloud Storage) path prefix in the bucket that Datastream will write its output to. This prefix will be prefixed to the Datastream output path. It's usually used when you want Datastream to write its output to an existing bucket and you want to easily differentiate it from other existing GCS files by its path prefix.  
+**Path Prefix**: The GCS (Google Cloud Storage) path prefix in the bucket that Datastream will write its output to. This prefix will be prefixed to the Datastream output path. It's usually used when you want Datastream to write its output to an existing bucket and you want to easily differentiate it from other existing GCS files by its path prefix.  
 
 Limitations
 -----------

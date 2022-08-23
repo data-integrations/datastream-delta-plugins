@@ -708,15 +708,13 @@ public final class Utils {
     Stream.Builder streamBuilder = Stream.newBuilder().setName(streamName).setState(state);
     FieldMask.Builder fieldMaskBuilder = FieldMask.newBuilder().addPaths(FIELD_STATE);
 
-    // TODO below is a workaround for datastream not supprting idempotent operation and only supporting 1 queued
+    // TODO below is a workaround for datastream only supporting 1 queued
     //  operation. once the issue is resolve we can remove those workaround
     // a predicate that indicate that we try to start/pause a stream when it is already in the progress of
     // starting/pausing
     Predicate<? extends Throwable> streamBeingChangedPredicate = t -> t.getCause() instanceof ExecutionException &&
-      // If it's already in the progress of starting/pausing, an IllegalArgumentException will be thrown
-      (t.getCause().getCause() instanceof InvalidArgumentException ||
       // If there is already an operation queued, an AbortedException will be thrown
-      t.getCause().getCause() instanceof AbortedException);
+      t.getCause().getCause() instanceof AbortedException;
 
     return Failsafe.with(
       // fall back to get stream until stream state reaches target state

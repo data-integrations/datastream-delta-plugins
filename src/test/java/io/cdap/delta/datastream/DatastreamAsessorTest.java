@@ -64,7 +64,7 @@ public class DatastreamAsessorTest extends BaseIntegrationTestCase {
     DatastreamConfig datastreamConfig = new DatastreamConfig(false, oracleHost, oraclePort,
             invalidOracleUser, oraclePassword, oracleDb, serviceLocation,
             DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null, null, null, null,
-            gcsBucket, null, serviceAccountKey, serviceAccountKey, streamId, project, null);
+            null, gcsBucket, null, serviceAccountKey, serviceAccountKey, streamId, project, null);
     DatastreamDeltaSource deltaSource = createDeltaSource(datastreamConfig);
     List<SourceTable> tables = new ArrayList<>(getSourceTables());
     try (TableAssessor<TableDetail> assessor = deltaSource.createTableAssessor(null, tables)) {

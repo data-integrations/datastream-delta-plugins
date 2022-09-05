@@ -198,6 +198,14 @@
           }
         },
         {
+          "name": "gcsBucketLocation",
+          "label": "GCS Bucket Location",
+          "widget-type": "textbox",
+          "widget-attributes": {
+            "default": "us"
+          }
+        },
+        {
           "name": "gcsBucket",
           "label": "GCS Bucket",
           "widget-type": "textbox"

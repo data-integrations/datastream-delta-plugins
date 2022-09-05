@@ -35,7 +35,7 @@ class DatastreamConfigTest {
   void testDefaultValues() {
     DatastreamConfig config =
       new DatastreamConfig(false, "hostname", null, "user", "password", null, null, null, null, null, null,
-                           null, null, null, null, null, null, null, null, null, null);
+                           null, null, null, null, null, null, null, null, null, null, null);
 
     assertFalse(config.isUsingExistingStream());
     assertEquals("hostname", config.getHost());
@@ -49,6 +49,7 @@ class DatastreamConfigTest {
     assertNull(config.getSshAuthenticationMethod());
     assertNull(config.getStreamId());
     assertNull(config.getGcsBucket());
+    assertNull(config.getGcsBucketLocation());
     assertEquals("/", config.getGcsPathPrefix());
     assertNotNull(config.getDatastreamCredentials());
     assertNotNull(config.getGcsCredentials());
@@ -58,7 +59,7 @@ class DatastreamConfigTest {
     // forward ssh tunnel as connectivity method
     config = new DatastreamConfig(false, "hostname", null, "user", "password", null, null,
                                   DatastreamConfig.CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL,
-                                  "sshHost", null, "sshUser", null, null, "sshPrivateKey", "bucket",
+                                  "sshHost", null, "sshUser", null, null, "sshPrivateKey", "us", "bucket",
                                   "prefix", "gcs-key", "datastream-key", null, "project", null);
     assertEquals("sshHost", config.getSshHost());
     assertEquals(DatastreamConfig.DEFAULT_SSH_PORT, config.getSshPort());
@@ -69,6 +70,7 @@ class DatastreamConfigTest {
     assertNull(config.getSshPassword());
     assertNull(config.getPrivateConnectionName());
     assertEquals("bucket", config.getGcsBucket());
+    assertEquals("us", config.getGcsBucketLocation());
     assertEquals("/prefix", config.getGcsPathPrefix());
     DatastreamConfig conf = config;
     assertThrows(IllegalArgumentException.class, () -> conf.getDatastreamCredentials());
@@ -83,7 +85,7 @@ class DatastreamConfigTest {
     // as connectivity method.
     new DatastreamConfig(false, "hostname", null, "user", "password", null, null,
                          DatastreamConfig.CONNECTIVITY_METHOD_IP_ALLOWLISTING, null, null, null,
-                         null, null, null, null, null, null, null, null, null, null).validate();
+                         null, null, null, null, null, null, null, null, null, null, null).validate();
 
     // sshPassowrd can be null if forward ssh tunnel is selected as connectivity method
     // and private/public key pair is selected as authentication method
@@ -91,7 +93,7 @@ class DatastreamConfigTest {
                                                    DatastreamConfig.CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL,
                                                    "sshHost", null, "sshUser",
                                                    DatastreamConfig.AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY,
-                                                   null, "sshPrivateKey", null, null, null, null, null, null, null);
+                                                   null, "sshPrivateKey", null, null, null, null, null, null, null, null);
     config.validate();
     // host should not be null
     Field field = DatastreamConfig.class.getDeclaredField("host");

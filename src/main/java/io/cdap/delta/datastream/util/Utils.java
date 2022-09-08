@@ -833,7 +833,13 @@ public final class Utils {
                           ((StorageException) t).getCode() == GCS_ERROR_CODE_CONFLICT ||
                           ((StorageException) t).getCode() == GCS_ERROR_CODE_INVALID_REQUEST)
                       ))
-        .run(() -> storage.create(BucketInfo.newBuilder(bucketName).setLocation(location).build()));
+        .run(() -> {
+          BucketInfo.Builder builder = BucketInfo.newBuilder(bucketName);
+          if(location != null && !location.trim().isEmpty()){
+            builder.setLocation(location);
+          }
+          storage.create(builder.build());
+        });
     } catch (StorageException se) {
       // It is possible that in multiple worker instances scenario
       // bucket is created by another worker instance after this worker instance

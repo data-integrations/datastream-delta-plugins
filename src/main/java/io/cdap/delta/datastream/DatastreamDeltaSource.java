@@ -151,7 +151,7 @@ public class DatastreamDeltaSource implements DeltaSource {
       // check whether GCS Bucket exists first
       String bucketName = config.getGcsBucket();
       // If user doesn't provide bucketName, we assign one based on run id
-      if (bucketName == null || bucketName.isEmpty()) {
+      if (bucketName == null || bucketName.trim().isEmpty()) {
         bucketName = Utils.buildBucketName(context.getRunId());
       }
       Utils.createBucketIfNotExisting(storage, bucketName, config.getGcsBucketLocation());

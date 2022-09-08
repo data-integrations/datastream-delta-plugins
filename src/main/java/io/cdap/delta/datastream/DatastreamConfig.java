@@ -308,10 +308,12 @@ public class DatastreamConfig extends PluginConfig {
   }
 
   public DatastreamConfig(boolean usingExistingStream, @Nullable String host, @Nullable Integer port,
-                          @Nullable String user, @Nullable String password, @Nullable String sid, @Nullable String region,
-                          @Nullable String connectivityMethod, @Nullable String sshHost, @Nullable Integer sshPort, @Nullable String sshUser,
-                          @Nullable String sshAuthenticationMethod, @Nullable String sshPassword, @Nullable String sshPrivateKey,
-                          @Nullable String gcsBucketLocation, @Nullable String gcsBucket, @Nullable String gcsPathPrefix, @Nullable String gcsServiceAccountKey,
+                          @Nullable String user, @Nullable String password, @Nullable String sid,
+                          @Nullable String region, @Nullable String connectivityMethod, @Nullable String sshHost,
+                          @Nullable Integer sshPort, @Nullable String sshUser, @Nullable String sshAuthenticationMethod,
+                          @Nullable String sshPassword, @Nullable String sshPrivateKey,
+                          @Nullable String gcsBucketLocation, @Nullable String gcsBucket,
+                          @Nullable String gcsPathPrefix, @Nullable String gcsServiceAccountKey,
                           @Nullable String dsServiceAccountKey, @Nullable String streamId, @Nullable String project,
                           @Nullable String privateConnectionName) {
     this.usingExistingStream = usingExistingStream;

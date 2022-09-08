@@ -129,6 +129,10 @@ public class DatastreamConfig extends PluginConfig {
   // only required when connectivity method is  "Private connectivity (VPC peering)"
   private String privateConnectionName;
 
+  @Nullable
+  @Description("The location of the GCS bucket where Datastream will write its output to." +
+          "This value is ignored if an existing GCS bucket is specified")
+  protected String gcsBucketLocation;
 
   @Nullable
   @Description("The GCS bucket that Datastream can write its output to. By default replicator " +
@@ -250,6 +254,10 @@ public class DatastreamConfig extends PluginConfig {
     return privateConnectionName;
   }
 
+  @Nullable
+  public String getGcsBucketLocation() {
+    return gcsBucketLocation;
+  }
 
   @Nullable
   public String getGcsBucket() {
@@ -300,12 +308,12 @@ public class DatastreamConfig extends PluginConfig {
   }
 
   public DatastreamConfig(boolean usingExistingStream, @Nullable String host, @Nullable Integer port,
-    @Nullable String user, @Nullable String password, @Nullable String sid, @Nullable String region,
-    @Nullable String connectivityMethod, @Nullable String sshHost, @Nullable Integer sshPort, @Nullable String sshUser,
-    @Nullable String sshAuthenticationMethod, @Nullable String sshPassword, @Nullable String sshPrivateKey,
-    @Nullable String gcsBucket, @Nullable String gcsPathPrefix, @Nullable String gcsServiceAccountKey,
-    @Nullable String dsServiceAccountKey, @Nullable String streamId, @Nullable String project,
-    @Nullable String privateConnectionName) {
+                          @Nullable String user, @Nullable String password, @Nullable String sid, @Nullable String region,
+                          @Nullable String connectivityMethod, @Nullable String sshHost, @Nullable Integer sshPort, @Nullable String sshUser,
+                          @Nullable String sshAuthenticationMethod, @Nullable String sshPassword, @Nullable String sshPrivateKey,
+                          @Nullable String gcsBucketLocation, @Nullable String gcsBucket, @Nullable String gcsPathPrefix, @Nullable String gcsServiceAccountKey,
+                          @Nullable String dsServiceAccountKey, @Nullable String streamId, @Nullable String project,
+                          @Nullable String privateConnectionName) {
     this.usingExistingStream = usingExistingStream;
     this.host = host;
     this.port = port;
@@ -327,6 +335,7 @@ public class DatastreamConfig extends PluginConfig {
     this.streamId = streamId;
     this.project = project;
     this.privateConnectionName = privateConnectionName;
+    this.gcsBucketLocation = gcsBucketLocation;
     validate();
   }
 

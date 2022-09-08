@@ -93,6 +93,9 @@ Plugin properties
 
 **GCS Service Account Key:** The service account key for the service account that will be used as the identity to access GCS. Datastream will write the change stream to the GCS bucket you specified as the `GCS Bucket` property of this plugin. This service account will be used as the identity to get and create (if you want this plugin to create a new bucket) the bucket and read Datastream result from the bucket. It will default to the content of the file referred by the system property `GOOGLE_APPLICATION_CREDENTIALS` for CDAP and Data Fusion Service Account for Data Fusion. 
 
+**GCS Bucket Location:** The location of GCS (Google Cloud Storage) bucket that Datastream will write its output to. A complete list of available locations can be found at
+https://cloud.google.com/bigquery/docs/locations. This value is ignored if an existing GCS bucket is specified.
+
 **GCS Bucket:** The GCS (Google Cloud Storage) bucket that Datastream will write its output to. If the bucket you provide doesn't exist or you leave it as empty, this plugin will create a new one in the `Project` you specified in this plugin. 
 
 **Path Prefix:** The GCS (Google Cloud Storage) path prefix in the bucket that Datastream will write its output to. This prefix will be prefixed to the Datastream output path. It's usually used when you want Datastream to write its output to an existing bucket and you want to easily differentiate it from other existing GCS files by its path prefix.  

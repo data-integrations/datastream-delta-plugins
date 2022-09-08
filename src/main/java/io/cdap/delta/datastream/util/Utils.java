@@ -822,9 +822,10 @@ public final class Utils {
    * Create a GCS bucket if it doesn't exist
    * @param storage the GCS client
    * @param bucketName the name of the bucket to be created
+   * @param location location where bucket will be created
    * @return whether the GCS bucket is newly created by this method
    */
-  public static boolean createBucketIfNotExisting(Storage storage, String bucketName) throws IOException {
+  public static boolean createBucketIfNotExisting(Storage storage, String bucketName, String location) throws IOException {
     // create corresponding GCS bucket
     try {
       Failsafe.with(createRetryPolicy()
@@ -832,7 +833,13 @@ public final class Utils {
                           ((StorageException) t).getCode() == GCS_ERROR_CODE_CONFLICT ||
                           ((StorageException) t).getCode() == GCS_ERROR_CODE_INVALID_REQUEST)
                       ))
-        .run(() -> storage.create(BucketInfo.newBuilder(bucketName).build()));
+        .run(() -> {
+          BucketInfo.Builder builder = BucketInfo.newBuilder(bucketName);
+          if(location != null && !location.trim().isEmpty()){
+            builder.setLocation(location);
+          }
+          storage.create(builder.build());
+        });
     } catch (StorageException se) {
       // It is possible that in multiple worker instances scenario
       // bucket is created by another worker instance after this worker instance

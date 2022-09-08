@@ -233,7 +233,7 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
         }
         // create corresponding GCS bucket
         try {
-          bucketCreated = Utils.createBucketIfNotExisting(storage, bucketName);
+          bucketCreated = Utils.createBucketIfNotExisting(storage, bucketName, conf.getGcsBucketLocation());
         } catch (Exception e) {
           throw new RuntimeException(String.format("Fail to assess replicator pipeline due to failure of creating GCS" +
                                                      " Bucket:\n%s.", e.getLocalizedMessage()), e);

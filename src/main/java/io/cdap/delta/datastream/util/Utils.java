@@ -825,7 +825,8 @@ public final class Utils {
    * @param location location where bucket will be created
    * @return whether the GCS bucket is newly created by this method
    */
-  public static boolean createBucketIfNotExisting(Storage storage, String bucketName, String location) throws IOException {
+  public static boolean createBucketIfNotExisting(Storage storage, String bucketName,
+                                                  String location) throws IOException {
     // create corresponding GCS bucket
     try {
       Failsafe.with(createRetryPolicy()
@@ -835,7 +836,7 @@ public final class Utils {
                       ))
         .run(() -> {
           BucketInfo.Builder builder = BucketInfo.newBuilder(bucketName);
-          if(location != null && !location.trim().isEmpty()){
+          if (location != null && !location.trim().isEmpty()) {
             builder.setLocation(location);
           }
           storage.create(builder.build());

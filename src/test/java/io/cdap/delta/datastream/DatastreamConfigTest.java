@@ -93,7 +93,8 @@ class DatastreamConfigTest {
                                                    DatastreamConfig.CONNECTIVITY_METHOD_FORWARD_SSH_TUNNEL,
                                                    "sshHost", null, "sshUser",
                                                    DatastreamConfig.AUTHENTICATION_METHOD_PRIVATE_PUBLIC_KEY,
-                                                   null, "sshPrivateKey", null, null, null, null, null, null, null, null);
+                                                   null, "sshPrivateKey", null, null, null, null,
+                                                   null, null, null, null);
     config.validate();
     // host should not be null
     Field field = DatastreamConfig.class.getDeclaredField("host");

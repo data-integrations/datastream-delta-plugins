@@ -24,10 +24,12 @@ import io.cdap.delta.api.DMLEvent;
 import io.cdap.delta.api.DMLOperation;
 import io.cdap.delta.api.DeltaSourceContext;
 import io.cdap.delta.api.Offset;
+import io.cdap.delta.api.SortKey;
 import io.cdap.delta.api.SourceTable;
 import io.cdap.delta.datastream.util.Utils;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.SeekableByteArrayInput;
+import org.apache.avro.generic.GenericArray;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
@@ -35,6 +37,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -55,6 +59,7 @@ public class DatastreamEventConsumer {
   private static final String TRANSACTION_ID_FIELD_NAME = "tx_id";
   private static final String SOURCE_TIMESTAMP_FIELD_NAME = "source_timestamp";
   private static final String PAYLOAD_FIELD_NAME = "payload";
+  private static final String SORT_KEYS_FIELD_NAME = "sort_keys";
   private static final String CHANGE_TYPE_UPDATE_DELETE = "UPDATE-DELETE";
   private static final String CHANGE_TYPE_UPDATE_INSERT = "UPDATE-INSERT";
   private final byte[] content;
@@ -238,7 +243,8 @@ public class DatastreamEventConsumer {
           .setRow(row).setRowId(sourceMetadata.get(ROW_ID_FIELD_NAME).toString()).setTransactionId(
           sourceMetadata.get(TRANSACTION_ID_FIELD_NAME) == null ? null :
             sourceMetadata.get(TRANSACTION_ID_FIELD_NAME).toString()).setSnapshot(isSnapshot)
-          .setSourceTimestamp((Long) record.get(SOURCE_TIMESTAMP_FIELD_NAME)).setOffset(new Offset(state));
+          .setSourceTimestamp((Long) record.get(SOURCE_TIMESTAMP_FIELD_NAME)).setOffset(new Offset(state))
+                .setSortKeys(getSortKeys(record));
 
       // The datastream doesn't provide with previous row details, But we need to add the previous row details in order
       // to support merging with Primary key. we can set current row as previous row is because we assume primary key
@@ -250,6 +256,26 @@ public class DatastreamEventConsumer {
       event = eventBuilder.build();
       return;
     }
+  }
+
+  private List<SortKey> getSortKeys(GenericRecord record) {
+    GenericArray<?> keys = (GenericArray<?>) record.get(SORT_KEYS_FIELD_NAME);
+    List<SortKey> sortKeys = null;
+    if (keys != null) {
+      sortKeys = new ArrayList<>(keys.size());
+      for (Object key : keys) {
+        if (Long.class.equals(key.getClass())) {
+          sortKeys.add(new SortKey(Schema.Type.LONG, key));
+        } else if (Integer.class.equals(key.getClass())) {
+          sortKeys.add(new SortKey(Schema.Type.INT, key));
+        } else if (key instanceof CharSequence) {
+          sortKeys.add(new SortKey(Schema.Type.STRING, key.toString()));
+        } else {
+          throw new IllegalArgumentException("Unsupported sort key type: " + schema.getType());
+        }
+      }
+    }
+    return sortKeys;
   }
 
   private DMLOperation.Type getOperationType(String changeType) {

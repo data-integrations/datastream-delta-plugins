@@ -258,20 +258,32 @@ public class DatastreamEventConsumer {
     }
   }
 
+  /**
+   * Gets the list of {@link SortKey} from the record.
+   * <p>
+   * Sort keys is a list of values that each DML record
+   * can be sorted by in the order that the comparison
+   * should be performed
+   * <p>
+   * Datastream generates sort keys of String/Long types
+   *
+   * @param record Datastream record
+   * @return List of {@link SortKey}
+   */
   private List<SortKey> getSortKeys(GenericRecord record) {
     GenericArray<?> keys = (GenericArray<?>) record.get(SORT_KEYS_FIELD_NAME);
     List<SortKey> sortKeys = null;
     if (keys != null) {
       sortKeys = new ArrayList<>(keys.size());
       for (Object key : keys) {
-        if (Long.class.equals(key.getClass())) {
+        if (key instanceof Long) {
           sortKeys.add(new SortKey(Schema.Type.LONG, key));
-        } else if (Integer.class.equals(key.getClass())) {
+        } else if (key instanceof Integer) {
           sortKeys.add(new SortKey(Schema.Type.INT, key));
         } else if (key instanceof CharSequence) {
           sortKeys.add(new SortKey(Schema.Type.STRING, key.toString()));
         } else {
-          throw new IllegalArgumentException("Unsupported sort key type: " + schema.getType());
+          throw new IllegalArgumentException("Unsupported sort key type: " + key.getClass());
         }
       }
     }

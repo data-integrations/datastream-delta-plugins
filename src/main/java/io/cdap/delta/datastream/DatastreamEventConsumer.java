@@ -266,6 +266,10 @@ public class DatastreamEventConsumer {
    * should be performed
    * <p>
    * Datastream generates sort keys of String/Long types
+   * "sort_keys":{"elementType":["string","long"],"type":"array"}
+   * <p>
+   * For oracle - [source_timestamp (Long), scn (Long), rs_id (String), ssn (Long)]
+   * e.g. [1609071865000, 680024, '0x000013.00000032.004c', 5]
    *
    * @param record Datastream record
    * @return List of {@link SortKey}

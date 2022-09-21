@@ -22,7 +22,7 @@
 
   <groupId>io.cdap.delta</groupId>
   <artifactId>datastream-delta-plugins</artifactId>
-  <version>0.4.1</version>
+  <version>0.4.2-SNAPSHOT</version>
   <name>Datastream Delta plugins</name>
   <packaging>jar</packaging>
   <description>Datastream Delta plugins</description>

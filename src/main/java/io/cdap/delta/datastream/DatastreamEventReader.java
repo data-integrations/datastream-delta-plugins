@@ -19,10 +19,10 @@ package io.cdap.delta.datastream;
 
 import com.google.api.gax.paging.Page;
 import com.google.api.gax.rpc.NotFoundException;
-import com.google.cloud.datastream.v1alpha1.DatastreamClient;
-import com.google.cloud.datastream.v1alpha1.Error;
-import com.google.cloud.datastream.v1alpha1.GcsProfile;
-import com.google.cloud.datastream.v1alpha1.Stream;
+import com.google.cloud.datastream.v1.DatastreamClient;
+import com.google.cloud.datastream.v1.Error;
+import com.google.cloud.datastream.v1.GcsProfile;
+import com.google.cloud.datastream.v1.Stream;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.Storage;
@@ -120,7 +120,7 @@ public class DatastreamEventReader implements EventReader {
     } catch (Exception e) {
       throw Utils.buildException("Failed to get stream : " + streamPath, e, true);
     }
-    String oracleProfileName = this.stream.getSourceConfig().getSourceConnectionProfileName();
+    String oracleProfileName = this.stream.getSourceConfig().getSourceConnectionProfile();
     try {
       this.databaseName =
         Utils.getConnectionProfile(datastream, oracleProfileName, LOGGER).getOracleProfile().getDatabaseService();
@@ -130,10 +130,10 @@ public class DatastreamEventReader implements EventReader {
     }
     String path = this.stream.getDestinationConfig().getGcsDestinationConfig().getPath();
     this.streamGcsPathPrefix = path == null ? "" : path.startsWith("/") ? path.substring(1) : path;
-    String gcsProfileName = this.stream.getDestinationConfig().getDestinationConnectionProfileName();
+    String gcsProfileName = this.stream.getDestinationConfig().getDestinationConnectionProfile();
     try {
       GcsProfile gcsProfile = Utils.getConnectionProfile(datastream, gcsProfileName, LOGGER).getGcsProfile();
-      this.bucketName = gcsProfile.getBucketName();
+      this.bucketName = gcsProfile.getBucket();
       path = gcsProfile.getRootPath();
       this.gcsRootPath = path.startsWith("/") ? path.substring(1) : path;
     } catch (Exception e) {

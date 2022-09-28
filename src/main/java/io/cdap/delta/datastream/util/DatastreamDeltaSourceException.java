@@ -18,7 +18,7 @@
 package io.cdap.delta.datastream.util;
 
 import com.google.api.core.ApiFuture;
-import com.google.cloud.datastream.v1alpha1.OperationMetadata;
+import com.google.cloud.datastream.v1.OperationMetadata;
 
 /**
  * Exception thrown by Datastream Delta Source on purpose. Such exception is thrown after Datastream Delta Source

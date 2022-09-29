@@ -131,19 +131,19 @@ public class DatastreamClientTest {
     }
 
     datastream =
-        DatastreamClient.create(DatastreamSettings.newBuilder().setCredentialsProvider(new CredentialsProvider() {
-          @Override
-          public Credentials getCredentials() throws IOException {
-            return credentials;
-          }
-        }).build());
+      DatastreamClient.create(DatastreamSettings.newBuilder().setCredentialsProvider(new CredentialsProvider() {
+        @Override
+        public Credentials getCredentials() throws IOException {
+          return credentials;
+        }
+      }).build());
   }
 
   @Test
   public void testDiscoverConnectionProfiles() throws IOException {
     DiscoverConnectionProfileRequest request =
-        DiscoverConnectionProfileRequest.newBuilder().setParent(parent).setFullHierarchy(true)
-            .setConnectionProfile(buildOracleConnectionProfile("discover-test")).build();
+      DiscoverConnectionProfileRequest.newBuilder().setParent(parent).setFullHierarchy(true)
+        .setConnectionProfile(buildOracleConnectionProfile("discover-test")).build();
     DiscoverConnectionProfileResponse response = datastream.discoverConnectionProfile(request);
     checkDiscoverResponse(response);
   }
@@ -168,11 +168,11 @@ public class DatastreamClientTest {
 
     String sourceName = "Datafusion-Oracle-" + UUID.randomUUID();
     OperationFuture<ConnectionProfile, OperationMetadata> sourceProfileCreationOperation =
-        createOracleConnectionProfile(sourceName);
+      createOracleConnectionProfile(sourceName);
 
     String destinationName = "Datafusion-GCS-" + UUID.randomUUID();
     OperationFuture<ConnectionProfile, OperationMetadata> destinationProfileCreationOperation =
-        createGcsConnectionProfile(destinationName);
+            createGcsConnectionProfile(destinationName);
 
 
     sourceProfileCreationOperation.get();
@@ -185,30 +185,28 @@ public class DatastreamClientTest {
     try {
       String streamName = "Datafusion-DS-" + UUID.randomUUID();
       Stream.Builder streamBuilder = Stream.newBuilder().setDisplayName(streamName).setDestinationConfig(
-              DestinationConfig.newBuilder()
-                  .setDestinationConnectionProfile(buildConnectionProfilePath(destinationName))
-                  .setGcsDestinationConfig(
-                      GcsDestinationConfig.newBuilder()
-                          .setAvroFileFormat(AvroFileFormat.getDefaultInstance())
-                          .setFileRotationMb(5)
-                          .setFileRotationInterval(Duration.newBuilder()
-                              .setSeconds(15).build())))
-          .setSourceConfig(
-              SourceConfig.newBuilder().setSourceConnectionProfile(buildConnectionProfilePath(sourceName))
-                  .setOracleSourceConfig(getOracleConfig()))
-          .setBackfillAll(Stream.BackfillAllStrategy.getDefaultInstance());
+                      DestinationConfig.newBuilder()
+                              .setDestinationConnectionProfile(buildConnectionProfilePath(destinationName))
+                              .setGcsDestinationConfig(
+                                      GcsDestinationConfig.newBuilder()
+                                              .setAvroFileFormat(AvroFileFormat.getDefaultInstance())
+                                              .setFileRotationMb(5)
+                                              .setFileRotationInterval(Duration.newBuilder()
+                                                      .setSeconds(15).build())))
+              .setSourceConfig(
+                      SourceConfig.newBuilder().setSourceConnectionProfile(buildConnectionProfilePath(sourceName))
+                              .setOracleSourceConfig(getOracleConfig()))
+              .setBackfillAll(Stream.BackfillAllStrategy.getDefaultInstance());
       OperationFuture<Stream, OperationMetadata> streamCreationOperation = datastream.createStreamAsync(
-          CreateStreamRequest.newBuilder()
-              .setParent(parent)
-              .setStream(streamBuilder)
-              .setStreamId(streamName).build());
+              CreateStreamRequest.newBuilder()
+                      .setParent(parent)
+                      .setStream(streamBuilder)
+                      .setStreamId(streamName).build());
 
-      //check this - it was created.. now what?
       assertEquals(State.NOT_STARTED, streamCreationOperation.get().getState());
 
       String streamPath = buildStreamPath(streamName);
       Stream stream = datastream.getStream(streamPath);
-      //same aas above
       assertEquals(State.NOT_STARTED, stream.getState());
 
       try {
@@ -235,8 +233,8 @@ public class DatastreamClientTest {
         assertEquals(Stream.State.RUNNING, datastream.getStream(streamPath).getState());
 
         OperationFuture<Stream, OperationMetadata> streamPauseOperation = datastream
-            .updateStreamAsync(Stream.newBuilder().setName(streamPath).setState(Stream.State.PAUSED).build(),
-                FieldMask.newBuilder().addPaths(FIELD_STATE).build());
+                .updateStreamAsync(Stream.newBuilder().setName(streamPath).setState(Stream.State.PAUSED).build(),
+                        FieldMask.newBuilder().addPaths(FIELD_STATE).build());
 
         assertEquals(Stream.State.PAUSED, streamPauseOperation.get().getState());
         assertEquals(Stream.State.PAUSED, datastream.getStream(streamPath).getState());
@@ -247,20 +245,20 @@ public class DatastreamClientTest {
       }
     } finally {
       OperationFuture<Empty, OperationMetadata> sourceProfileDeletionOperation =
-          datastream.deleteConnectionProfileAsync(buildConnectionProfilePath(sourceName));
+              datastream.deleteConnectionProfileAsync(buildConnectionProfilePath(sourceName));
 
       OperationFuture<Empty, OperationMetadata> destinationProfileDeletionOperation =
-          datastream.deleteConnectionProfileAsync(buildConnectionProfilePath(destinationName));
+              datastream.deleteConnectionProfileAsync(buildConnectionProfilePath(destinationName));
 
 
       sourceProfileDeletionOperation.get();
       destinationProfileDeletionOperation.get();
 
       assertThrows(NotFoundException.class,
-          () -> datastream.getConnectionProfile(buildConnectionProfilePath(sourceName)));
+              () -> datastream.getConnectionProfile(buildConnectionProfilePath(sourceName)));
 
       assertThrows(NotFoundException.class,
-          () -> datastream.getConnectionProfile(buildConnectionProfilePath(destinationName)));
+              () -> datastream.getConnectionProfile(buildConnectionProfilePath(destinationName)));
     }
   }
 
@@ -269,13 +267,13 @@ public class DatastreamClientTest {
 
     String sourceName = "Datafusion-Oracle-" + UUID.randomUUID();
     OperationFuture<ConnectionProfile, OperationMetadata> sourceProfileCreationOperation =
-        createOracleConnectionProfile(sourceName);
+            createOracleConnectionProfile(sourceName);
 
     String destinationName = "Datafusion-GCS-" + UUID.randomUUID();
     String originalBucket = gcsBucket;
     gcsBucket = "non-existing";
     OperationFuture<ConnectionProfile, OperationMetadata> destinationProfileCreationOperation =
-        createGcsConnectionProfile(destinationName);
+      createGcsConnectionProfile(destinationName);
     gcsBucket = originalBucket;
 
     sourceProfileCreationOperation.get();
@@ -286,21 +284,21 @@ public class DatastreamClientTest {
 
     String streamName = "Datafusion-DS-" + UUID.randomUUID();
     Stream.Builder streamBuilder = Stream.newBuilder().setDisplayName(streamName).setDestinationConfig(
-            DestinationConfig.newBuilder().setDestinationConnectionProfile(buildConnectionProfilePath(destinationName))
-                .setGcsDestinationConfig(
-                    GcsDestinationConfig.newBuilder().setAvroFileFormat(AvroFileFormat.getDefaultInstance()).setFileRotationMb(5)
-                        .setFileRotationInterval(Duration.newBuilder().setSeconds(15).build()))).setSourceConfig(
-            SourceConfig.newBuilder().setSourceConnectionProfile(buildConnectionProfilePath(sourceName))
-                .setOracleSourceConfig(OracleSourceConfig.newBuilder().setIncludeObjects(OracleRdbms.getDefaultInstance())
-                    .setExcludeObjects(OracleRdbms.getDefaultInstance())))
-        .setBackfillAll(Stream.BackfillAllStrategy.getDefaultInstance());
+      DestinationConfig.newBuilder().setDestinationConnectionProfile(buildConnectionProfilePath(destinationName))
+        .setGcsDestinationConfig(
+          GcsDestinationConfig.newBuilder().setAvroFileFormat(AvroFileFormat.getDefaultInstance()).setFileRotationMb(5)
+            .setFileRotationInterval(Duration.newBuilder().setSeconds(15).build()))).setSourceConfig(
+      SourceConfig.newBuilder().setSourceConnectionProfile(buildConnectionProfilePath(sourceName))
+        .setOracleSourceConfig(OracleSourceConfig.newBuilder().setIncludeObjects(OracleRdbms.getDefaultInstance())
+          .setExcludeObjects(OracleRdbms.getDefaultInstance())))
+      .setBackfillAll(Stream.BackfillAllStrategy.getDefaultInstance());
 
     OperationFuture<Stream, OperationMetadata> streamValidationOperation = datastream.createStreamAsync(
-        CreateStreamRequest.newBuilder().setParent(parent)
-            .setStream(streamBuilder)
-            .setStreamId(streamName)
-            .setValidateOnly(true)
-            .build());
+      CreateStreamRequest.newBuilder().setParent(parent)
+              .setStream(streamBuilder)
+              .setStreamId(streamName)
+              .setValidateOnly(true)
+              .build());
     ExecutionException exception = assertThrows(ExecutionException.class, () -> streamValidationOperation.get());
     assertTrue(exception.getCause() instanceof FailedPreconditionException);
     ValidationResult validationResult = streamValidationOperation.getMetadata().get().getValidationResult();
@@ -308,17 +306,17 @@ public class DatastreamClientTest {
     for (Validation validation : validationResult.getValidationsList()) {
       String code = validation.getCode();
       assertFalse(code.isEmpty());
-      Validation.State status = validation.getState();
+      Validation.State state = validation.getState();
       String description = validation.getDescription();
       assertFalse(description.isEmpty());
 
       if (code.equals("GCS_VALIDATE_PERMISSIONS")) {
-        assertEquals(Validation.State.FAILED, status);
+        assertEquals(Validation.State.FAILED, state);
         List<ValidationMessage> messages = validation.getMessageList();
         assertFalse(messages.get(0).getCode().isEmpty());
         assertFalse(messages.get(0).getMessage().isEmpty());
       } else {
-        assertEquals(Validation.State.PASSED, status);
+        assertEquals(Validation.State.PASSED, state);
       }
     }
 
@@ -328,15 +326,15 @@ public class DatastreamClientTest {
   }
 
   private OperationFuture<ConnectionProfile, OperationMetadata> createGcsConnectionProfile(String name)
-      throws IOException {
+    throws IOException {
     return datastream.createConnectionProfileAsync(CreateConnectionProfileRequest.newBuilder().setParent(parent)
-        .setConnectionProfile(buildGCSConnectionProfile(name)).setConnectionProfileId(name).build());
+            .setConnectionProfile(buildGCSConnectionProfile(name)).setConnectionProfileId(name).build());
   }
 
   private OperationFuture<ConnectionProfile, OperationMetadata> createOracleConnectionProfile(String name)
-      throws IOException {
+          throws IOException {
     return datastream.createConnectionProfileAsync(CreateConnectionProfileRequest.newBuilder().setParent(parent)
-        .setConnectionProfile(buildOracleConnectionProfile(name)).setConnectionProfileId(name).build());
+            .setConnectionProfile(buildOracleConnectionProfile(name)).setConnectionProfileId(name).build());
   }
 
   private OracleSourceConfig.Builder getOracleConfig() {
@@ -362,7 +360,7 @@ public class DatastreamClientTest {
       OracleRdbms.Builder builder = OracleRdbms.newBuilder();
       schemaTables.forEach((schema, tables) -> {
         OracleSchema.Builder schemaBuilder = OracleSchema.newBuilder()
-            .setSchema(schema);
+                .setSchema(schema);
         for (String table : tables) {
           schemaBuilder.addOracleTables(OracleTable.newBuilder().setTable(table));
         }
@@ -372,8 +370,8 @@ public class DatastreamClientTest {
     }
 
     return OracleSourceConfig.newBuilder()
-        .setIncludeObjects(oracleRdbms)
-        .setExcludeObjects(OracleRdbms.getDefaultInstance());
+            .setIncludeObjects(oracleRdbms)
+            .setExcludeObjects(OracleRdbms.getDefaultInstance());
   }
 
   private String buildConnectionProfilePath(String resourceName) {
@@ -387,13 +385,13 @@ public class DatastreamClientTest {
   private ConnectionProfile buildOracleConnectionProfile(String name) {
 
     return ConnectionProfile.newBuilder().setDisplayName(name)
-        .setStaticServiceIpConnectivity(StaticServiceIpConnectivity.getDefaultInstance()).setOracleProfile(
-            OracleProfile.newBuilder().setHostname(oracleHost).setUsername(oracleUser).setPassword(oraclePassword)
-                .setDatabaseService(oracleDb).setPort(oraclePort)).build();
+      .setStaticServiceIpConnectivity(StaticServiceIpConnectivity.getDefaultInstance()).setOracleProfile(
+        OracleProfile.newBuilder().setHostname(oracleHost).setUsername(oracleUser).setPassword(oraclePassword)
+          .setDatabaseService(oracleDb).setPort(oraclePort)).build();
   }
 
   private ConnectionProfile buildGCSConnectionProfile(String name) {
     return ConnectionProfile.newBuilder().setDisplayName(name)
-        .setGcsProfile(GcsProfile.newBuilder().setBucket(gcsBucket).setRootPath("/" + name)).build();
+      .setGcsProfile(GcsProfile.newBuilder().setBucket(gcsBucket).setRootPath("/" + name)).build();
   }
 }

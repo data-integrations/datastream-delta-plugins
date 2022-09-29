@@ -318,8 +318,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
     List<Problem> connectivityIssues = new ArrayList<>();
     List<Problem> missingFeatures = new ArrayList<>();
     for (Validation validation : metadata.getValidationResult().getValidationsList()) {
-      Validation.State status = validation.getState();
-      if (Validation.State.FAILED.equals(status)) {
+      Validation.State state = validation.getState();
+      if (Validation.State.FAILED.equals(state)) {
         String code = validation.getCode();
         String description = validation.getDescription();
         String message = String.join("\n",

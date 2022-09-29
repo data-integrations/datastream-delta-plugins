@@ -368,8 +368,6 @@ public final class Utils {
     GcsProfile.Builder setGcsProfileBuilder =
       GcsProfile.newBuilder().setBucket(gcsBucket).setRootPath(gcsPathPrefix);
     return ConnectionProfile.newBuilder().setDisplayName(name)
-        //TODO figure out what this does
-      //.setNoConnectivity(NoConnectivitySettings.getDefaultInstance())
       .setGcsProfile(setGcsProfileBuilder).build();
   }
 

@@ -183,9 +183,7 @@ public class DatastreamTableRegistry implements TableRegistry {
 
   @Override
   public void close() throws IOException {
-    LOGGER.error("Closing DatastreamTableRegistry");
     datastream.close();
-    LOGGER.error("Closed DatastreamTableRegistry");
   }
 
   private DiscoverConnectionProfileRequest.Builder buildDiscoverConnectionProfileRequest(

@@ -17,15 +17,15 @@
 
 package io.cdap.delta.datastream;
 
-import com.google.cloud.datastream.v1.ConnectionProfile;
-import com.google.cloud.datastream.v1.DestinationConfig;
-import com.google.cloud.datastream.v1.GcsDestinationConfig;
-import com.google.cloud.datastream.v1.GcsProfile;
-import com.google.cloud.datastream.v1.OracleProfile;
-import com.google.cloud.datastream.v1.OracleRdbms;
-import com.google.cloud.datastream.v1.OracleSourceConfig;
-import com.google.cloud.datastream.v1.SourceConfig;
-import com.google.cloud.datastream.v1.Stream;
+import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
+import com.google.cloud.datastream.v1alpha1.DestinationConfig;
+import com.google.cloud.datastream.v1alpha1.GcsDestinationConfig;
+import com.google.cloud.datastream.v1alpha1.GcsProfile;
+import com.google.cloud.datastream.v1alpha1.OracleProfile;
+import com.google.cloud.datastream.v1alpha1.OracleRdbms;
+import com.google.cloud.datastream.v1alpha1.OracleSourceConfig;
+import com.google.cloud.datastream.v1alpha1.SourceConfig;
+import com.google.cloud.datastream.v1alpha1.Stream;
 import io.cdap.delta.api.DeltaSourceContext;
 import io.cdap.delta.datastream.util.MockSourceContext;
 import org.junit.jupiter.api.Test;
@@ -48,9 +48,9 @@ class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
     deltaSource.initialize(context);
     String streamPath = String.format("%s/streams/%s", parentPath, streamId);
     Stream stream = datastream.getStream(streamPath);
-    OracleRdbms allowlist = stream.getSourceConfig().getOracleSourceConfig().getIncludeObjects();
+    OracleRdbms allowlist = stream.getSourceConfig().getOracleSourceConfig().getAllowlist();
     assertTrue(allowlist.getOracleSchemasList().stream().flatMap(schema -> schema.getOracleTablesList().stream()
-      .map(table -> String.format("%s.%s", schema.getSchema(), table.getTable()))).collect(Collectors.toSet())
+      .map(table -> String.format("%s.%s", schema.getSchemaName(), table.getTableName()))).collect(Collectors.toSet())
       .containsAll(oracleTables));
   }
 
@@ -97,6 +97,7 @@ class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
     assertEquals(srcProfilePath, srcProfile.getName());
     assertTrue(srcProfile.hasStaticServiceIpConnectivity());
     assertFalse(srcProfile.hasForwardSshConnectivity());
+    assertFalse(srcProfile.hasNoConnectivity());
     assertFalse(srcProfile.hasPrivateConnectivity());
     OracleProfile oracleProfile = srcProfile.getOracleProfile();
     assertEquals(oracleHost, oracleProfile.getHostname());
@@ -111,7 +112,7 @@ class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
     assertEquals(desProfileName, desProfile.getDisplayName());
     assertEquals(desProfilePath, desProfile.getName());
     GcsProfile gcsProfile = desProfile.getGcsProfile();
-    assertEquals(gcsBucket, gcsProfile.getBucket());
+    assertEquals(gcsBucket, gcsProfile.getBucketName());
     assertEquals("/", gcsProfile.getRootPath());
 
     // Check stream
@@ -122,17 +123,17 @@ class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
     assertEquals(streamPath, stream.getName());
 
     SourceConfig sourceConfig = stream.getSourceConfig();
-    String sourceConnectionProfileName = sourceConfig.getSourceConnectionProfile();
+    String sourceConnectionProfileName = sourceConfig.getSourceConnectionProfileName();
     assertEquals(srcProfilePath.substring(srcProfilePath.indexOf("/locations")),
       sourceConnectionProfileName.substring(sourceConnectionProfileName.indexOf("/locations")));
     OracleSourceConfig oracleSourceConfig = sourceConfig.getOracleSourceConfig();
-    OracleRdbms allowlist = oracleSourceConfig.getIncludeObjects();
+    OracleRdbms allowlist = oracleSourceConfig.getAllowlist();
     allowlist.getOracleSchemasList().forEach(schema -> schema.getOracleTablesList().forEach(table -> {
-      assertTrue(oracleTables.contains(String.format("%s.%s", schema.getSchema(), table.getTable())));
+      assertTrue(oracleTables.contains(String.format("%s.%s", schema.getSchemaName(), table.getTableName())));
     }));
 
     DestinationConfig desConfig = stream.getDestinationConfig();
-    String destinationConnectionProfileName = desConfig.getDestinationConnectionProfile();
+    String destinationConnectionProfileName = desConfig.getDestinationConnectionProfileName();
     assertEquals(desProfilePath.substring(desProfilePath.indexOf("/locations")),
       destinationConnectionProfileName.substring(destinationConnectionProfileName.indexOf("/locations")));
     GcsDestinationConfig gcsConfig = desConfig.getGcsDestinationConfig();

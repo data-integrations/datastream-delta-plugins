@@ -26,29 +26,30 @@ import com.google.api.gax.rpc.InvalidArgumentException;
 import com.google.api.gax.rpc.NotFoundException;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.datastream.v1.AvroFileFormat;
-import com.google.cloud.datastream.v1.ConnectionProfile;
-import com.google.cloud.datastream.v1.CreateConnectionProfileRequest;
-import com.google.cloud.datastream.v1.CreateStreamRequest;
-import com.google.cloud.datastream.v1.DatastreamClient;
-import com.google.cloud.datastream.v1.DatastreamSettings;
-import com.google.cloud.datastream.v1.DestinationConfig;
-import com.google.cloud.datastream.v1.DiscoverConnectionProfileRequest;
-import com.google.cloud.datastream.v1.DiscoverConnectionProfileResponse;
-import com.google.cloud.datastream.v1.ForwardSshTunnelConnectivity;
-import com.google.cloud.datastream.v1.GcsDestinationConfig;
-import com.google.cloud.datastream.v1.GcsProfile;
-import com.google.cloud.datastream.v1.OperationMetadata;
-import com.google.cloud.datastream.v1.OracleProfile;
-import com.google.cloud.datastream.v1.OracleRdbms;
-import com.google.cloud.datastream.v1.OracleSchema;
-import com.google.cloud.datastream.v1.OracleSourceConfig;
-import com.google.cloud.datastream.v1.OracleTable;
-import com.google.cloud.datastream.v1.PrivateConnectivity;
-import com.google.cloud.datastream.v1.SourceConfig;
-import com.google.cloud.datastream.v1.StaticServiceIpConnectivity;
-import com.google.cloud.datastream.v1.Stream;
-import com.google.cloud.datastream.v1.UpdateStreamRequest;
+import com.google.cloud.datastream.v1alpha1.AvroFileFormat;
+import com.google.cloud.datastream.v1alpha1.ConnectionProfile;
+import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
+import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
+import com.google.cloud.datastream.v1alpha1.DatastreamClient;
+import com.google.cloud.datastream.v1alpha1.DatastreamSettings;
+import com.google.cloud.datastream.v1alpha1.DestinationConfig;
+import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileRequest;
+import com.google.cloud.datastream.v1alpha1.DiscoverConnectionProfileResponse;
+import com.google.cloud.datastream.v1alpha1.ForwardSshTunnelConnectivity;
+import com.google.cloud.datastream.v1alpha1.GcsDestinationConfig;
+import com.google.cloud.datastream.v1alpha1.GcsProfile;
+import com.google.cloud.datastream.v1alpha1.NoConnectivitySettings;
+import com.google.cloud.datastream.v1alpha1.OperationMetadata;
+import com.google.cloud.datastream.v1alpha1.OracleProfile;
+import com.google.cloud.datastream.v1alpha1.OracleRdbms;
+import com.google.cloud.datastream.v1alpha1.OracleSchema;
+import com.google.cloud.datastream.v1alpha1.OracleSourceConfig;
+import com.google.cloud.datastream.v1alpha1.OracleTable;
+import com.google.cloud.datastream.v1alpha1.PrivateConnectivity;
+import com.google.cloud.datastream.v1alpha1.SourceConfig;
+import com.google.cloud.datastream.v1alpha1.StaticServiceIpConnectivity;
+import com.google.cloud.datastream.v1alpha1.Stream;
+import com.google.cloud.datastream.v1alpha1.UpdateStreamRequest;
 import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageException;
@@ -238,7 +239,7 @@ public final class Utils {
         return profileBuilder.setStaticServiceIpConnectivity(StaticServiceIpConnectivity.getDefaultInstance()).build();
       case CONNECTIVITY_METHOD_PRIVATE_CONNECTIVITY:
         return profileBuilder.setPrivateConnectivity(PrivateConnectivity.newBuilder()
-          .setPrivateConnection(buildPrivateConnectionPath(parentPath, config.getPrivateConnectionName()))).build();
+          .setPrivateConnectionName(buildPrivateConnectionPath(parentPath, config.getPrivateConnectionName()))).build();
       default:
         throw new IllegalArgumentException("Unsupported connectivity method: " + config.getConnectivityMethod());
     }
@@ -269,8 +270,8 @@ public final class Utils {
   public static Stream buildStreamConfig(String parentPath, String name, String sourcePath, String targetPath,
                                          Set<SourceTable> tables, boolean replicateExistingData) {
     OracleSourceConfig.Builder oracleSourceConfigBuilder =
-      OracleSourceConfig.newBuilder().setIncludeObjects(buildAllowlist(tables));
-    SourceConfig.Builder sourceConfigBuilder = SourceConfig.newBuilder().setSourceConnectionProfile(sourcePath)
+      OracleSourceConfig.newBuilder().setAllowlist(buildAllowlist(tables));
+    SourceConfig.Builder sourceConfigBuilder = SourceConfig.newBuilder().setSourceConnectionProfileName(sourcePath)
       .setOracleSourceConfig(oracleSourceConfigBuilder);
     Duration.Builder durationBuilder = Duration.newBuilder().setSeconds(FILE_ROTATION_INTERVAL_IN_SECONDS);
     GcsDestinationConfig.Builder gcsDestinationConfigBuilder =
@@ -278,7 +279,7 @@ public final class Utils {
         .setFileRotationMb(FILE_ROTATIONS_SIZE_IN_MB)
         .setFileRotationInterval(durationBuilder);
     Stream.Builder streamBuilder = Stream.newBuilder().setDisplayName(name).setDestinationConfig(
-      DestinationConfig.newBuilder().setDestinationConnectionProfile(targetPath)
+      DestinationConfig.newBuilder().setDestinationConnectionProfileName(targetPath)
         .setGcsDestinationConfig(gcsDestinationConfigBuilder)).setSourceConfig(sourceConfigBuilder);
     if (replicateExistingData) {
       streamBuilder.setBackfillAll(Stream.BackfillAllStrategy.getDefaultInstance());
@@ -305,12 +306,12 @@ public final class Utils {
   }
 
   private static void addTablesToAllowList(Set<SourceTable> tables, List<OracleSchema.Builder> schemas) {
-    Map<String, Set<String>> schemaToTables = schemas.stream().collect(Collectors.toMap(s -> s.getSchema(), s ->
+    Map<String, Set<String>> schemaToTables = schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s ->
       // if the stream has allow list as "hr.*", then the schema name will be "hr" and oracleTables will be empty
-      s.getOracleTablesList().stream().map(o -> o.getTable()).collect(Collectors.toSet())));
+      s.getOracleTablesList().stream().map(o -> o.getTableName()).collect(Collectors.toSet())));
 
     Map<String, OracleSchema.Builder> nameToSchema =
-      schemas.stream().collect(Collectors.toMap(s -> s.getSchema(), s -> s));
+      schemas.stream().collect(Collectors.toMap(s -> s.getSchemaName(), s -> s));
 
     tables.forEach(table -> {
       Set<String> oracleTables = schemaToTables.get(table.getSchema());
@@ -323,13 +324,13 @@ public final class Utils {
         schemaToTables.put(table.getSchema(), oracleTables);
       }
       OracleSchema.Builder oracleSchema = nameToSchema.computeIfAbsent(table.getSchema(), name -> {
-        OracleSchema.Builder newSchema = OracleSchema.newBuilder().setSchema(name);
+        OracleSchema.Builder newSchema = OracleSchema.newBuilder().setSchemaName(name);
         schemas.add(newSchema);
         return newSchema;
       });
 
       if (oracleTables.add(table.getTable())) {
-        OracleTable.Builder oracleTableBuilder = OracleTable.newBuilder().setTable(table.getTable());
+        OracleTable.Builder oracleTableBuilder = OracleTable.newBuilder().setTableName(table.getTable());
         oracleSchema.addOracleTables(oracleTableBuilder);
       }
     });
@@ -368,8 +369,9 @@ public final class Utils {
   public static ConnectionProfile buildGcsConnectionProfile(String parentPath, String name, String gcsBucket,
     String gcsPathPrefix) {
     GcsProfile.Builder setGcsProfileBuilder =
-      GcsProfile.newBuilder().setBucket(gcsBucket).setRootPath(gcsPathPrefix);
+      GcsProfile.newBuilder().setBucketName(gcsBucket).setRootPath(gcsPathPrefix);
     return ConnectionProfile.newBuilder().setDisplayName(name)
+      .setNoConnectivity(NoConnectivitySettings.getDefaultInstance())
       .setGcsProfile(setGcsProfileBuilder).build();
   }
 
@@ -514,7 +516,7 @@ public final class Utils {
    */
   public static void addToAllowList(Stream.Builder stream, Set<SourceTable> tables) {
     OracleRdbms.Builder allowlist =
-      stream.getSourceConfigBuilder().getOracleSourceConfigBuilder().getIncludeObjectsBuilder();
+      stream.getSourceConfigBuilder().getOracleSourceConfigBuilder().getAllowlistBuilder();
     List<OracleSchema.Builder> oracleSchemas = new ArrayList<>(allowlist.getOracleSchemasBuilderList());
     addTablesToAllowList(tables, oracleSchemas);
     allowlist.clearOracleSchemas()
@@ -750,7 +752,7 @@ public final class Utils {
                                         Logger logger) {
     Stream.Builder streamBuilder = Stream.newBuilder().setName(stream.getName());
     streamBuilder.getSourceConfigBuilder().getOracleSourceConfigBuilder()
-      .setIncludeObjects(stream.getSourceConfig().getOracleSourceConfig().getIncludeObjects());
+      .setAllowlist(stream.getSourceConfig().getOracleSourceConfig().getAllowlist());
     UpdateStreamRequest request = UpdateStreamRequest.newBuilder().setStream(streamBuilder)
             .setUpdateMask(FieldMask.newBuilder().addPaths(FIELD_ALLOWLIST))
             .setValidateOnly(validateOnly).build();
@@ -822,10 +824,8 @@ public final class Utils {
       String requestStr = "DiscoverConnectionProfile Request:\n" + request.toString();
       logger.debug(requestStr);
     }
-
     DiscoverConnectionProfileResponse response =
       Failsafe.with(createDataStreamRetryPolicy()).get(() -> datastream.discoverConnectionProfile(request));
-
     if (logger.isDebugEnabled()) {
       logger.debug("DiscoverConnectionProfile Response:\n" + response.toString());
     }

@@ -57,7 +57,7 @@
     <delta.version>0.7.0-SNAPSHOT</delta.version>
     <slf4j.version>1.7.25</slf4j.version>
     <avro.version>1.8.2</avro.version>
-    <gcp.version>26.1.1</gcp.version>
+    <gcp.version>16.1.0</gcp.version>
     <failsafe.version>2.3.3</failsafe.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
@@ -108,8 +108,11 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.google.cloud</groupId>
-      <artifactId>google-cloud-datastream</artifactId>
+      <groupId>com.google</groupId>
+      <artifactId>datastream-gapic-client</artifactId>
+      <version>0.0.0-SNAPSHOT</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/src/main/resources/lib/gapic-google-cloud-datastream-v1alpha1-java-0.0.0-SNAPSHOT-all.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
@@ -129,29 +132,6 @@
       <artifactId>junit-jupiter-engine</artifactId>
       <version>5.4.0</version>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-netty-shaded</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-all</artifactId>
-      <version>1.49.0</version>
-      <exclusions>
-        <exclusion>
-          <artifactId>io.grpc</artifactId>
-          <groupId>grpc-netty</groupId>
-        </exclusion>
-      </exclusions>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.perfmark</groupId>
-      <artifactId>perfmark-api</artifactId>
-      <version>0.25.0</version>
-      <scope>compile</scope>
     </dependency>
   </dependencies>
 

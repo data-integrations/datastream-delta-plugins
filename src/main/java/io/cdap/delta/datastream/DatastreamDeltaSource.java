@@ -17,10 +17,10 @@
 package io.cdap.delta.datastream;
 
 import com.google.api.gax.rpc.NotFoundException;
-import com.google.cloud.datastream.v1.CreateConnectionProfileRequest;
-import com.google.cloud.datastream.v1.CreateStreamRequest;
-import com.google.cloud.datastream.v1.DatastreamClient;
-import com.google.cloud.datastream.v1.Stream;
+import com.google.cloud.datastream.v1alpha1.CreateConnectionProfileRequest;
+import com.google.cloud.datastream.v1alpha1.CreateStreamRequest;
+import com.google.cloud.datastream.v1alpha1.DatastreamClient;
+import com.google.cloud.datastream.v1alpha1.Stream;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import com.google.gson.Gson;

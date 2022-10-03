@@ -18,10 +18,10 @@
 package io.cdap.delta.datastream;
 
 import com.google.api.core.ApiFuture;
-import com.google.cloud.datastream.v1.OperationMetadata;
-import com.google.cloud.datastream.v1.Validation;
-import com.google.cloud.datastream.v1.ValidationMessage;
-import com.google.cloud.datastream.v1.ValidationResult;
+import com.google.cloud.datastream.v1alpha1.OperationMetadata;
+import com.google.cloud.datastream.v1alpha1.Validation;
+import com.google.cloud.datastream.v1alpha1.ValidationMessage;
+import com.google.cloud.datastream.v1alpha1.ValidationResult;
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.delta.api.assessment.Assessment;
 import io.cdap.delta.api.assessment.ColumnAssessment;
@@ -69,7 +69,7 @@ public class DatastreamAssessmentTest {
 
       @Override
       public OperationMetadata get() throws InterruptedException, ExecutionException {
-        Validation.Builder messageBuilder = Validation.newBuilder().setState(Validation.State.FAILED);
+        Validation.Builder messageBuilder = Validation.newBuilder().setStatus(Validation.Status.FAILED);
         return OperationMetadata.newBuilder().setValidationResult(ValidationResult.newBuilder().addValidations(
           messageBuilder.setCode("ORACLE_VALIDATE_TUNNEL_CONNECTIVITY").setDescription("OVTC-description")
             .clearMessage().addMessage(ValidationMessage.newBuilder().setMessage("OVTC-message1"))

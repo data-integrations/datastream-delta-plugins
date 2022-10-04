@@ -27,6 +27,7 @@ import com.google.gson.Gson;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Name;
 import io.cdap.cdap.api.annotation.Plugin;
+import io.cdap.cdap.api.common.Bytes;
 import io.cdap.delta.api.Configurer;
 import io.cdap.delta.api.DeltaSource;
 import io.cdap.delta.api.DeltaSourceContext;
@@ -154,8 +155,10 @@ public class DatastreamDeltaSource implements DeltaSource {
       if (bucketName == null || bucketName.trim().isEmpty()) {
         bucketName = Utils.buildBucketName(context.getRunId());
       }
-      Utils.createBucketIfNotExisting(storage, bucketName, config.getGcsBucketLocation());
-
+      boolean bucketCreated = Utils.createBucketIfNotExisting(storage, bucketName, config.getGcsBucketLocation());
+      if (bucketCreated) {
+        context.putState("bucketCreatedByCDF", Bytes.toBytes("true"));
+      }
       // create the gcs connection profile
       createConnectionProfileRequest =
         CreateConnectionProfileRequest.newBuilder().setParent(parentPath).setConnectionProfile(

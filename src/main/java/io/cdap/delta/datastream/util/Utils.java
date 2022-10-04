@@ -54,6 +54,7 @@ import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageException;
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Empty;
 import com.google.protobuf.FieldMask;
@@ -837,7 +838,12 @@ public final class Utils {
         .run(() -> {
           BucketInfo.Builder builder = BucketInfo.newBuilder(bucketName);
           if (location != null && !location.trim().isEmpty()) {
-            builder.setLocation(location);
+            builder.setLocation(location)
+                    .setLifecycleRules(ImmutableList.of(
+                            new BucketInfo.LifecycleRule(
+                                    BucketInfo.LifecycleRule.LifecycleAction.newDeleteAction(),
+                                    BucketInfo.LifecycleRule.LifecycleCondition.newBuilder()
+                                            .setDaysSinceCustomTime(30).build())));
           }
           storage.create(builder.build());
         });

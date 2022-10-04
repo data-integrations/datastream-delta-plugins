@@ -27,16 +27,30 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Empty;
 import com.google.protobuf.FieldMask;
+import io.cdap.delta.datastream.util.Utils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -45,8 +59,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
-
 public class DatastreamClientTest {
+
+  Logger logger = LoggerFactory.getLogger(DatastreamClientTest.class);
 
   private static final String FIELD_STATE = "state";
   private static String parent;
@@ -55,6 +70,7 @@ public class DatastreamClientTest {
   private static String oracleUser;
   private static String oraclePassword;
   private static String oracleDb;
+  private static Set<String> oracleTables;
   private static String gcsBucket;
   private static DatastreamClient datastream;
 
@@ -100,6 +116,9 @@ public class DatastreamClientTest {
 
     oracleDb = System.getProperty("oracle.database");
     assumeFalse(oracleDb == null);
+
+    String tables = System.getProperty("oracle.tables");
+    oracleTables = tables == null ? Collections.emptySet() : new HashSet<>(Arrays.asList(tables.split(",")));
 
     gcsBucket = System.getProperty("gcs.bucket");
     assumeFalse(gcsBucket == null);
@@ -152,7 +171,7 @@ public class DatastreamClientTest {
 
     String destinationName = "Datafusion-GCS-" + UUID.randomUUID();
     OperationFuture<ConnectionProfile, OperationMetadata> destinationProfileCreationOperation =
-      createGcsConnectionProfile(destinationName);
+            createGcsConnectionProfile(destinationName);
 
 
     sourceProfileCreationOperation.get();
@@ -161,64 +180,90 @@ public class DatastreamClientTest {
     destinationProfileCreationOperation.get();
     assertNotNull(datastream.getConnectionProfile(buildConnectionProfilePath(destinationName)));
 
-    String streamName = "Datafusion-DS-" + UUID.randomUUID();
-    Stream.Builder streamBuilder = Stream.newBuilder().setDisplayName(streamName).setDestinationConfig(
-      DestinationConfig.newBuilder().setDestinationConnectionProfileName(buildConnectionProfilePath(destinationName))
-        .setGcsDestinationConfig(
-          GcsDestinationConfig.newBuilder().setAvroFileFormat(AvroFileFormat.getDefaultInstance()).setFileRotationMb(5)
-            .setFileRotationInterval(Duration.newBuilder().setSeconds(15).build()))).setSourceConfig(
-      SourceConfig.newBuilder().setSourceConnectionProfileName(buildConnectionProfilePath(sourceName))
-        .setOracleSourceConfig(OracleSourceConfig.newBuilder().setAllowlist(OracleRdbms.getDefaultInstance())
-          .setRejectlist(OracleRdbms.getDefaultInstance())))
-      .setBackfillAll(Stream.BackfillAllStrategy.getDefaultInstance());
-    OperationFuture<Stream, OperationMetadata> streamCreationOperation = datastream.createStreamAsync(
-      CreateStreamRequest.newBuilder().setParent(parent).setStream(streamBuilder).setStreamId(streamName).build());
 
-    assertEquals(Stream.State.CREATED, streamCreationOperation.get().getState());
+    try {
+      String streamName = "Datafusion-DS-" + UUID.randomUUID();
+      Stream.Builder streamBuilder = Stream.newBuilder().setDisplayName(streamName).setDestinationConfig(
+                      DestinationConfig.newBuilder()
+                              .setDestinationConnectionProfileName(buildConnectionProfilePath(destinationName))
+                              .setGcsDestinationConfig(
+                                      GcsDestinationConfig.newBuilder()
+                                              .setAvroFileFormat(AvroFileFormat.getDefaultInstance())
+                                              .setFileRotationMb(5)
+                                              .setFileRotationInterval(Duration.newBuilder()
+                                                      .setSeconds(15).build())))
+              .setSourceConfig(
+                      SourceConfig.newBuilder().setSourceConnectionProfileName(buildConnectionProfilePath(sourceName))
+                              .setOracleSourceConfig(getOracleConfig()))
+              .setBackfillAll(Stream.BackfillAllStrategy.getDefaultInstance());
+      OperationFuture<Stream, OperationMetadata> streamCreationOperation = datastream.createStreamAsync(
+              CreateStreamRequest.newBuilder()
+                      .setParent(parent)
+                      .setStream(streamBuilder)
+                      .setStreamId(streamName).build());
 
-    String streamPath = buildStreamPath(streamName);
-    assertEquals(Stream.State.CREATED, datastream.getStream(streamPath).getState());
+      assertEquals(Stream.State.CREATED, streamCreationOperation.get().getState());
+
+      String streamPath = buildStreamPath(streamName);
+      Stream stream = datastream.getStream(streamPath);
+      assertEquals(Stream.State.CREATED, stream.getState());
+
+      try {
+        //Simulate update by multiple workers
+        ExecutorService executorService = Executors.newFixedThreadPool(3);
+        try {
+          List<Callable<Stream.State>> tasks = new ArrayList<>();
+          for (int i = 0; i < 3; i++) {
+            tasks.add(() -> {
+              Stream updatedStream = Utils.startStream(datastream, stream, logger);
+              Stream.State state = updatedStream.getState();
+              assertEquals(Stream.State.RUNNING, state);
+              return state;
+            });
+          }
+          List<Future<Stream.State>> futures = executorService.invokeAll(tasks);
+          for (Future<Stream.State> future : futures) {
+            future.get();
+          }
+        } finally {
+          executorService.shutdown();
+        }
+
+        assertEquals(Stream.State.RUNNING, datastream.getStream(streamPath).getState());
+
+        OperationFuture<FetchErrorsResponse, OperationMetadata> fetchErrorOperation =
+                datastream.fetchErrorsAsync(FetchErrorsRequest.newBuilder().setStream(streamPath).build());
+        FetchErrorsResponse fetchErrorsResponse = fetchErrorOperation.get();
+        assertTrue(fetchErrorsResponse.getErrorsList().isEmpty());
+
+        OperationFuture<Stream, OperationMetadata> streamPauseOperation = datastream
+                .updateStreamAsync(Stream.newBuilder().setName(streamPath).setState(Stream.State.PAUSED).build(),
+                        FieldMask.newBuilder().addPaths(FIELD_STATE).build());
+
+        assertEquals(Stream.State.PAUSED, streamPauseOperation.get().getState());
+        assertEquals(Stream.State.PAUSED, datastream.getStream(streamPath).getState());
+      } finally {
+        OperationFuture<Empty, OperationMetadata> streamDeletionOperation = datastream.deleteStreamAsync(streamPath);
+        streamDeletionOperation.get();
+        assertThrows(NotFoundException.class, () -> datastream.getStream(buildStreamPath(streamName)));
+      }
+    } finally {
+      OperationFuture<Empty, OperationMetadata> sourceProfileDeletionOperation =
+              datastream.deleteConnectionProfileAsync(buildConnectionProfilePath(sourceName));
+
+      OperationFuture<Empty, OperationMetadata> destinationProfileDeletionOperation =
+              datastream.deleteConnectionProfileAsync(buildConnectionProfilePath(destinationName));
 
 
-    OperationFuture<Stream, OperationMetadata> streamStartOperation = datastream
-      .updateStreamAsync(Stream.newBuilder().setName(streamPath).setState(Stream.State.RUNNING).build(),
-        FieldMask.newBuilder().addPaths(FIELD_STATE).build());
+      sourceProfileDeletionOperation.get();
+      destinationProfileDeletionOperation.get();
 
-    assertEquals(Stream.State.RUNNING, streamStartOperation.get().getState());
-    assertEquals(Stream.State.RUNNING, datastream.getStream(streamPath).getState());
+      assertThrows(NotFoundException.class,
+              () -> datastream.getConnectionProfile(buildConnectionProfilePath(sourceName)));
 
-    OperationFuture<FetchErrorsResponse, OperationMetadata> fetchErrorOperation =
-      datastream.fetchErrorsAsync(FetchErrorsRequest.newBuilder().setStream(streamPath).build());
-    FetchErrorsResponse fetchErrorsResponse = fetchErrorOperation.get();
-    assertTrue(fetchErrorsResponse.getErrorsList().isEmpty());
-
-    OperationFuture<Stream, OperationMetadata> streamPauseOperation = datastream
-      .updateStreamAsync(Stream.newBuilder().setName(streamPath).setState(Stream.State.PAUSED).build(),
-        FieldMask.newBuilder().addPaths(FIELD_STATE).build());
-
-    assertEquals(Stream.State.PAUSED, streamPauseOperation.get().getState());
-    assertEquals(Stream.State.PAUSED, datastream.getStream(streamPath).getState());
-
-    OperationFuture<Empty, OperationMetadata> streamDeletionOperation = datastream.deleteStreamAsync(streamPath);
-
-    streamDeletionOperation.get();
-    assertThrows(NotFoundException.class, () -> datastream.getStream(buildStreamPath(streamName)));
-
-    OperationFuture<Empty, OperationMetadata> sourceProfileDeletionOperation =
-      datastream.deleteConnectionProfileAsync(buildConnectionProfilePath(sourceName));
-
-    OperationFuture<Empty, OperationMetadata> destinationProfileDeletionOperation =
-      datastream.deleteConnectionProfileAsync(buildConnectionProfilePath(destinationName));
-
-
-    sourceProfileDeletionOperation.get();
-    destinationProfileDeletionOperation.get();
-
-    assertThrows(NotFoundException.class,
-      () -> datastream.getConnectionProfile(buildConnectionProfilePath(sourceName)));
-
-    assertThrows(NotFoundException.class,
-      () -> datastream.getConnectionProfile(buildConnectionProfilePath(destinationName)));
+      assertThrows(NotFoundException.class,
+              () -> datastream.getConnectionProfile(buildConnectionProfilePath(destinationName)));
+    }
   }
 
   @Test
@@ -226,7 +271,7 @@ public class DatastreamClientTest {
 
     String sourceName = "Datafusion-Oracle-" + UUID.randomUUID();
     OperationFuture<ConnectionProfile, OperationMetadata> sourceProfileCreationOperation =
-      createOracleConnectionProfile(sourceName);
+            createOracleConnectionProfile(sourceName);
 
     String destinationName = "Datafusion-GCS-" + UUID.randomUUID();
     String originalBucket = gcsBucket;
@@ -287,13 +332,50 @@ public class DatastreamClientTest {
   private OperationFuture<ConnectionProfile, OperationMetadata> createGcsConnectionProfile(String name)
     throws IOException {
     return datastream.createConnectionProfileAsync(CreateConnectionProfileRequest.newBuilder().setParent(parent)
-      .setConnectionProfile(buildGCSConnectionProfile(name)).setConnectionProfileId(name).build());
+            .setConnectionProfile(buildGCSConnectionProfile(name)).setConnectionProfileId(name).build());
   }
 
   private OperationFuture<ConnectionProfile, OperationMetadata> createOracleConnectionProfile(String name)
-    throws IOException {
+          throws IOException {
     return datastream.createConnectionProfileAsync(CreateConnectionProfileRequest.newBuilder().setParent(parent)
-      .setConnectionProfile(buildOracleConnectionProfile(name)).setConnectionProfileId(name).build());
+            .setConnectionProfile(buildOracleConnectionProfile(name)).setConnectionProfileId(name).build());
+  }
+
+  private OracleSourceConfig.Builder getOracleConfig() {
+    OracleRdbms oracleRdbms = OracleRdbms.getDefaultInstance();
+
+    if (!oracleTables.isEmpty()) {
+      Map<String, List<String>> schemaTables = new HashMap<>();
+      for (String fullTableName : oracleTables) {
+        String[] parts = fullTableName.split("\\.");
+        String schema;
+        String table;
+        if (parts.length != 2) {
+          schema = parts[0];
+          table = parts[1];
+        } else {
+          schema = "";
+          table = fullTableName;
+        }
+        schemaTables.putIfAbsent(schema, new ArrayList<>());
+        schemaTables.get(schema).add(table);
+      }
+
+      OracleRdbms.Builder builder = OracleRdbms.newBuilder();
+      schemaTables.forEach((schema, tables) -> {
+        OracleSchema.Builder schemaBuilder = OracleSchema.newBuilder()
+                .setSchemaName(schema);
+        for (String table : tables) {
+          schemaBuilder.addOracleTables(OracleTable.newBuilder().setTableName(table));
+        }
+        builder.addOracleSchemas(schemaBuilder.build());
+      });
+      oracleRdbms = builder.build();
+    }
+
+    return OracleSourceConfig.newBuilder()
+            .setAllowlist(oracleRdbms)
+            .setRejectlist(OracleRdbms.getDefaultInstance());
   }
 
   private String buildConnectionProfilePath(String resourceName) {

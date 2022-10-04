@@ -106,6 +106,7 @@ public final class Utils {
   private static final int GCS_ERROR_CODE_CONFLICT = 409;
   private static final int GCS_ERROR_CODE_INVALID_REQUEST = 400;
   private static final int DATASTREAM_CLIENT_POOL_SIZE = 20;
+  private static final int TTL_DAYS = 30;
   private static final float DATASTREAM_CLIENT_POOL_LOAD_FACTOR = 0.75f;
   private static final LinkedHashMap<GoogleCredentials, DatastreamClient> datastreamClientPool =
     new LinkedHashMap<GoogleCredentials, DatastreamClient>(
@@ -843,7 +844,7 @@ public final class Utils {
                             new BucketInfo.LifecycleRule(
                                     BucketInfo.LifecycleRule.LifecycleAction.newDeleteAction(),
                                     BucketInfo.LifecycleRule.LifecycleCondition.newBuilder()
-                                            .setDaysSinceCustomTime(30).build())));
+                                            .setDaysSinceCustomTime(TTL_DAYS).build())));
           }
           storage.create(builder.build());
         });

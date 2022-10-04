@@ -57,7 +57,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.TimeZone;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -105,7 +104,7 @@ public class DatastreamEventReader implements EventReader {
   // The GCS bucket in which datastream result is written to
   private final String bucketName;
   private final String databaseName;
-  private final boolean bucketCreatedByCDF;
+  private boolean bucketCreatedByCDF;
   private Stream stream;
 
   public DatastreamEventReader(DatastreamConfig config, EventReaderDefinition definition, DeltaSourceContext context,
@@ -115,9 +114,10 @@ public class DatastreamEventReader implements EventReader {
     this.definition = definition;
     this.emitter = emitter;
 
-    String bucketCreatedStateVal = new String(Objects.requireNonNull(context.getState(BUCKET_CREATED_BY_CDF)),
-                                              StandardCharsets.UTF_8);
-    this.bucketCreatedByCDF = bucketCreatedStateVal.equals("true");
+    this.bucketCreatedByCDF = false;
+    if (context.getState(BUCKET_CREATED_BY_CDF) != null) {
+      this.bucketCreatedByCDF = new String(context.getState(BUCKET_CREATED_BY_CDF), StandardCharsets.UTF_8).equals("true");
+    }
     int threads = bucketCreatedByCDF ? 2 : 1;
     this.executorService = Executors.newScheduledThreadPool(threads);
 
@@ -215,6 +215,7 @@ public class DatastreamEventReader implements EventReader {
 
   class SetTTLTask implements Runnable {
     private Map<String, String> state;
+    private static final  int GCS_UPDATE_BATCH_LIMIT = 100;
     SetTTLTask(Offset offset) {
       this.state = new HashMap<>(offset.get());
     }
@@ -230,7 +231,7 @@ public class DatastreamEventReader implements EventReader {
           setBlobTTL();
         }
       } catch (Throwable t) {
-        LOGGER.warn("Error encountered while setting TTL for last processed batch of blobs.");
+        LOGGER.warn("Error encountered while setting TTL for last processed batch of blobs.", t);
       }
     }
 
@@ -270,7 +271,7 @@ public class DatastreamEventReader implements EventReader {
           count++;
           index--;
 
-          if (count >= 100) {
+          if (count >= GCS_UPDATE_BATCH_LIMIT) {
             batchRequest.submit();
             batchRequest = storage.batch();
             count = 0;

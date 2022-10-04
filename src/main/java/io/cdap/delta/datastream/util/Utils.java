@@ -55,6 +55,7 @@ import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageException;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Empty;
 import com.google.protobuf.FieldMask;
@@ -106,7 +107,7 @@ public final class Utils {
   private static final int GCS_ERROR_CODE_CONFLICT = 409;
   private static final int GCS_ERROR_CODE_INVALID_REQUEST = 400;
   private static final int DATASTREAM_CLIENT_POOL_SIZE = 20;
-  private static final int TTL_DAYS = 30;
+  private static final int GCS_PURGE_POLICY_TTL_DAYS = 30;
   private static final float DATASTREAM_CLIENT_POOL_LOAD_FACTOR = 0.75f;
   private static final LinkedHashMap<GoogleCredentials, DatastreamClient> datastreamClientPool =
     new LinkedHashMap<GoogleCredentials, DatastreamClient>(
@@ -690,7 +691,7 @@ public final class Utils {
    * @return the started stream
    */
   public static Stream startStream(DatastreamClient datastream, Stream stream, Logger logger) {
-    return updateStreamState(datastream, stream.getName(), Stream.State.RUNNING, logger);
+    return updateStreamState(datastream, stream.getName(), Stream.State.RUNNING, Stream.State.STARTING, logger);
   }
 
   /**
@@ -702,11 +703,11 @@ public final class Utils {
    * @return the paused stream
    */
   public static Stream pauseStream(DatastreamClient datastream, Stream stream, Logger logger) {
-    return updateStreamState(datastream, stream.getName(), Stream.State.PAUSED, logger);
+    return updateStreamState(datastream, stream.getName(), Stream.State.PAUSED, Stream.State.DRAINING, logger);
   }
 
   private static Stream updateStreamState(DatastreamClient datastream, String streamName, Stream.State state,
-    Logger logger) {
+                                          Stream.State transitionState, Logger logger) {
     Stream.Builder streamBuilder = Stream.newBuilder().setName(streamName).setState(state);
     FieldMask.Builder fieldMaskBuilder = FieldMask.newBuilder().addPaths(FIELD_STATE);
 
@@ -715,14 +716,26 @@ public final class Utils {
     // a predicate that indicate that we try to start/pause a stream when it is already in the progress of
     // starting/pausing
     Predicate<? extends Throwable> streamBeingChangedPredicate = t -> t.getCause() instanceof ExecutionException &&
-      // If there is already an operation queued, an AbortedException will be thrown
-      t.getCause().getCause() instanceof AbortedException;
+            // If there is already an operation queued, an AbortedException will be thrown
+            // Check if the stream is in one of transition or target state
+            (t.getCause().getCause() instanceof AbortedException) &&
+            streamStateIn(datastream, streamName, ImmutableSet.of(state, transitionState), logger);
 
     return Failsafe.with(
-      // fall back to get stream until stream state reaches target state
-      Fallback.of(() -> getStreamUntilStateEquals(datastream, state, streamName, logger))
-        .handleIf(streamBeingChangedPredicate)).get(() -> updateStream(datastream,
-      UpdateStreamRequest.newBuilder().setStream(streamBuilder).setUpdateMask(fieldMaskBuilder).build(), logger));
+            // fall back to get stream until stream state reaches target state
+            Fallback.of(() -> getStreamUntilStateEquals(datastream, state, streamName, logger))
+                    .handleIf(streamBeingChangedPredicate)).get(() -> updateStream(datastream,
+            UpdateStreamRequest.newBuilder().setStream(streamBuilder).setUpdateMask(fieldMaskBuilder).build(), logger));
+  }
+
+  private static boolean streamStateIn(DatastreamClient datastream, String streamName, Set<Stream.State> validStates,
+                                       Logger logger) {
+    Stream stream = getStream(datastream, streamName, logger);
+    boolean isStateValid = validStates.contains(stream.getState());
+    if (!isStateValid) {
+      logger.error("Stream {} is not in valid state {}", streamName, stream.getState());
+    }
+    return isStateValid;
   }
 
   /**
@@ -844,7 +857,7 @@ public final class Utils {
                             new BucketInfo.LifecycleRule(
                                     BucketInfo.LifecycleRule.LifecycleAction.newDeleteAction(),
                                     BucketInfo.LifecycleRule.LifecycleCondition.newBuilder()
-                                            .setDaysSinceCustomTime(TTL_DAYS).build())));
+                                            .setDaysSinceCustomTime(GCS_PURGE_POLICY_TTL_DAYS).build())));
           }
           storage.create(builder.build());
         });

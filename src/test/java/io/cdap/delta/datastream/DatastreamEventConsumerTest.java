@@ -85,6 +85,9 @@ class DatastreamEventConsumerTest {
       assertTrue(operation.getSizeInBytes() > 0);
       assertFalse(event.getRowId().isEmpty());
       assertTrue(event.getIngestTimestampMillis() >= startTime);
+      assertNotNull(event.getSortKeys());
+      assertEquals(event.getSortKeys().size(), 4);
+      assertEquals(event.getSortKeys().get(0).getType(), Schema.Type.LONG);
       assertNull(event.getPreviousRow());
       assertNull(event.getTransactionId());
       HashMap<String, String> newState = new HashMap<>(state);
@@ -150,6 +153,9 @@ class DatastreamEventConsumerTest {
       assertTrue(operation.getSizeInBytes() > 0);
       assertFalse(event.getRowId().isEmpty());
       assertTrue(event.getIngestTimestampMillis() >= startTime);
+      assertNotNull(event.getSortKeys());
+      assertEquals(event.getSortKeys().size(), 4);
+      assertEquals(event.getSortKeys().get(0).getType(), Schema.Type.LONG);
       assertNull(event.getPreviousRow());
       assertNotNull(event.getTransactionId());
       HashMap<String, String> newState = new HashMap<>(state);
@@ -215,6 +221,9 @@ class DatastreamEventConsumerTest {
       assertTrue(operation.getSizeInBytes() > 0);
       assertFalse(event.getRowId().isEmpty());
       assertTrue(event.getIngestTimestampMillis() >= startTime);
+      assertNotNull(event.getSortKeys());
+      assertEquals(event.getSortKeys().size(), 4);
+      assertEquals(event.getSortKeys().get(0).getType(), Schema.Type.LONG);
       assertNotNull(event.getPreviousRow());
       assertNotNull(event.getTransactionId());
       HashMap<String, String> newState = new HashMap<>(state);
@@ -276,6 +285,9 @@ class DatastreamEventConsumerTest {
       assertTrue(operation.getSizeInBytes() == 0);
       assertFalse(event.getRowId().isEmpty());
       assertTrue(event.getIngestTimestampMillis() >= startTime);
+      assertNotNull(event.getSortKeys());
+      assertEquals(event.getSortKeys().size(), 4);
+      assertEquals(event.getSortKeys().get(0).getType(), Schema.Type.LONG);
       assertNull(event.getPreviousRow());
       assertNotNull(event.getTransactionId());
       HashMap<String, String> newState = new HashMap<>(state);

@@ -852,12 +852,7 @@ public final class Utils {
         .run(() -> {
           BucketInfo.Builder builder = BucketInfo.newBuilder(bucketName);
           if (location != null && !location.trim().isEmpty()) {
-            builder.setLocation(location)
-              .setLifecycleRules(ImmutableList.of(
-                new BucketInfo.LifecycleRule(
-                  BucketInfo.LifecycleRule.LifecycleAction.newDeleteAction(),
-                  BucketInfo.LifecycleRule.LifecycleCondition.newBuilder()
-                    .setDaysSinceCustomTime(30).build())));
+            builder.setLocation(location);
           }
           builder.setLifecycleRules(ImmutableList.of(new BucketInfo.LifecycleRule(
             BucketInfo.LifecycleRule.LifecycleAction.newDeleteAction(),

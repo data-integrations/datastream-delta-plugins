@@ -26,6 +26,7 @@ import com.google.cloud.datastream.v1.Stream;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageBatch;
 import com.google.gson.Gson;
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.delta.api.ChangeEvent;
@@ -46,8 +47,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -83,6 +86,7 @@ public class DatastreamEventReader implements EventReader {
   // Datastream suggested 3 days scanning window
   private static final int DATASTREAM_SLA_IN_MINUTES = 60 * 24 * 3;
   private static final int SCAN_INTERVAL_IN_SECONDS = 30;
+  private static final int SET_TTL_INTERVAL_IN_SECONDS = 90;
 
   private final DatastreamClient datastream;
   private final DatastreamConfig config;
@@ -99,6 +103,7 @@ public class DatastreamEventReader implements EventReader {
   // The GCS bucket in which datastream result is written to
   private final String bucketName;
   private final String databaseName;
+  private final boolean bucketCreatedByCDF;
   private Stream stream;
 
   public DatastreamEventReader(DatastreamConfig config, EventReaderDefinition definition, DeltaSourceContext context,
@@ -107,7 +112,14 @@ public class DatastreamEventReader implements EventReader {
     this.config = config;
     this.definition = definition;
     this.emitter = emitter;
-    this.executorService = Executors.newSingleThreadScheduledExecutor();
+
+    this.bucketCreatedByCDF = new String(context.getState("bucketCreatedByCDF"), StandardCharsets.UTF_8).equals("true");
+    if (bucketCreatedByCDF) {
+      this.executorService = Executors.newScheduledThreadPool(2);
+    } else {
+      this.executorService = Executors.newSingleThreadScheduledExecutor();
+    }
+
     this.datastream = datastream;
     this.storage = storage;
     String streamId =
@@ -151,7 +163,9 @@ public class DatastreamEventReader implements EventReader {
       return;
     }
     executorService.scheduleAtFixedRate(new ScanTask(offset), 0, SCAN_INTERVAL_IN_SECONDS, TimeUnit.SECONDS);
-
+    if (bucketCreatedByCDF) {
+      executorService.scheduleAtFixedRate(new SetTTLTask(offset), 0, SET_TTL_INTERVAL_IN_SECONDS, TimeUnit.SECONDS);
+    }
   }
 
   public void stop() throws InterruptedException {
@@ -182,6 +196,90 @@ public class DatastreamEventReader implements EventReader {
     // start the stream if not
     if (Stream.State.RUNNING != stream.getState()) {
       Utils.startStream(datastream, stream, LOGGER);
+    }
+  }
+
+  private String buildReplicatorPathPrefix() {
+    if (gcsRootPath.isEmpty() && streamGcsPathPrefix.isEmpty()) {
+      return "";
+    }
+    if (gcsRootPath.isEmpty()) {
+      return streamGcsPathPrefix + "/";
+    }
+    if (streamGcsPathPrefix.isEmpty()) {
+      return gcsRootPath + "/";
+    }
+    return String.format("%s/%s/", gcsRootPath, streamGcsPathPrefix);
+  }
+
+  class SetTTLTask implements Runnable {
+    private Map<String, String> state;
+    SetTTLTask(Offset offset) {
+      this.state = new HashMap<>(offset.get());
+    }
+    @Override
+    public void run() {
+      try {
+        // Check whether offset has changed since previous invocation
+        if (!context.getCommittedOffset().get().equals(this.state)) {
+          this.state = new HashMap<>(context.getCommittedOffset().get());
+          if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Committed offset changed. Writing TTL for last processed batch of blobs.");
+          }
+          setBlobTTL();
+        }
+      } catch (Throwable t) {
+        Utils.handleError(LOGGER, context, t);
+        context.notifyFailed(t);
+      }
+    }
+
+    private void setBlobTTL() {
+      List<String> tables = new ArrayList<>();
+      for (SourceTable table : definition.getTables()) {
+        tables.add(Utils.buildCompositeTableName(table.getSchema(), table.getTable()));
+      }
+      Bucket bucket = storage.get(bucketName);
+      String replicatorPathPrefix = buildReplicatorPathPrefix();
+
+      // Scan table by table
+      for (String tableName : tables) {
+        String prefix = replicatorPathPrefix + tableName.toUpperCase() + "/";
+        String path = state.get(tableName + PATH_STATE_KEY_SUFFIX);
+        long lastProcessed = Long.parseLong(state.getOrDefault(tableName + PROCESSED_TIME_STATE_KEY_SUFFIX, "0"));
+
+        Page<Blob> allBlobs = bucket.list(Storage.BlobListOption.prefix(prefix),
+                                          Storage.BlobListOption.fields(
+                                            Storage.BlobField.NAME, Storage.BlobField.TIME_CREATED,
+                                            Storage.BlobField.SIZE, Storage.BlobField.CUSTOM_TIME));
+        List<BlobWrapper> blobs = new ArrayList<>();
+        for (Blob blob : allBlobs.iterateAll()) {
+          if (blob.getSize() > 0) {
+            blobs.add(new BlobWrapper(blob));
+          }
+        }
+        // Sort list of blobs according to creation time
+        // Iterate backwards from lastProcessed blob until blob with customTime already set is encountered
+        blobs.sort(Comparator.naturalOrder());
+        StorageBatch batchRequest = storage.batch();
+        int count = 0;
+        int index = lastProcessed > 0 ? Collections.binarySearch(blobs, new BlobWrapper(lastProcessed, path)) - 1 : -1;
+        while (index >= 0 && blobs.get(index).getBlob().getCustomTime() == null) {
+          Blob blob = blobs.get(index).getBlob();
+          batchRequest.update(blob.toBuilder().setCustomTime(Instant.now().toEpochMilli()).build());
+          count++;
+          index--;
+
+          if (count >= 100) {
+            batchRequest.submit();
+            batchRequest = storage.batch();
+            count = 0;
+          }
+        }
+        if (count > 0) {
+          batchRequest.submit();
+        }
+      }
     }
   }
 
@@ -595,19 +693,6 @@ public class DatastreamEventReader implements EventReader {
 
     private String getSourceTime(String tableName) {
       return state.get(tableName + SOURCE_TIME_STATE_KEY_SUFFIX);
-    }
-
-    private String buildReplicatorPathPrefix() {
-      if (gcsRootPath.isEmpty() && streamGcsPathPrefix.isEmpty()) {
-        return "";
-      }
-      if (gcsRootPath.isEmpty()) {
-        return streamGcsPathPrefix + "/";
-      }
-      if (streamGcsPathPrefix.isEmpty()) {
-        return gcsRootPath + "/";
-      }
-      return String.format("%s/%s/", gcsRootPath, streamGcsPathPrefix);
     }
 
     private void emitEvent(ChangeEvent event) throws Exception {

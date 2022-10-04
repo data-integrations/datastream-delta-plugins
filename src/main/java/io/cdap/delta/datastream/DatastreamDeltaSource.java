@@ -157,9 +157,7 @@ public class DatastreamDeltaSource implements DeltaSource {
         bucketName = Utils.buildBucketName(context.getRunId());
       }
       boolean bucketCreated = Utils.createBucketIfNotExisting(storage, bucketName, config.getGcsBucketLocation());
-      if (bucketCreated) {
-        context.putState(BUCKET_CREATED_BY_CDF, Bytes.toBytes("true"));
-      }
+      context.putState(BUCKET_CREATED_BY_CDF, Bytes.toBytes(bucketCreated));
       // create the gcs connection profile
       createConnectionProfileRequest =
         CreateConnectionProfileRequest.newBuilder().setParent(parentPath).setConnectionProfile(

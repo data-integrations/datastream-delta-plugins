@@ -114,7 +114,6 @@ public class DatastreamEventReader implements EventReader {
     this.config = config;
     this.definition = definition;
     this.emitter = emitter;
-
     String bucketCreatedStateVal = new String(Objects.requireNonNull(context.getState(BUCKET_CREATED_BY_CDF)),
                                               StandardCharsets.UTF_8);
     this.bucketCreatedByCDF = bucketCreatedStateVal.equals("true");

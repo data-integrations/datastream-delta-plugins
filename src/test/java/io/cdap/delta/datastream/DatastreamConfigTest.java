@@ -73,8 +73,8 @@ class DatastreamConfigTest {
     assertEquals("us", config.getGcsBucketLocation());
     assertEquals("/prefix", config.getGcsPathPrefix());
     DatastreamConfig conf = config;
-    assertThrows(IllegalArgumentException.class, () -> conf.getDatastreamCredentials());
-    assertThrows(IllegalArgumentException.class, () -> conf.getGcsCredentials());
+    assertThrows(RuntimeException.class, () -> conf.getDatastreamCredentials());
+    assertThrows(RuntimeException.class, () -> conf.getGcsCredentials());
     assertEquals("project", config.getProject());
   }
 

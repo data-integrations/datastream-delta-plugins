@@ -58,6 +58,7 @@ import static io.cdap.delta.datastream.util.Utils.buildOracleConnectionProfile;
 public class DatastreamDeltaSource implements DeltaSource {
 
   public static final String NAME = "OracleDatastream";
+  public static final String BUCKET_CREATED_BY_CDF = "bucketCreatedByCDF";
   private static final Logger LOGGER = LoggerFactory.getLogger(DatastreamDeltaSource.class);
   private static final Gson GSON = new Gson();
   private final DatastreamConfig config;
@@ -157,7 +158,7 @@ public class DatastreamDeltaSource implements DeltaSource {
       }
       boolean bucketCreated = Utils.createBucketIfNotExisting(storage, bucketName, config.getGcsBucketLocation());
       if (bucketCreated) {
-        context.putState("bucketCreatedByCDF", Bytes.toBytes("true"));
+        context.putState(BUCKET_CREATED_BY_CDF, Bytes.toBytes("true"));
       }
       // create the gcs connection profile
       createConnectionProfileRequest =

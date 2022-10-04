@@ -57,12 +57,14 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TimeZone;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static io.cdap.delta.datastream.DatastreamDeltaSource.BUCKET_CREATED_BY_CDF;
 import static io.cdap.delta.datastream.DatastreamEventConsumer.POSITION_STATE_KEY_SUFFIX;
 
 /**
@@ -86,7 +88,7 @@ public class DatastreamEventReader implements EventReader {
   // Datastream suggested 3 days scanning window
   private static final int DATASTREAM_SLA_IN_MINUTES = 60 * 24 * 3;
   private static final int SCAN_INTERVAL_IN_SECONDS = 30;
-  private static final int SET_TTL_INTERVAL_IN_SECONDS = 90;
+  private static final int TTL_TASK_INTERVAL_IN_SECONDS = 90;
 
   private final DatastreamClient datastream;
   private final DatastreamConfig config;
@@ -113,12 +115,11 @@ public class DatastreamEventReader implements EventReader {
     this.definition = definition;
     this.emitter = emitter;
 
-    this.bucketCreatedByCDF = new String(context.getState("bucketCreatedByCDF"), StandardCharsets.UTF_8).equals("true");
-    if (bucketCreatedByCDF) {
-      this.executorService = Executors.newScheduledThreadPool(2);
-    } else {
-      this.executorService = Executors.newSingleThreadScheduledExecutor();
-    }
+    String bucketCreatedStateVal = new String(Objects.requireNonNull(context.getState(BUCKET_CREATED_BY_CDF)),
+                                              StandardCharsets.UTF_8);
+    this.bucketCreatedByCDF = bucketCreatedStateVal.equals("true");
+    int threads = bucketCreatedByCDF ? 2 : 1;
+    this.executorService = Executors.newScheduledThreadPool(threads);
 
     this.datastream = datastream;
     this.storage = storage;
@@ -164,7 +165,7 @@ public class DatastreamEventReader implements EventReader {
     }
     executorService.scheduleAtFixedRate(new ScanTask(offset), 0, SCAN_INTERVAL_IN_SECONDS, TimeUnit.SECONDS);
     if (bucketCreatedByCDF) {
-      executorService.scheduleAtFixedRate(new SetTTLTask(offset), 0, SET_TTL_INTERVAL_IN_SECONDS, TimeUnit.SECONDS);
+      executorService.scheduleAtFixedRate(new SetTTLTask(offset), 0, TTL_TASK_INTERVAL_IN_SECONDS, TimeUnit.SECONDS);
     }
   }
 
@@ -229,8 +230,7 @@ public class DatastreamEventReader implements EventReader {
           setBlobTTL();
         }
       } catch (Throwable t) {
-        Utils.handleError(LOGGER, context, t);
-        context.notifyFailed(t);
+        LOGGER.warn("Error encountered while setting TTL for last processed batch of blobs.");
       }
     }
 

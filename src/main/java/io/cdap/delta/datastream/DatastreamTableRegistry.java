@@ -183,7 +183,7 @@ public class DatastreamTableRegistry implements TableRegistry {
 
   @Override
   public void close() throws IOException {
-    datastream.close();
+    //datastream.close();
   }
 
   private DiscoverConnectionProfileRequest.Builder buildDiscoverConnectionProfileRequest(

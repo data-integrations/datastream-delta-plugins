@@ -183,6 +183,9 @@ public class DatastreamTableRegistry implements TableRegistry {
 
   @Override
   public void close() throws IOException {
+    // closing datastream client to close all daemon threads
+    // but the datastream client not shutting down gracefully is causing other issues like sandbox crashing
+    // need to fix this as soon as datastream client issue has been addressed in the new datastream client
     //datastream.close();
   }
 

@@ -45,6 +45,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
+  String namespace = "default";
+  String appName = "datastream-ut";
+  String runId = "9876543210";
+  long generation = 0;
 
   @Test
   public void testInitializeExistingStream() throws Exception {

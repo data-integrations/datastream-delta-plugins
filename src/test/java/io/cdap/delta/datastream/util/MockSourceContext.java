@@ -43,7 +43,7 @@ public class MockSourceContext implements DeltaSourceContext {
   private Map<String, byte[]> mockState = new HashMap<>();
 
   public MockSourceContext(String namespace, String appName, long generation, String runId, Set<String> oracleTables,
-    String oracleDb) {
+                           String oracleDb) {
     this.runId = runId;
     this.namespace = namespace;
     this.appName = appName;

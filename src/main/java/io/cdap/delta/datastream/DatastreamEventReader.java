@@ -393,18 +393,31 @@ public class DatastreamEventReader implements EventReader {
       Map<String, Boolean> backFillStatuses = new HashMap<>();
       for (StreamObject streamObject : streamObjects) {
         if (!streamObject.getSourceObject().hasOracleIdentifier()) {
-          throw Utils.buildException(String.format("Stream doesn't have Oracle Identifier"), false);
+          LOGGER.error(String.format("StreamObject doesn't have Oracle Identifier: %s", streamObject));
+          throw Utils.buildException(String.format("StreamObject doesn't have Oracle Identifier"), false);
+        }
+        if (!streamObject.hasBackfillJob()) {
+          LOGGER.error(String.format("StreamObject doesn't have Backfill Job: %s", streamObject));
+          throw Utils.buildException(String.format("StreamObject doesn't have Backfill Job"), false);
         }
         String tableName = streamObject.getSourceObject().getOracleIdentifier().getTable();
-        boolean backFillDone = isBackFillDone(streamObject.getBackfillJob().getState(), tableName);
+        boolean backFillDone = isBackFillDone(streamObject.getBackfillJob(), tableName);
         backFillStatuses.put(tableName, backFillDone);
       }
       return backFillStatuses;
     }
 
-    private boolean isBackFillDone(BackfillJob.State state, String tableName) throws Exception {
+    private boolean isBackFillDone(BackfillJob backfillJob, String tableName) throws Exception {
+      BackfillJob.State state = backfillJob.getState();
       switch (state) {
         case FAILED:
+          StringBuilder errorMessage = new StringBuilder();
+          for (Error error : backfillJob.getErrorsList()) {
+            errorMessage.append(error);
+            errorMessage.append(System.lineSeparator());
+          }
+          LOGGER.error(String.format("Backfill error message for table: %s, errorMessage: %s",
+                                     tableName, errorMessage));
           throw Utils.buildException(String.format("Backfill failed for table : %s", tableName), false);
         case COMPLETED:
           return true;

@@ -26,6 +26,9 @@ import com.google.cloud.datastream.v1.OracleRdbms;
 import com.google.cloud.datastream.v1.OracleSourceConfig;
 import com.google.cloud.datastream.v1.SourceConfig;
 import com.google.cloud.datastream.v1.Stream;
+import com.google.cloud.storage.Bucket;
+import com.google.cloud.storage.Storage;
+import io.cdap.cdap.api.common.Bytes;
 import io.cdap.delta.api.DeltaSourceContext;
 import io.cdap.delta.datastream.util.MockSourceContext;
 import io.cdap.delta.datastream.util.Utils;
@@ -113,6 +116,24 @@ class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
     deltaSource.initialize(context);
     checkStream(replicatorId);
     clearStream(replicatorId);
+  }
+
+  @Test
+  public void testGCSBucketCreation() throws Exception {
+    // Check if lifecycle rules are set on bucket created by CDF
+    DatastreamConfig config = buildDatastreamConfig(false);
+    DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
+    DeltaSourceContext context = new MockSourceContext(namespace, appName, generation, runId, oracleTables, oracleDb);
+    String originalBucket = gcsBucket;
+
+    gcsBucket = null;
+    deltaSource.initialize(context);
+    byte[] bucketCreated = context.getState(BUCKET_CREATED_BY_CDF);
+    assertTrue(bucketCreated != null && Bytes.toBoolean(bucketCreated));
+    gcsBucket = Utils.buildBucketName(context.getRunId());
+    Bucket bucket = storage.get(gcsBucket, Storage.BucketGetOption.fields(Storage.BucketField.values()));
+    assertEquals(1, bucket.getLifecycleRules().size());
+    gcsBucket = originalBucket;
   }
 
   private void clearStream(String replicatorId) throws InterruptedException, IOException, ExecutionException {

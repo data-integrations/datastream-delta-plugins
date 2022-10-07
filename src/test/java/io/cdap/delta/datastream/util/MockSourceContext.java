@@ -40,17 +40,16 @@ public class MockSourceContext implements DeltaSourceContext {
   private long generation;
   private Set<String> oracleTables;
   private String oracleDb;
-  private Map<String, byte[]> mockState;
+  private Map<String, byte[]> mockState = new HashMap<>();
 
   public MockSourceContext(String namespace, String appName, long generation, String runId, Set<String> oracleTables,
-    String oracleDb) {
+                           String oracleDb) {
     this.runId = runId;
     this.namespace = namespace;
     this.appName = appName;
     this.generation = generation;
     this.oracleTables = oracleTables;
     this.oracleDb = oracleDb;
-    this.mockState = new HashMap<>();
   }
 
   public MockSourceContext() {
@@ -98,10 +97,7 @@ public class MockSourceContext implements DeltaSourceContext {
 
   @Override
   public byte[] getState(String s) throws IOException {
-    if (s.equals(BUCKET_CREATED_BY_CDF)) {
-      return mockState.get(s);
-    }
-    return new byte[0];
+    return mockState.getOrDefault(s, new byte[0]);
   }
 
   @Override

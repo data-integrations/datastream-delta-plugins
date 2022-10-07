@@ -28,6 +28,7 @@ import io.cdap.delta.api.SourceTable;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -39,9 +40,10 @@ public class MockSourceContext implements DeltaSourceContext {
   private long generation;
   private Set<String> oracleTables;
   private String oracleDb;
+  private Map<String, byte[]> mockState = new HashMap<>();
 
   public MockSourceContext(String namespace, String appName, long generation, String runId, Set<String> oracleTables,
-    String oracleDb) {
+                           String oracleDb) {
     this.runId = runId;
     this.namespace = namespace;
     this.appName = appName;
@@ -95,12 +97,12 @@ public class MockSourceContext implements DeltaSourceContext {
 
   @Override
   public byte[] getState(String s) throws IOException {
-    return new byte[0];
+    return mockState.getOrDefault(s, new byte[0]);
   }
 
   @Override
   public void putState(String s, byte[] bytes) throws IOException {
-
+    mockState.put(s, bytes);
   }
 
   @Override

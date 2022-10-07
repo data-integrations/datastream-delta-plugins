@@ -28,6 +28,7 @@ import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageBatch;
 import com.google.gson.Gson;
+import io.cdap.cdap.api.common.Bytes;
 import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.delta.api.ChangeEvent;
 import io.cdap.delta.api.DDLEvent;
@@ -114,9 +115,9 @@ public class DatastreamEventReader implements EventReader {
     this.config = config;
     this.definition = definition;
     this.emitter = emitter;
-    String bucketCreatedStateVal = new String(Objects.requireNonNull(context.getState(BUCKET_CREATED_BY_CDF)),
-                                              StandardCharsets.UTF_8);
-    this.bucketCreatedByCDF = bucketCreatedStateVal.equals("true");
+
+    byte[] stateVal = context.getState(BUCKET_CREATED_BY_CDF);
+    this.bucketCreatedByCDF = (stateVal != null && stateVal.length != 0 && Bytes.toBoolean(stateVal));
     int threads = bucketCreatedByCDF ? 2 : 1;
     this.executorService = Executors.newScheduledThreadPool(threads);
 

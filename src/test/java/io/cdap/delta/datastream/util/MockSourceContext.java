@@ -33,8 +33,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static io.cdap.delta.datastream.DatastreamDeltaSource.BUCKET_CREATED_BY_CDF;
-
 public class MockSourceContext implements DeltaSourceContext {
   private String runId;
   private String namespace;

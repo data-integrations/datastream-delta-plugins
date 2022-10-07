@@ -98,7 +98,7 @@ class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
   public void testInitializeNewStream() throws Exception {
     String namespace = "default";
     String appName = "datastream-ut";
-    String runId = "9876543210";
+    String runId = "1234567890";
     long generation = 0;
     DatastreamConfig config = buildDatastreamConfig(false);
     DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);

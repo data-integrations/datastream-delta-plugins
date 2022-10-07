@@ -118,24 +118,6 @@ class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
     clearStream(replicatorId);
   }
 
-  @Test
-  public void testGCSBucketCreation() throws Exception {
-    // Check if lifecycle rules are set on bucket created by CDF
-    DatastreamConfig config = buildDatastreamConfig(false);
-    DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
-    DeltaSourceContext context = new MockSourceContext(namespace, appName, generation, runId, oracleTables, oracleDb);
-    String originalBucket = gcsBucket;
-
-    gcsBucket = null;
-    deltaSource.initialize(context);
-    byte[] bucketCreated = context.getState(BUCKET_CREATED_BY_CDF);
-    assertTrue(bucketCreated != null && Bytes.toBoolean(bucketCreated));
-    gcsBucket = Utils.buildBucketName(context.getRunId());
-    Bucket bucket = storage.get(gcsBucket, Storage.BucketGetOption.fields(Storage.BucketField.values()));
-    assertEquals(1, bucket.getLifecycleRules().size());
-    gcsBucket = originalBucket;
-  }
-
   private void clearStream(String replicatorId) throws InterruptedException, IOException, ExecutionException {
     datastream
       .deleteConnectionProfileAsync(String.format("%s" + "/connectionProfiles/DF-ORA-%s", parentPath, replicatorId))

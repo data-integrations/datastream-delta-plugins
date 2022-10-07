@@ -26,19 +26,28 @@ import com.google.cloud.datastream.v1alpha1.OracleRdbms;
 import com.google.cloud.datastream.v1alpha1.OracleSourceConfig;
 import com.google.cloud.datastream.v1alpha1.SourceConfig;
 import com.google.cloud.datastream.v1alpha1.Stream;
+import com.google.cloud.storage.Bucket;
+import com.google.cloud.storage.Storage;
+import io.cdap.cdap.api.common.Bytes;
 import io.cdap.delta.api.DeltaSourceContext;
 import io.cdap.delta.datastream.util.MockSourceContext;
+import io.cdap.delta.datastream.util.Utils;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+import static io.cdap.delta.datastream.DatastreamDeltaSource.BUCKET_CREATED_BY_CDF;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
+  String namespace = "default";
+  String appName = "datastream-ut";
+  String runId = "9876543210";
+  long generation = 0;
 
   @Test
   public void testInitializeExistingStream() throws Exception {
@@ -56,18 +65,14 @@ class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
 
   @Test
   public void testInitializeNewStream() throws Exception {
-    String namspace = "default";
-    String appName = "datastream-ut";
-    String runId = "1234567890";
-    long generation = 0;
     DatastreamConfig config = buildDatastreamConfig(false);
     DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
-    DeltaSourceContext context = new MockSourceContext(namspace, appName, generation, runId, oracleTables, oracleDb);
+    DeltaSourceContext context = new MockSourceContext(namespace, appName, generation, runId, oracleTables, oracleDb);
     if (gcsBucket == null) {
       gcsBucket = "df-rds-" + runId;
     }
     deltaSource.initialize(context);
-    String replicatorId = String.format("%s-%s-%d", namspace, appName, generation);
+    String replicatorId = String.format("%s-%s-%d", namespace, appName, generation);
     checkStream(replicatorId);
     // call twice should not have impact
     deltaSource.initialize(context);
@@ -76,6 +81,24 @@ class DatastreamDeltaSourceTest extends BaseIntegrationTestCase {
     deltaSource.initialize(context);
     checkStream(replicatorId);
     clearStream(replicatorId);
+  }
+
+  @Test
+  public void testGCSBucketCreation() throws Exception {
+    // Check if lifecycle rules are set on bucket created by CDF
+    DatastreamConfig config = buildDatastreamConfig(false);
+    DatastreamDeltaSource deltaSource = new DatastreamDeltaSource(config);
+    DeltaSourceContext context = new MockSourceContext(namespace, appName, generation, runId, oracleTables, oracleDb);
+    String originalBucket = gcsBucket;
+
+    gcsBucket = null;
+    deltaSource.initialize(context);
+    byte[] bucketCreated = context.getState(BUCKET_CREATED_BY_CDF);
+    assertTrue(bucketCreated != null && Bytes.toBoolean(bucketCreated));
+    gcsBucket = Utils.buildBucketName(context.getRunId());
+    Bucket bucket = storage.get(gcsBucket, Storage.BucketGetOption.fields(Storage.BucketField.values()));
+    assertEquals(1, bucket.getLifecycleRules().size());
+    gcsBucket = originalBucket;
   }
 
   private void clearStream(String replicatorId) throws InterruptedException, IOException, ExecutionException {

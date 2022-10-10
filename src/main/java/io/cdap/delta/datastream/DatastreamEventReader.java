@@ -364,8 +364,8 @@ public class DatastreamEventReader implements EventReader {
           }
           // dump is finished
           dumpCompleted(tableName);
-          // check if all tables dump is done or not
-          checkAllTablesDumpDone(tableBackFillStatuses);
+          // check if all tables dump is done or not. We use ScanTask state to check if all dumps are complete
+          checkAllTablesDumpDone(tables);
         }
 
         // scanning window starts from ${table_name}.source.time - SLO
@@ -385,9 +385,9 @@ public class DatastreamEventReader implements EventReader {
     private Map<String, Boolean> getBackFillStatuses() throws Exception {
       // Makes a single call to datastream API for the BackFill Statuses of all tables
       // If all tables backfill status is DONE or stream has no backfill,
-      // then this won't make the datastream API call and returns an empty map
+      // then this won't make the datastream API call and returns a null
       if (getAllTablesDumpDone() || stream.hasBackfillNone()) {
-        return new HashMap<>();
+        return null;
       }
       List<StreamObject> streamObjects = Utils.getStreamObjects(datastream, stream.getName(), LOGGER);
       Map<String, Boolean> backFillStatuses = new HashMap<>();
@@ -426,9 +426,9 @@ public class DatastreamEventReader implements EventReader {
       }
     }
 
-    private void checkAllTablesDumpDone(Map<String, Boolean> tableBackFillStatuses) {
-      for (Boolean done : tableBackFillStatuses.values()) {
-        if (!done) {
+    private void checkAllTablesDumpDone(Map<String, SourceTable> tables) {
+      for (String tableName : tables.keySet()) {
+        if (!getDumped(tableName)) {
           return;
         }
       }

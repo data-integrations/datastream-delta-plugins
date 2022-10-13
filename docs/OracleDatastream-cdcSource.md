@@ -107,9 +107,6 @@ Limitations
 Each row is identified by the Primary key of the table. Upon a Primary key update on the oracle source, the data stream generates 2 events : Insert + delete. 
 Since Events written by Datastream may arrive out of order , we do not hard delete and rather mark the column `_is_deleted` as true when we get a Delete event. So, in case of a Primary key update, we will have the row with new value inserted while the old row will be present but would be marked as deleted.
 
-### Multiple updates to the same row
-Events written by Datastream may arrive out of order. BigQuery plugin cannot sort the events if multiple events happened in the same milli-second to the same row. The consequence is that target database may apply those events in the order of receiving them. But such case is very rare becasue it only happens when multiple change events against the same row are committed in the same millisecond and Datastream write them out of order.
-
 Trouble Shooting changes got replicated with a high latency
 -----------
 The following issue occurs when you have incorrect redo log settings on your Oracle database:

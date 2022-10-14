@@ -48,6 +48,7 @@ import com.google.cloud.datastream.v1.PrivateConnectivity;
 import com.google.cloud.datastream.v1.SourceConfig;
 import com.google.cloud.datastream.v1.StaticServiceIpConnectivity;
 import com.google.cloud.datastream.v1.Stream;
+import com.google.cloud.datastream.v1.StreamObject;
 import com.google.cloud.datastream.v1.UpdateStreamRequest;
 import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
@@ -954,6 +955,32 @@ public final class Utils {
       }
     }
     return client;
+  }
+
+  /**
+   * Get all StreamObjects associated to a Stream (There will be one StreamObject associated to each table)
+   * @param datastreamClient
+   * @param streamPath
+   * @param logger
+   * @return
+   */
+  public static List<StreamObject> getStreamObjects(DatastreamClient datastreamClient,
+                                                    String streamPath, Logger logger) {
+    DatastreamClient.ListStreamObjectsPagedResponse listStreamObjectsPagedResponse =
+      Failsafe.with(Utils.<DatastreamClient.ListStreamObjectsPagedResponse>createRetryPolicy())
+        .get(() -> datastreamClient.listStreamObjects(streamPath));
+
+    if (logger.isDebugEnabled()) {
+      logger.debug("ListStreamObjects Response : \n");
+    }
+    List<StreamObject> streamObjects = new ArrayList<>();
+    for (StreamObject streamObject : listStreamObjectsPagedResponse.iterateAll()) {
+      streamObjects.add(streamObject);
+      if (logger.isDebugEnabled()) {
+        logger.debug(streamObject.toString());
+      }
+    }
+    return streamObjects;
   }
 
   private static DatastreamClient createDatastreamClient(GoogleCredentials credentials) throws IOException {

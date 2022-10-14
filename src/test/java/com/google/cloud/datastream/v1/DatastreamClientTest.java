@@ -237,6 +237,13 @@ public class DatastreamClientTest {
 
         assertEquals(Stream.State.PAUSED, streamPauseOperation.get().getState());
         assertEquals(Stream.State.PAUSED, datastream.getStream(streamPath).getState());
+
+        // test stream objects
+        List<StreamObject> streamObjects = Utils.getStreamObjects(datastream, streamPath, logger);
+        for (StreamObject streamObject : streamObjects) {
+          assertTrue(streamObject.hasSourceObject());
+          assertTrue(streamObject.getSourceObject().hasOracleIdentifier());
+        }
       } finally {
         OperationFuture<Empty, OperationMetadata> streamDeletionOperation = datastream.deleteStreamAsync(streamPath);
         streamDeletionOperation.get();

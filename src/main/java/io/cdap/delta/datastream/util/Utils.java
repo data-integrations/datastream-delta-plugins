@@ -54,6 +54,7 @@ import com.google.cloud.storage.BucketInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageException;
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Empty;
@@ -74,7 +75,6 @@ import java.io.IOException;
 import java.sql.SQLType;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -107,6 +107,7 @@ public final class Utils {
   private static final int GCS_ERROR_CODE_CONFLICT = 409;
   private static final int GCS_ERROR_CODE_INVALID_REQUEST = 400;
   private static final int DATASTREAM_CLIENT_POOL_SIZE = 20;
+  public static final int GCS_PURGE_POLICY_TTL_DAYS = 30;
   private static final float DATASTREAM_CLIENT_POOL_LOAD_FACTOR = 0.75f;
   private static final LinkedHashMap<GoogleCredentials, DatastreamClient> datastreamClientPool =
     new LinkedHashMap<GoogleCredentials, DatastreamClient>(
@@ -854,6 +855,10 @@ public final class Utils {
           if (location != null && !location.trim().isEmpty()) {
             builder.setLocation(location);
           }
+          builder.setLifecycleRules(ImmutableList.of(new BucketInfo.LifecycleRule(
+            BucketInfo.LifecycleRule.LifecycleAction.newDeleteAction(),
+            BucketInfo.LifecycleRule.LifecycleCondition.newBuilder()
+              .setDaysSinceCustomTime(GCS_PURGE_POLICY_TTL_DAYS).build())));
           storage.create(builder.build());
         });
     } catch (StorageException se) {

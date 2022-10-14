@@ -27,6 +27,7 @@ import com.google.gson.Gson;
 import io.cdap.cdap.api.annotation.Description;
 import io.cdap.cdap.api.annotation.Name;
 import io.cdap.cdap.api.annotation.Plugin;
+import io.cdap.cdap.api.common.Bytes;
 import io.cdap.delta.api.Configurer;
 import io.cdap.delta.api.DeltaSource;
 import io.cdap.delta.api.DeltaSourceContext;
@@ -57,6 +58,7 @@ import static io.cdap.delta.datastream.util.Utils.buildOracleConnectionProfile;
 public class DatastreamDeltaSource implements DeltaSource {
 
   public static final String NAME = "OracleDatastream";
+  public static final String BUCKET_CREATED_BY_CDF = "bucketCreatedByCDF";
   private static final Logger LOGGER = LoggerFactory.getLogger(DatastreamDeltaSource.class);
   private static final Gson GSON = new Gson();
   private final DatastreamConfig config;
@@ -154,8 +156,8 @@ public class DatastreamDeltaSource implements DeltaSource {
       if (bucketName == null || bucketName.trim().isEmpty()) {
         bucketName = Utils.buildBucketName(context.getRunId());
       }
-      Utils.createBucketIfNotExisting(storage, bucketName, config.getGcsBucketLocation());
-
+      boolean bucketCreated = Utils.createBucketIfNotExisting(storage, bucketName, config.getGcsBucketLocation());
+      context.putState(BUCKET_CREATED_BY_CDF, Bytes.toBytes(bucketCreated));
       // create the gcs connection profile
       createConnectionProfileRequest =
         CreateConnectionProfileRequest.newBuilder().setParent(parentPath).setConnectionProfile(

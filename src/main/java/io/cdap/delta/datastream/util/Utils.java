@@ -966,7 +966,7 @@ public final class Utils {
         .get(() -> datastreamClient.listStreamObjects(streamPath));
 
     if (logger.isDebugEnabled()) {
-      logger.debug("GetStreamObjects Response : \n");
+      logger.debug("ListStreamObjects Response : \n");
     }
     List<StreamObject> streamObjects = new ArrayList<>();
     for (StreamObject streamObject : listStreamObjectsPagedResponse.iterateAll()) {

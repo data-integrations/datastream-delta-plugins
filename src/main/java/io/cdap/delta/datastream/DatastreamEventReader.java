@@ -19,10 +19,12 @@ package io.cdap.delta.datastream;
 
 import com.google.api.gax.paging.Page;
 import com.google.api.gax.rpc.NotFoundException;
+import com.google.cloud.datastream.v1.BackfillJob;
 import com.google.cloud.datastream.v1.DatastreamClient;
 import com.google.cloud.datastream.v1.Error;
 import com.google.cloud.datastream.v1.GcsProfile;
 import com.google.cloud.datastream.v1.Stream;
+import com.google.cloud.datastream.v1.StreamObject;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.Storage;
@@ -85,6 +87,7 @@ public class DatastreamEventReader implements EventReader {
   private static final String SCAN_DONE_STATE_KEY_SUFFIX = ".last.done";
   private static final String TABLE_DETAIL_STATE_KEY_SUFFIX = ".table.detail";
   private static final String SCHEMA_KEY_STATE_KEY_SUFFIX = ".schema.key";
+  private static final String ALL_TABLES_DUMP_DONE_KEY = "all.tables.dump.done";
 
   // Datastream suggested 3 days scanning window
   private static final int DATASTREAM_SLA_IN_MINUTES = 60 * 24 * 3;
@@ -414,6 +417,9 @@ public class DatastreamEventReader implements EventReader {
         tables.put(Utils.buildCompositeTableName(table.getSchema(), table.getTable()), table);
       }
 
+      // get backfill statuses of all tables
+      Map<String, Boolean> tableBackFillStatuses = getBackFillStatuses();
+
       // get the target gcs bucket
       Bucket bucket = storage.get(bucketName);
       String replicatorPathPrefix = buildReplicatorPathPrefix();
@@ -445,14 +451,19 @@ public class DatastreamEventReader implements EventReader {
               .fields(Storage.BlobField.NAME, Storage.BlobField.TIME_CREATED, Storage.BlobField.SIZE));
 
             scanEvents(blobs, tableName, srcTable, true, path != null);
-            // TODO use Datastream API to determine whether dump is done, below is just a workaround
-            // if new dump file found  then that means dump hasn't been completed
-            if (getPath(tableName) == null || !getPath(tableName).equals(path)) {
+
+            // checks whether backfill is done for the table
+            if (!tableBackFillStatuses.containsKey(srcTable.getTable())) {
+              throw Utils.buildException(String.format("No Backfill information for table: %s", tableName), false);
+            }
+            if (!tableBackFillStatuses.get(srcTable.getTable())) {
               continue;
             }
           }
           // dump is finished
           dumpCompleted(tableName);
+          // check if all tables dump is done or not. We use ScanTask state to check if all dumps are complete
+          checkAllTablesDumpDone(tables);
         }
 
         // scanning window starts from ${table_name}.source.time - SLO
@@ -467,6 +478,59 @@ public class DatastreamEventReader implements EventReader {
         scanEvents(bucket.list(listOptions.toArray(new Storage.BlobListOption[listOptions.size()])), tableName,
           srcTable, false, true);
       }
+    }
+
+    private Map<String, Boolean> getBackFillStatuses() throws Exception {
+      // Makes a single call to datastream API for the BackFill Statuses of all tables
+      // If all tables backfill status is DONE or stream has no backfill,
+      // then this won't make the datastream API call and returns a null
+      if (getAllTablesDumpDone() || stream.hasBackfillNone()) {
+        return null;
+      }
+      List<StreamObject> streamObjects = Utils.getStreamObjects(datastream, stream.getName(), LOGGER);
+      Map<String, Boolean> backFillStatuses = new HashMap<>();
+      for (StreamObject streamObject : streamObjects) {
+        if (!streamObject.getSourceObject().hasOracleIdentifier()) {
+          LOGGER.error(String.format("StreamObject doesn't have Oracle Identifier: %s", streamObject));
+          throw Utils.buildException(String.format("StreamObject doesn't have Oracle Identifier"), false);
+        }
+        if (!streamObject.hasBackfillJob()) {
+          LOGGER.error(String.format("StreamObject doesn't have Backfill Job: %s", streamObject));
+          throw Utils.buildException(String.format("StreamObject doesn't have Backfill Job"), false);
+        }
+        String tableName = streamObject.getSourceObject().getOracleIdentifier().getTable();
+        boolean backFillDone = isBackFillDone(streamObject.getBackfillJob(), tableName);
+        backFillStatuses.put(tableName, backFillDone);
+      }
+      return backFillStatuses;
+    }
+
+    private boolean isBackFillDone(BackfillJob backfillJob, String tableName) throws Exception {
+      BackfillJob.State state = backfillJob.getState();
+      switch (state) {
+        case FAILED:
+          StringBuilder errorMessage = new StringBuilder();
+          for (Error error : backfillJob.getErrorsList()) {
+            errorMessage.append(error);
+            errorMessage.append(System.lineSeparator());
+          }
+          LOGGER.error(String.format("Backfill error message for table: %s, errorMessage: %s",
+                                     tableName, errorMessage));
+          throw Utils.buildException(String.format("Backfill failed for table : %s", tableName), false);
+        case COMPLETED:
+          return true;
+        default:
+          return false;
+      }
+    }
+
+    private void checkAllTablesDumpDone(Map<String, SourceTable> tables) {
+      for (String tableName : tables.keySet()) {
+        if (!getDumped(tableName)) {
+          return;
+        }
+      }
+      setAllTablesDumpDone();
     }
 
     private void dumpCompleted(String tableName) {
@@ -693,6 +757,14 @@ public class DatastreamEventReader implements EventReader {
 
     private String getSourceTime(String tableName) {
       return state.get(tableName + SOURCE_TIME_STATE_KEY_SUFFIX);
+    }
+
+    private boolean getAllTablesDumpDone() {
+      return Boolean.parseBoolean(state.getOrDefault(ALL_TABLES_DUMP_DONE_KEY, "false"));
+    }
+
+    private void setAllTablesDumpDone() {
+      state.put(ALL_TABLES_DUMP_DONE_KEY, "true");
     }
 
     private void emitEvent(ChangeEvent event) throws Exception {

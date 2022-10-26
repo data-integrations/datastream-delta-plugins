@@ -96,7 +96,7 @@ Plugin properties
 **GCS Bucket Location:** The location of GCS (Google Cloud Storage) bucket that Datastream will write its output to. A complete list of available locations can be found at
 https://cloud.google.com/bigquery/docs/locations. This value is ignored if an existing GCS bucket is specified.
 
-**GCS Bucket:** The GCS (Google Cloud Storage) bucket that Datastream will write its output to. If the bucket you provide doesn't exist or you leave it as empty, this plugin will create a new one in the `Project` you specified in this plugin.
+**GCS Bucket:** The GCS (Google Cloud Storage) bucket that Datastream will write its output to. If the bucket you provide doesn't exist or you leave it as empty, this plugin will create a new one in the `Project` you specified in this plugin. 
 
 **Path Prefix:** The GCS (Google Cloud Storage) path prefix in the bucket that Datastream will write its output to. This prefix will be prefixed to the Datastream output path. It's usually used when you want Datastream to write its output to an existing bucket and you want to easily differentiate it from other existing GCS files by its path prefix.  
 

@@ -100,6 +100,14 @@ https://cloud.google.com/bigquery/docs/locations. This value is ignored if an ex
 
 **Path Prefix:** The GCS (Google Cloud Storage) path prefix in the bucket that Datastream will write its output to. This prefix will be prefixed to the Datastream output path. It's usually used when you want Datastream to write its output to an existing bucket and you want to easily differentiate it from other existing GCS files by its path prefix.  
 
+Purge Policy
+------------
+A purge policy is implemented for a GCS (Google Cloud Storage) bucket created by the plugin that Datastream will write its output to. The bucket will have the following lifecycle rule set for objects:
+- Action - delete object
+- Rule - 30+ days since `Custom-Time` metadata of the object
+
+`Custom-Time` is a property that is set on an object after it has been completely processed in the pipeline. 
+
 Limitations
 -----------
 

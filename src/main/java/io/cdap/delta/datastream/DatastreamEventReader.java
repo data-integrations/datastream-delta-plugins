@@ -456,7 +456,13 @@ public class DatastreamEventReader implements EventReader {
             if (!tableBackFillStatuses.containsKey(srcTable.getTable())) {
               throw Utils.buildException(String.format("No Backfill information for table: %s", tableName), false);
             }
-            if (!tableBackFillStatuses.get(srcTable.getTable())) {
+            if (!tableBackFillStatuses.get(srcTable.getTable())
+              // This still a workaround - since datastream backfill seems to be unreliable
+              // i.e. even after datastream api is returning that the backfill is COMPLETED,
+              // we see new snapshot files in GCS bucket.
+              // Once we get a fix from datastream, we should remove this logic
+              || getPath(tableName) == null
+              || !getPath(tableName).equals(path)) {
               continue;
             }
           }

@@ -192,7 +192,7 @@ public class DatastreamTableRegistry implements TableRegistry {
   private DiscoverConnectionProfileRequest.Builder buildDiscoverConnectionProfileRequest(
     String sourceConnectionProfileName) throws IOException {
     DiscoverConnectionProfileRequest.Builder request =
-      DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath).setFullHierarchy(true);
+      DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath).setHierarchyDepth(2);
 
     if (sourceConnectionProfileName == null || sourceConnectionProfileName.isEmpty()) {
       return request.setConnectionProfile(Utils.buildOracleConnectionProfile(parentPath, "", config));

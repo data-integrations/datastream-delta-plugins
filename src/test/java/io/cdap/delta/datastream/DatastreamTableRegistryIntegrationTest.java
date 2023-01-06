@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-class DatastreamTableRegistryTest extends BaseIntegrationTestCase {
+class DatastreamTableRegistryIntegrationTest extends BaseIntegrationTestCase {
 
   @Test
   public void testListDescribeTableNew() throws Exception {

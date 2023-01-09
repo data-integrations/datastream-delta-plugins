@@ -315,6 +315,8 @@ public class DatastreamTableAssessor implements TableAssessor<TableDetail> {
                                                  "operation metadata:\n%s", e.getLocalizedMessage()), e);
     }
 
+    LOGGER.error("Stream validation failed : {}", metadata);
+
     List<Problem> connectivityIssues = new ArrayList<>();
     List<Problem> missingFeatures = new ArrayList<>();
     for (Validation validation : metadata.getValidationResult().getValidationsList()) {

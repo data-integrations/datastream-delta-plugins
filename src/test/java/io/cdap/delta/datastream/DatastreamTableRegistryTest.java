@@ -1,6 +1,5 @@
 /*
- *
- * Copyright © 2020 Cask Data, Inc.
+ * Copyright © 2023 Cask Data, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
@@ -17,74 +16,68 @@
 
 package io.cdap.delta.datastream;
 
-import io.cdap.delta.api.assessment.ColumnDetail;
-import io.cdap.delta.api.assessment.TableDetail;
+import com.google.cloud.datastream.v1.DatastreamClient;
+import com.google.cloud.datastream.v1.DiscoverConnectionProfileRequest;
+import com.google.cloud.datastream.v1.DiscoverConnectionProfileResponse;
+import com.google.cloud.datastream.v1.OracleRdbms;
+import com.google.cloud.datastream.v1.OracleSchema;
+import com.google.cloud.datastream.v1.OracleTable;
 import io.cdap.delta.api.assessment.TableList;
-import io.cdap.delta.api.assessment.TableRegistry;
 import io.cdap.delta.api.assessment.TableSummary;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-class DatastreamTableRegistryTest extends BaseIntegrationTestCase {
-
+public class DatastreamTableRegistryTest {
   @Test
-  public void testListDescribeTableNew() throws Exception {
-    testListDesribeTable(false);
-  }
+  public void testListTable() throws Exception {
+    DatastreamConfig datastreamConfig = Mockito.mock(DatastreamConfig.class);
+    Mockito.when(datastreamConfig.isUsingExistingStream()).thenReturn(false);
+    Mockito.when(datastreamConfig.getSid()).thenReturn("sid");
+    Mockito.when(datastreamConfig.getHost()).thenReturn("host");
+    Mockito.when(datastreamConfig.getUser()).thenReturn("user");
+    Mockito.when(datastreamConfig.getPassword()).thenReturn("password");
+    Mockito.when(datastreamConfig.getConnectivityMethod()).thenReturn("ip-allowlisting");
 
-  @Test
-  public void testListDescribeTableExisting() throws Exception {
-    testListDesribeTable(true);
-  }
+    DiscoverConnectionProfileResponse response = Mockito.mock(DiscoverConnectionProfileResponse.class);
 
-  private void testListDesribeTable(boolean usingExisting) throws Exception {
-    TableList tableList = null;
-    DatastreamDeltaSource deltaSource = createDeltaSource(usingExisting);
-    try (TableRegistry registry = deltaSource.createTableRegistry(null)) {
-      tableList = registry.listTables();
-    }
+    OracleTable table = Mockito.mock(OracleTable.class);
+    Mockito.when(table.getTable()).thenReturn("table");
+    Mockito.when(table.getOracleColumnsCount()).thenReturn(2);
+
+    OracleSchema schema = Mockito.mock(OracleSchema.class);
+    Mockito.when(schema.getSchema()).thenReturn("schema");
+    Mockito.when(schema.getOracleTablesList()).thenReturn(Arrays.asList(table));
+
+    OracleRdbms oracleRdbms = Mockito.mock(OracleRdbms.class);
+    Mockito.when(response.getOracleRdbms()).thenReturn(oracleRdbms);
+    Mockito.when(oracleRdbms.getOracleSchemasList()).thenReturn(Arrays.asList(schema));
+
+    DatastreamClient datastreamClient = Mockito.mock(DatastreamClient.class);
+    Mockito.when(datastreamClient.discoverConnectionProfile(Mockito.any())).thenReturn(response);
+
+    DatastreamTableRegistry datastreamTableRegistry = new DatastreamTableRegistry(datastreamConfig, datastreamClient);
+    TableList tableList = datastreamTableRegistry.listTables();
+
     assertNotNull(tableList);
     List<TableSummary> tables = tableList.getTables();
     assertNotNull(tables);
-    assertFalse(tables.isEmpty());
-    System.out.println("table counts:" + tables.size());
-    for (TableSummary table : tables) {
-      assertNotNull(table);
-      assertEquals(oracleDb, table.getDatabase());
-      String schema = table.getSchema();
-      assertNotNull(schema);
-      String tableName = table.getTable();
-      assertNotNull(tableName);
-      System.out.println(String.format("table : %s.%s", schema, tableName));
-      TableDetail tableDetail = null;
-      try (TableRegistry registry = deltaSource.createTableRegistry(null)) {
-        tableDetail = registry.describeTable(oracleDb, schema, tableName);
-      }
-      assertNotNull(tableDetail);
-      List<ColumnDetail> columns = tableDetail.getColumns();
-      assertNotNull(columns);
-      assertFalse(columns.isEmpty());
-      for (ColumnDetail column : columns) {
-        assertNotNull(column);
-        assertNotNull(column.getName());
-        Map<String, String> properties = column.getProperties();
-        assertNotNull(properties);
-        assertNotNull(column.getType());
-        System.out.println(String.format("column: %s type : %s", column.getName(), column.getType()));
-      }
-      List<String> primaryKeys = tableDetail.getPrimaryKey();
-      System.out.println("primary keys: " + primaryKeys);
-      assertNotNull(primaryKeys);
-      for (String key : primaryKeys) {
-        assertNotNull(key);
-        assertFalse(key.isEmpty());
-      }
-    }
+    assertEquals(1, tables.size());
+    TableSummary table1 = tables.get(0);
+    assertEquals("schema", table1.getSchema());
+    assertEquals("table", table1.getTable());
+    
+    //verify hierarchy depth set to 2
+    ArgumentCaptor<DiscoverConnectionProfileRequest> captor = ArgumentCaptor.forClass(
+      DiscoverConnectionProfileRequest.class);
+    Mockito.verify(datastreamClient).discoverConnectionProfile(captor.capture());
+    assertEquals(2, captor.getValue().getHierarchyDepth());
   }
 }

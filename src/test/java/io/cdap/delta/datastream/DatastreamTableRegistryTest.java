@@ -70,12 +70,17 @@ public class DatastreamTableRegistryTest {
     List<TableSummary> tables = tableList.getTables();
     assertNotNull(tables);
     assertFalse(tables.isEmpty());
-    System.out.println("table counts:" + tables.size());
-
+    assertEquals(1, tables.size());
+    TableSummary table1 = tables.get(0);
+    assertNotNull(table1.getSchema());
+    assertNotNull(table1.getTable());
+    assertEquals("schema", table1.getSchema());
+    assertEquals("table", table1.getTable());
+    
     //verify hierarchy depth set to 2
     ArgumentCaptor<DiscoverConnectionProfileRequest> captor = ArgumentCaptor.forClass(
       DiscoverConnectionProfileRequest.class);
     Mockito.verify(datastreamClient).discoverConnectionProfile(captor.capture());
-    assertEquals(captor.getValue().getHierarchyDepth(), 2);
+    assertEquals(2, captor.getValue().getHierarchyDepth());
   }
 }

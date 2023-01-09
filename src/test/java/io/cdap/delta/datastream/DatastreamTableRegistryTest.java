@@ -69,11 +69,8 @@ public class DatastreamTableRegistryTest {
     assertNotNull(tableList);
     List<TableSummary> tables = tableList.getTables();
     assertNotNull(tables);
-    assertFalse(tables.isEmpty());
     assertEquals(1, tables.size());
     TableSummary table1 = tables.get(0);
-    assertNotNull(table1.getSchema());
-    assertNotNull(table1.getTable());
     assertEquals("schema", table1.getSchema());
     assertEquals("table", table1.getTable());
     

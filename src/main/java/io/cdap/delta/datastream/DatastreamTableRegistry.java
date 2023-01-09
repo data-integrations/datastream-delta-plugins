@@ -191,8 +191,13 @@ public class DatastreamTableRegistry implements TableRegistry {
 
   private DiscoverConnectionProfileRequest.Builder buildDiscoverConnectionProfileRequest(
     String sourceConnectionProfileName) throws IOException {
+    //Hierarchy Depth specifies the number of levels below the current level to be
+    //retrieved (Levels : db -> schema -> table -> columns).
+    //While listing tables,next two levels(schema.table) from db(current level) have to be retrieved.
+    //While displaying table details, only single level(columns) from tables is needed.
+    //Hence, hierarchy depth is set to 2.
     DiscoverConnectionProfileRequest.Builder request =
-      DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath).setFullHierarchy(true);
+      DiscoverConnectionProfileRequest.newBuilder().setParent(parentPath).setHierarchyDepth(2);
 
     if (sourceConnectionProfileName == null || sourceConnectionProfileName.isEmpty()) {
       return request.setConnectionProfile(Utils.buildOracleConnectionProfile(parentPath, "", config));

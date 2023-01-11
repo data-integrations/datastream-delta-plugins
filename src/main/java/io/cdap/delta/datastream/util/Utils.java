@@ -887,6 +887,9 @@ public final class Utils {
       .abortOn(t ->
         t instanceof NotFoundException ||
         t instanceof InvalidArgumentException ||
+        t instanceof FailedPreconditionException ||
+        t instanceof AlreadyExistsException ||
+        t instanceof IllegalArgumentException ||
         t.getCause() instanceof ExecutionException && (
         // connection profile already exists
         t.getCause().getCause() instanceof AlreadyExistsException ||

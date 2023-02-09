@@ -20,6 +20,7 @@ import com.google.api.gax.grpc.GrpcStatusCode;
 import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.api.gax.rpc.FailedPreconditionException;
 import com.google.api.gax.rpc.InvalidArgumentException;
+import com.google.api.gax.rpc.PermissionDeniedException;
 import com.google.cloud.datastream.v1.DatastreamClient;
 import com.google.cloud.datastream.v1.DiscoverConnectionProfileRequest;
 import com.google.cloud.datastream.v1.DiscoverConnectionProfileResponse;
@@ -27,7 +28,9 @@ import com.google.cloud.datastream.v1.OracleRdbms;
 import com.google.cloud.datastream.v1.OracleSchema;
 import com.google.cloud.datastream.v1.OracleTable;
 import io.cdap.delta.api.assessment.TableList;
+import io.cdap.delta.api.assessment.TableNotFoundException;
 import io.cdap.delta.api.assessment.TableSummary;
+import io.cdap.delta.datastream.util.DatastreamDeltaSourceException;
 import io.grpc.Status;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +40,10 @@ import org.mockito.Mockito;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -111,13 +117,25 @@ class DatastreamTableRegistryTest {
     exceptions.add(new InvalidArgumentException("error", new Exception("error"),
                                                 GrpcStatusCode.of(Status.Code.INVALID_ARGUMENT), false));
     exceptions.add(new IllegalArgumentException("error", new Exception("error")));
+    exceptions.add(new PermissionDeniedException("error", new Exception("error"),
+                                                 GrpcStatusCode.of(Status.Code.PERMISSION_DENIED),  false));
+
+    Map<Class<? extends Throwable>, Class<? extends Throwable>> mappedException = new HashMap<>();
+    mappedException.put(FailedPreconditionException.class, TableNotFoundException.class);
+    mappedException.put(InvalidArgumentException.class, TableNotFoundException.class);
+
+    ArrayList<Throwable> nestedExceptions = new ArrayList<>();
+    for (Throwable exception : exceptions) {
+      nestedExceptions.add(new DatastreamDeltaSourceException("error", new ExecutionException("error", exception)));
+    }
+    exceptions.addAll(nestedExceptions);
 
     for (Throwable exception : exceptions) {
       Mockito.reset(datastreamClient);
       Mockito.when(datastreamClient.discoverConnectionProfile(Mockito.any()))
         .thenThrow(exception);
 
-      Assertions.assertThrows(exception.getClass(),
+      Assertions.assertThrows(mappedException.getOrDefault(exception.getClass(), exception.getClass()),
                               () -> datastreamTableRegistry.describeTable(DATABASE, SCHEMA, TABLE));
 
       ArgumentCaptor<DiscoverConnectionProfileRequest> captor = ArgumentCaptor.forClass(

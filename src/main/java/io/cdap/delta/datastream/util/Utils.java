@@ -112,6 +112,7 @@ public final class Utils {
   private static final int DATASTREAM_CLIENT_POOL_SIZE = 20;
   public static final int GCS_PURGE_POLICY_TTL_DAYS = 30;
   private static final float DATASTREAM_CLIENT_POOL_LOAD_FACTOR = 0.75f;
+  private static final int EXCEPTION_CAUSE_MAX_LEVELS = 5;
   private static final LinkedHashMap<GoogleCredentials, DatastreamClient> datastreamClientPool =
     new LinkedHashMap<GoogleCredentials, DatastreamClient>(
       (int) (DATASTREAM_CLIENT_POOL_SIZE / DATASTREAM_CLIENT_POOL_LOAD_FACTOR), DATASTREAM_CLIENT_POOL_LOAD_FACTOR,
@@ -1010,9 +1011,8 @@ public final class Utils {
   }
 
   private static Optional<ApiException> getApiExceptionFromCauses(Throwable e) {
-    int maxLevels = 5;
     int currLevel = 0;
-    while (e != null && currLevel < maxLevels) {
+    while (e != null && currLevel < EXCEPTION_CAUSE_MAX_LEVELS) {
       if (e instanceof ApiException) {
         return Optional.of((ApiException) e);
       }

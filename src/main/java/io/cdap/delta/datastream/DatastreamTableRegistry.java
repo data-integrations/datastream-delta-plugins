@@ -16,6 +16,7 @@
 
 package io.cdap.delta.datastream;
 
+import com.google.api.gax.rpc.ApiException;
 import com.google.api.gax.rpc.FailedPreconditionException;
 import com.google.api.gax.rpc.InvalidArgumentException;
 import com.google.api.gax.rpc.NotFoundException;
@@ -100,6 +101,7 @@ public class DatastreamTableRegistry implements TableRegistry {
     try {
       response = Utils.discoverConnectionProfile(datastream, request, LOGGER);
     } catch (InvalidArgumentException | FailedPreconditionException e) {
+      LOGGER.error("Error in discovering database schema {}", Utils.getErrorMessage(e));
        throw new RuntimeException("Failed to connect to the database. Please double check whether the connection " +
         "information you input is correct.", e);
     } catch (Exception e) {
@@ -135,8 +137,10 @@ public class DatastreamTableRegistry implements TableRegistry {
         .build();
 
       discoverResponse = Utils.discoverConnectionProfile(datastream, request, LOGGER);
-    } catch (NotFoundException e) {
-      throw new TableNotFoundException(db, schema, table, e.getMessage(), e);
+    } catch (NotFoundException | InvalidArgumentException | FailedPreconditionException e) {
+      String errorMessage = Utils.getErrorMessage(e);
+      LOGGER.error("Error in getting table details: {}", errorMessage);
+      throw new TableNotFoundException(db, schema, table, errorMessage, e);
     }
 
     OracleSchema oracleSchema = Iterables.getOnlyElement(discoverResponse.getOracleRdbms().getOracleSchemasList());

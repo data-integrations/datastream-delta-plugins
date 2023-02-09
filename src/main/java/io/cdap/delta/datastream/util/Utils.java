@@ -21,9 +21,11 @@ import com.google.api.gax.core.CredentialsProvider;
 import com.google.api.gax.longrunning.OperationFuture;
 import com.google.api.gax.rpc.AbortedException;
 import com.google.api.gax.rpc.AlreadyExistsException;
+import com.google.api.gax.rpc.ApiException;
 import com.google.api.gax.rpc.FailedPreconditionException;
 import com.google.api.gax.rpc.InvalidArgumentException;
 import com.google.api.gax.rpc.NotFoundException;
+import com.google.api.gax.rpc.PermissionDeniedException;
 import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.datastream.v1.AvroFileFormat;
@@ -79,6 +81,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Predicate;
@@ -640,6 +643,12 @@ public final class Utils {
                                 logger));
     } catch (Exception ce) {
       if (!isAlreadyExisted(ce)) {
+        Optional<ApiException> apiException = getApiExceptionFromCauses(ce);
+        //Log error details from apiException, otherwise the actual cause is lost
+        if (apiException.isPresent()) {
+          logger.error("Error in creating connection profile reqeust {} error details {}",
+                       reqeust, getErrorMessage(apiException.get()));
+        }
         throw ce;
       }
       created = false;
@@ -890,13 +899,17 @@ public final class Utils {
         t instanceof FailedPreconditionException ||
         t instanceof AlreadyExistsException ||
         t instanceof IllegalArgumentException ||
+        t instanceof PermissionDeniedException ||
         t.getCause() instanceof ExecutionException && (
         // connection profile already exists
         t.getCause().getCause() instanceof AlreadyExistsException ||
         // create argument is not correct
         t.getCause().getCause() instanceof IllegalArgumentException ||
+        // create argument is not correct
+        t.getCause().getCause() instanceof InvalidArgumentException ||
         // validation failed
-        t.getCause().getCause() instanceof FailedPreconditionException));
+        t.getCause().getCause() instanceof FailedPreconditionException ||
+        t.getCause().getCause() instanceof PermissionDeniedException));
   }
 
   private static <T> RetryPolicy<T> createRetryPolicy() {
@@ -994,5 +1007,26 @@ public final class Utils {
         return credentials;
       }
     }).build());
+  }
+
+  private static Optional<ApiException> getApiExceptionFromCauses(Throwable e) {
+    int maxLevels = 5;
+    int currLevel = 0;
+    while (e != null && currLevel < maxLevels) {
+      if (e instanceof ApiException) {
+        return Optional.of((ApiException) e);
+      }
+      if (e == e.getCause()) {
+        return Optional.empty();
+      }
+      e = e.getCause();
+      currLevel++;
+    }
+    return Optional.empty();
+  }
+
+  public static String getErrorMessage(ApiException e) {
+    String errorDetails = e.getErrorDetails() != null ? ", details: " + e.getErrorDetails().toString() : "";
+    return e.getMessage() + errorDetails;
   }
 }

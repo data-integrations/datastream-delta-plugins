@@ -38,6 +38,7 @@ import io.cdap.delta.api.EventReader;
 import io.cdap.delta.api.EventReaderDefinition;
 import io.cdap.delta.api.Offset;
 import io.cdap.delta.api.SourceTable;
+import io.cdap.delta.api.StopContext;
 import io.cdap.delta.api.assessment.StandardizedTableDetail;
 import io.cdap.delta.api.assessment.TableDetail;
 import io.cdap.delta.api.assessment.TableNotFoundException;
@@ -154,27 +155,20 @@ public class DatastreamEventReader implements EventReader {
 
   }
 
-  public void stop() throws InterruptedException {
+  public void stop(StopContext stopContext) throws InterruptedException {
+    LOGGER.info("Stopping Datastream scan task, reason: " + stopContext.getOrigin());
     executorService.shutdownNow();
-    // TODO change the DeltaWoker to send some signal about whether such stop is for restarting due to
-    // temporary failure or it's stopped by the end user
     // if it's not stopped by the end user , we should not stop the stream because other workers are still working
-    // below is just a workaround to avoid changes in delta app.
-    // if the caller is from DeltaWorker.run it's a stop due to failure and don't need to stop stream
-    // otherwise it's from DeltaWorker.stop which is intended by the end user.
-    String callerMethod = new Throwable().getStackTrace()[1].getMethodName();
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Stop method is called from {}", callerMethod);
-    }
-    if (!callerMethod.startsWith("lambda$run")) {
+    if (stopContext.getOrigin() == StopContext.Origin.USER) {
       try {
         Utils.pauseStream(datastream, stream, LOGGER);
       } catch (NotFoundException e) {
         //it's possible that the stream was not created successfully when the pipeline is stopped.
+        LOGGER.warn("Cannot pause stream {} as it does not exist", stream.getName());
       }
     }
     if (!executorService.awaitTermination(2, TimeUnit.MINUTES)) {
-      LOGGER.warn("Unable to cleanly shutdown reader within the timeout.");
+      LOGGER.error("Unable to cleanly shutdown reader within the timeout.");
     }
   }
 

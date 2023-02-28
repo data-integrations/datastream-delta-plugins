@@ -59,13 +59,15 @@ public class DatastreamEventReaderTest extends BaseIntegrationTestCase {
       private long ddleventsNum;
 
       @Override
-      public void emit(DDLEvent ddlEvent) throws InterruptedException {
+      public boolean emit(DDLEvent ddlEvent) throws InterruptedException {
         System.out.println("DDLEvent:" + ddleventsNum++ + "-" + GSON.toJson(ddlEvent));
+        return true;
       }
 
       @Override
-      public void emit(DMLEvent dmlEvent) throws InterruptedException {
+      public boolean emit(DMLEvent dmlEvent) throws InterruptedException {
         System.out.println("DMLEvent:" + dmleventsNum++ + "-" + GSON.toJson(dmlEvent));
+        return true;
       }
     };
   }

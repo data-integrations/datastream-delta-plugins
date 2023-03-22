@@ -497,7 +497,7 @@ public final class Utils {
     try {
       context.setError(new ReplicationError(cause));
     } catch (IOException ioException) {
-      logger.warn("Unable to set error for source status!", cause);
+      logger.warn("Unable to set error for source status!", ioException);
     }
   }
 
@@ -681,6 +681,12 @@ public final class Utils {
         () -> waitUntilComplete(datastream.createStreamAsync(createStreamRequest), createStreamRequestStr, logger));
     } catch (Exception ex) {
       if (!Utils.isAlreadyExisted(ex)) {
+        Optional<ApiException> apiException = getApiExceptionFromCauses(ex);
+        //Log error details from apiException, otherwise the actual cause is lost
+        if (apiException.isPresent()) {
+          logger.error("Error in creating stream reqeust {} error details {}",
+                       createStreamRequestStr, getErrorMessage(apiException.get()));
+        }
         throw ex;
       }
       created = false;
@@ -787,7 +793,7 @@ public final class Utils {
       response =
         Failsafe.with(createDataStreamRetryPolicy()).get(() -> waitUntilComplete(operation, requestStr, logger));
     } catch (NotFoundException e) {
-      logger.warn("Stream {} to be deleted does not exit.", path);
+      logger.warn("Stream {} to be deleted does not exist.", path);
     }
     if (logger.isDebugEnabled()) {
       logger.debug("DeleteStream Response:\n" + response);

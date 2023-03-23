@@ -680,11 +680,11 @@ public final class Utils {
       stream = Failsafe.with(createDataStreamRetryPolicy()).get(
         () -> waitUntilComplete(datastream.createStreamAsync(createStreamRequest), createStreamRequestStr, logger));
     } catch (Exception ex) {
-      if (!Utils.isAlreadyExisted(ex)) {
+      if (!isAlreadyExisted(ex)) {
         Optional<ApiException> apiException = getApiExceptionFromCauses(ex);
         //Log error details from apiException, otherwise the actual cause is lost
         if (apiException.isPresent()) {
-          logger.error("Error in creating stream reqeust {} error details {}",
+          logger.error("Error in creating stream request {} error details {}",
                        createStreamRequestStr, getErrorMessage(apiException.get()));
         }
         throw ex;

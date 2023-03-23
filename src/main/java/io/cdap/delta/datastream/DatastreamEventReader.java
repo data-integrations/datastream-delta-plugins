@@ -227,7 +227,7 @@ public class DatastreamEventReader implements EventReader {
           setBlobTTL();
         }
       } catch (Throwable t) {
-        LOGGER.warn("Error encountered while setting TTL for last processed batch of blobs.");
+        LOGGER.warn("Error encountered while setting TTL for last processed batch of blobs.", t);
       }
     }
 

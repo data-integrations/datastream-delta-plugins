@@ -36,10 +36,9 @@ import java.util.concurrent.TimeUnit;
 public class ReplicationActions {
     private static String parentWindow = StringUtils.EMPTY;
     private static final String projectId = PluginPropertyUtils.pluginProp("projectId");
-    private static final String database = PluginPropertyUtils.pluginProp("database");
+    private static final String database = PluginPropertyUtils.pluginProp("dataset");
     public static String tableName = PluginPropertyUtils.pluginProp("sourceTable");
     public static String schemaName = PluginPropertyUtils.pluginProp("schema");
-    public static String datatypeColumnNames = PluginPropertyUtils.pluginProp("datatypeColumnNames");
     public static String datatypeValues = PluginPropertyUtils.pluginProp("datatypeValuesForInsertOperation");
     public static String deleteCondition = PluginPropertyUtils.pluginProp("deleteRowCondition");
     public static String updateCondition = PluginPropertyUtils.pluginProp("updateRowCondition");
@@ -53,14 +52,16 @@ public class ReplicationActions {
         time.sleep(1);
         ElementHelper.clickOnElement(ReplicationLocators.next);
     }
+
     public static void clickOnOraclePlugin() {
         ElementHelper.clickOnElement(ReplicationLocators.oraclePlugin);
     }
 
-    public static void selectTable(String tableName) {
-        WaitHelper.waitForElementToBeDisplayed(ReplicationLocators.selectTable(tableName));
-        AssertionHelper.verifyElementDisplayed(ReplicationLocators.selectTable(tableName));
-        ElementHelper.clickOnElement(ReplicationLocators.selectTable(tableName));
+    public static void selectTable() {
+        String table = schemaName + "." + tableName;
+        WaitHelper.waitForElementToBeDisplayed(ReplicationLocators.selectTable(table));
+        AssertionHelper.verifyElementDisplayed(ReplicationLocators.selectTable(table));
+        ElementHelper.clickOnElement(ReplicationLocators.selectTable(table));
     }
 
     public static void deployPipeline() {
@@ -109,9 +110,10 @@ public class ReplicationActions {
 
     public static void waitTillPipelineIsRunningAndCheckForErrors() throws InterruptedException {
         //wait for datastream to startup
-        int defaultTimeout = Integer.parseInt(PluginPropertyUtils.pluginProp("datastream.timeout"));
+        int defaultTimeout = Integer.parseInt(PluginPropertyUtils.pluginProp("pipeline-initialization"));
         TimeUnit time = TimeUnit.SECONDS;
         time.sleep(defaultTimeout);
+        ValidationHelper.waitForFlush();
         // Checking if an error message is displayed.
         Assert.assertFalse(ElementHelper.isElementDisplayed(ReplicationLocators.error));
     }
@@ -121,6 +123,7 @@ public class ReplicationActions {
         SeleniumDriver.getDriver().switchTo().window(parentWindow);
         //Stopping the pipeline
         ElementHelper.clickOnElement(ReplicationLocators.stop);
+        SeleniumDriver.getDriver().navigate().refresh();
         WaitHelper.waitForElementToBeDisplayed(ReplicationLocators.stopped);
     }
     public static void verifyTargetBigQueryRecordMatchesExpectedOracleRecord()
@@ -129,25 +132,25 @@ public class ReplicationActions {
         Assert.assertFalse(ElementHelper.isElementDisplayed(ReplicationLocators.error));
 
         List<Map<String, Object>> sourceOracleRecords = OracleClient.getOracleRecordsAsMap(tableName, schemaName);
-        List<Map<String, Object>> targetBigQueryRecords = ValidationHelper.getBigQueryRecordsAsMap(projectId, database, tableName);          //+ "_v1`"
+        List<Map<String, Object>> targetBigQueryRecords = ValidationHelper.getBigQueryRecordsAsMap(projectId, database, tableName);
         ValidationHelper.validateRecords(sourceOracleRecords, targetBigQueryRecords);
     }
 
     public static void insertRecordAndWait()
-            throws IOException, InterruptedException, SQLException, ClassNotFoundException { //JCoException,
-        OracleClient.insertRow(tableName,schemaName, datatypeColumnNames,datatypeValues);
+            throws InterruptedException, SQLException, ClassNotFoundException {
+        OracleClient.insertRow(tableName, schemaName, datatypeValues);
         OracleClient.forceFlushCDC();
         ValidationHelper.waitForFlush();
     }
 
-    public static void deleteRecordAndWait() throws SQLException, ClassNotFoundException, IOException, InterruptedException {
-        OracleClient.deleteRow(tableName,schemaName, deleteCondition);
+    public static void deleteRecordAndWait() throws SQLException, ClassNotFoundException, InterruptedException {
+        OracleClient.deleteRow(tableName, schemaName, deleteCondition);
         OracleClient.forceFlushCDC();
         ValidationHelper.waitForFlush();
     }
 
-    public static void updateRecordAndWait() throws SQLException, ClassNotFoundException, IOException, InterruptedException {
-        OracleClient.updateRow(tableName,schemaName, updateCondition, updatedValue );
+    public static void updateRecordAndWait() throws SQLException, ClassNotFoundException, InterruptedException {
+        OracleClient.updateRow(tableName, schemaName, updateCondition, updatedValue );
         OracleClient.forceFlushCDC();
         ValidationHelper.waitForFlush();
     }

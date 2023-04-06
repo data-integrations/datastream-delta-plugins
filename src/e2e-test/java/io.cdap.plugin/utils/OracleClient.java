@@ -33,7 +33,7 @@ public class OracleClient {
         TimeZone timezone = TimeZone.getTimeZone("UTC");
         TimeZone.setDefault(timezone);
         Class.forName("oracle.jdbc.driver.OracleDriver");
-        String databaseName = PluginPropertyUtils.pluginProp("database");
+        String databaseName = PluginPropertyUtils.pluginProp("dataset");
         String host = PluginPropertyUtils.pluginProp("host");
         String port = PluginPropertyUtils.pluginProp("port");
         String username = PluginPropertyUtils.pluginProp("username");
@@ -61,10 +61,10 @@ public class OracleClient {
 
 
 
-    public static void insertRow(String table, String schema, String datatypeColumns, String datatypeValues) throws SQLException, ClassNotFoundException {
+    public static void insertRow(String table, String schema, String datatypeValues) throws SQLException, ClassNotFoundException {
         try (Connection connect = getOracleConnection(); Statement statement = connect.createStatement()) {
             // Insert dummy data.
-            statement.executeUpdate("INSERT INTO " + schema + "." + table + " " + datatypeColumns +
+            statement.executeUpdate("INSERT INTO " + schema + "." + table + " " +
                     " VALUES " + datatypeValues);
 
         }
@@ -122,7 +122,7 @@ public class OracleClient {
         }
     }
 
-    public static void deleteTables(String table, String schema)
+    public static void deleteTables(String schema, String table)
             throws SQLException, ClassNotFoundException {
         try (Connection connect = getOracleConnection(); Statement statement = connect.createStatement()) {
             String dropTableQuery = "DROP TABLE " + schema + "." + table;

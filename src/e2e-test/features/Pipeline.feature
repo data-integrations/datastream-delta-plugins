@@ -14,37 +14,9 @@
 # the License.
 #
 
-Feature: Oracle - Verify Oracle source data transfer
-
-#  Scenario: Sanity test from Oracle to Big Query
-#    Given Open DataFusion Project with replication to configure pipeline
-#    When Enter input plugin property: "name" with value: "pipelineName"
-#    And Click on the Next button
-#    And Select Oracle as Source
-#    Then Replace input plugin property: "host" with value: "host" for Credentials and Authorization related fields
-#    Then Replace input plugin property: "port" with value: "port" for Credentials and Authorization related fields
-#    Then Click plugin property: "region"
-#    Then Click plugin property: "regionOption"
-#    Then Replace input plugin property: "user" with value: "username" for Credentials and Authorization related fields
-#    Then Replace input plugin property: "password" with value: "password" for Credentials and Authorization related fields
-#    Then Replace input plugin property: "sid" with value: "database" for Credentials and Authorization related fields
-#    Then Click on the Next button
-#    Then Replace input plugin property: "loadInterval" with value: "loadInterval"
-#    Then Click on the Next button
-#    Then Validate Table is available and can be selected "ABC.E2E-sanity"
-#    And Click on the Next button
-#    And Click on the Next button
-#    And Click on the Next button
-#    Then Deploy the replication pipeline
-#    And Run the replication Pipeline
-#    Then Open the logs
-#    And Wait till pipeline is in running state and check if no errors occurred
-#    Then Verify expected Oracle records in target BigQuery table
-#    And Capture raw logs
-#    Then Close the pipeline logs and stop the pipeline
-
-#  @ORACLE_SOURCE
-  Scenario: To verify snapshot and cdc from Oracle to Big Query successfully
+Feature: Oracle - Verify Oracle source data transfer to Big Query
+  @ORACLE_SOURCE @BIGQUERY_TARGET
+  Scenario: To verify replication of snapshot and cdc data from Oracle to Big Query successfully with Sanity test
     Given Open DataFusion Project with replication to configure pipeline
     When Enter input plugin property: "name" with value: "pipelineName"
     And Click on the Next button
@@ -55,11 +27,11 @@ Feature: Oracle - Verify Oracle source data transfer
     Then Click plugin property: "regionOption"
     Then Replace input plugin property: "user" with value: "username" for Credentials and Authorization related fields
     Then Replace input plugin property: "password" with value: "password" for Credentials and Authorization related fields
-    Then Replace input plugin property: "sid" with value: "database" for Credentials and Authorization related fields
+    Then Replace input plugin property: "sid" with value: "dataset" for Credentials and Authorization related fields
     Then Click on the Next button
     Then Replace input plugin property: "loadInterval" with value: "loadInterval"
     Then Click on the Next button
-    Then Validate Table is available and can be selected "ABC.E2E1"
+    Then Validate Source table is available and select it
     And Click on the Next button
     And Click on the Next button
     And Click on the Next button

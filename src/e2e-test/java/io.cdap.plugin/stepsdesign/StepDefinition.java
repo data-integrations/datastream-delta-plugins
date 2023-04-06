@@ -42,9 +42,10 @@ public class StepDefinition implements CdfHelper {
     public void selectSourceAsOracle() {
         ReplicationActions.clickOnOraclePlugin();
     }
-    @Then("Validate Table is available and can be selected {string}")
-    public void selectTable(String table) {
-        ReplicationActions.selectTable(table);
+
+    @Then("Validate Source table is available and select it")
+    public void selectTable1() {
+        ReplicationActions.selectTable();
     }
     @Then("Deploy the replication pipeline")
     public void deployPipeline() {
@@ -94,6 +95,5 @@ public class StepDefinition implements CdfHelper {
     public void verifyExpectedOracleRecordsInTargetBigQueryTable() throws IOException, InterruptedException, SQLException, ClassNotFoundException {
         ReplicationActions.verifyTargetBigQueryRecordMatchesExpectedOracleRecord();
     }
-
 
 }

@@ -21,15 +21,9 @@ import com.google.cloud.bigquery.FieldValue;
 import com.google.cloud.bigquery.FieldValueList;
 import com.google.cloud.bigquery.TableResult;
 import io.cdap.e2e.utils.BigQueryClient;
-import io.cdap.e2e.utils.ConstantsUtil;
 import io.cdap.e2e.utils.PluginPropertyUtils;
-import net.jodah.failsafe.Failsafe;
-import net.jodah.failsafe.RetryPolicy;
 import org.junit.Assert;
-
 import java.io.IOException;
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -41,19 +35,7 @@ public class ValidationHelper {
         String query = "SELECT * EXCEPT ( _row_id, _source_timestamp, _sort) FROM `" + projectId
                 + "." + database + "." + tableName + "`";
         List<Map<String, Object>> bqRecords = new ArrayList<>();
-        //Let us account for 90 seconds flush here.And for every flush, how long does it take to reflect the changes in bg by running queries.
-        //handle exceptions and retry
-        RetryPolicy<Object> retryPolicy = new RetryPolicy<>()
-                .withMaxAttempts(5)
-                .onRetry(  e -> System.out.println("Retrying exception"))
-                .withDelay(Duration.ofSeconds(60));
-                //.withMaxDuration(Duration.of(5, ChronoUnit.MINUTES));
-        TableResult results = Failsafe.with(retryPolicy).get(() -> {
-            //Let changes reflect in bq making sure flush cycle is included
-//            TimeUnit time = TimeUnit.SECONDS;
-//            time.sleep(180);
-            return BigQueryClient.getQueryResult(query);
-        });
+        TableResult results = BigQueryClient.getQueryResult(query);
         List<String> columns = new ArrayList<>();
         for (Field field : results.getSchema().getFields()) {
             columns.add(field.getName() + "#" + field.getType());
@@ -67,8 +49,6 @@ public class ValidationHelper {
                 Object value;
                 if(dataType.equalsIgnoreCase("TIMESTAMP")){
                     value = fieldValue.getTimestampValue();
-//                    } else if (dataType.toUpperCase().equals("FLOAT")) {
-//                        value = Float.parseFloat(fieldValue.getStringValue());
                 } else {
                     value = fieldValue.getValue();
                     value = value != null ? value.toString() : null;
@@ -85,14 +65,13 @@ public class ValidationHelper {
                                        List<Map<String, Object>> targetBigQueryRecords) {
 
         String uniqueField = PluginPropertyUtils.pluginProp("primaryKey");
-        //Assert.assertEquals("Checking the size of lists ", targetBigQueryRecords.size(), sourceOracleRecords.size()); //doesn't make sense in our case, since few datatypes are dropped during assessment
-
         // Logic to maintain the order of both lists and validate records based on that order.
         Map BqUniqueIdMap = (Map)targetBigQueryRecords.stream()
                 .filter(t -> t.get("_is_deleted")==null)
                 .collect(Collectors.toMap(
                         t -> t.get(uniqueField),
                         t -> t,
+                        //This logic is to handle duplication scenario in bq target
                         (x,y) -> {
                             Long xSeqNum = Long.parseLong(x.get("_sequence_num").toString());
                             Long ySeqNum = Long.parseLong(y.get("_sequence_num").toString());
@@ -102,48 +81,35 @@ public class ValidationHelper {
                             return y;
                         }));
 
-
         for (int record = 0; record < sourceOracleRecords.size(); record++) {
             Map<String, Object> oracleRecord = sourceOracleRecords.get(record);
             Object uniqueId = oracleRecord.get(uniqueField);
-            //EXP : In case data type not matched, convert to string and compare
-//            if( !uniqueId.getClass().equals(targetBigQueryRecords.get(0).get(uniqueField).getClass()) ){
-//                uniqueId = uniqueId.toString();
-//            }
             Map<String, Object> bqRow = (Map<String, Object>) BqUniqueIdMap.get(uniqueId);
-            bqRow.remove("_is_deleted");
-            bqRow.remove("_sequence_num");
-
-            ValidationHelper.compareBothResponses( bqRow, oracleRecord);
+            if (bqRow != null) {
+                bqRow.remove("_is_deleted");
+                bqRow.remove("_sequence_num");
+                bqRow.forEach((key, value) -> System.out.println("Bq record" + key + ":" + value));
+            }
+            compareRecords(bqRow, oracleRecord);
         }
     }
 
-    public static void compareBothResponses(Map<String, Object> targetBigQueryRecords,
-                                            Map<String, Object> sourceOracleRecord) {
-        Assert.assertNotNull("Checking if target BigQuery Record is null", targetBigQueryRecords);
+    public static void compareRecords(Map<String, Object> targetBigQueryRecords,
+                                      Map<String, Object> sourceOracleRecord) {
         Set<String> bigQueryKeySet = targetBigQueryRecords.keySet();
         for (String field : bigQueryKeySet) {
             Object bigQueryFieldValue = targetBigQueryRecords.get(field);
-            Object sapFieldValue = sourceOracleRecord.get(field);
-//          if(!bigQueryFieldValue.getClass().equals(sapFieldValue.getClass())){
-//                    sapFieldValue = sapFieldValue.toString();
-//                    bigQueryFieldValue = bigQueryFieldValue.toString();
-//                }
+            Object oracleFieldValue = sourceOracleRecord.get(field);
             Assert.assertEquals(String.format("Field %s is not equal: expected %s but got %s", field,
-                            sapFieldValue, bigQueryFieldValue),
-                    sapFieldValue, bigQueryFieldValue);
+                            oracleFieldValue, bigQueryFieldValue),
+                    oracleFieldValue, bigQueryFieldValue);
         }
     }
-
-
-
 
     public static void waitForFlush() throws InterruptedException {
         int flushInterval = Integer.parseInt(PluginPropertyUtils.pluginProp("loadInterval"));
         TimeUnit time = TimeUnit.SECONDS;
-        time.sleep(2*flushInterval);
+        time.sleep(2 * flushInterval);
     }
-
-
 
 }

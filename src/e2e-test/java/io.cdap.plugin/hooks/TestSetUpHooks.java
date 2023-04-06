@@ -15,12 +15,16 @@
  */
 
 package io.cdap.plugin.hooks;
+import com.google.cloud.bigquery.BigQueryException;
+import io.cdap.e2e.utils.BigQueryClient;
 import io.cdap.e2e.utils.PluginPropertyUtils;
 import io.cdap.plugin.utils.OracleClient;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
+import org.junit.Assert;
 import stepsdesign.BeforeActions;
 
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,13 +40,15 @@ public class TestSetUpHooks {
     public static String schemaName = PluginPropertyUtils.pluginProp("schema");
     public static String primaryKey = PluginPropertyUtils.pluginProp("primaryKey");
     public static String datatypeColumns = PluginPropertyUtils.pluginProp("datatypeColumns");
-    public static String datatypeColumnNames = PluginPropertyUtils.pluginProp("datatypeColumnNames");
     public static String row1 = PluginPropertyUtils.pluginProp("datatypeValuesRow1");
     public static String row2= PluginPropertyUtils.pluginProp("datatypeValuesRow2");
 
-
     @Before(order = 1, value = "@ORACLE_SOURCE")
     public static void overridePropertiesFromEnvVarsIfProvided() {
+        String projectId = System.getenv("PROJECT_ID");
+        if (projectId != null && !projectId.isEmpty()) {
+            PluginPropertyUtils.addPluginProp("projectId", projectId);
+        }
         String username = System.getenv("ORACLE_USERNAME");
         if (username != null && !username.isEmpty()) {
             PluginPropertyUtils.addPluginProp("username", username);
@@ -55,22 +61,26 @@ public class TestSetUpHooks {
         if (port!= null && !port.isEmpty()) {
             PluginPropertyUtils.addPluginProp("port", port);
         }
-        String sapHost = System.getenv("ORACLE_HOST");
-        if (sapHost != null && !sapHost.isEmpty()) {
-            PluginPropertyUtils.addPluginProp("host", sapHost);
+        String oracleHost = System.getenv("ORACLE_HOST");
+        if (oracleHost != null && !oracleHost.isEmpty()) {
+            PluginPropertyUtils.addPluginProp("host", oracleHost);
+        }
+        String sourceTable = System.getenv("SOURCE_TABLE");
+        if (sourceTable != null && !sourceTable.isEmpty()) {
+            PluginPropertyUtils.addPluginProp("sourceTable", sourceTable);
+            tableName = PluginPropertyUtils.pluginProp("sourceTable");
         }
     }
 
     @Before(order = 2, value = "@ORACLE_SOURCE")
     public static void createTable() throws SQLException, ClassNotFoundException {
-        OracleClient.createTable(tableName,schemaName,datatypeColumns, primaryKey);
+        OracleClient.createTable(tableName, schemaName, datatypeColumns, primaryKey);
     }
 
     @Before(order = 3, value = "@ORACLE_SOURCE")
     public static void insertRow() throws SQLException, ClassNotFoundException {
-        OracleClient.insertRow(tableName, schemaName, datatypeColumnNames, row1);
-        OracleClient.insertRow(tableName, schemaName, datatypeColumnNames, row2);
-        sourceOracleRecords = OracleClient.getOracleRecordsAsMap(tableName, schemaName);
+        OracleClient.insertRow(tableName, schemaName, row1);
+        OracleClient.insertRow(tableName, schemaName, row2);
     }
 
     @Before(order = 4, value = "@ORACLE_SOURCE")
@@ -79,8 +89,23 @@ public class TestSetUpHooks {
         BeforeActions.scenario.write("Expected Oracle records : " + sourceOracleRecords);
     }
 
-  @After(order = 1, value = "@ORACLE_SOURCE_TEMP")
+  @After(order = 1, value = "@ORACLE_SOURCE")
   public static void dropTables() throws SQLException, ClassNotFoundException {
-    OracleClient.deleteTables(schemaName, tableName);
+        OracleClient.deleteTables(schemaName, tableName);
   }
+
+  @After(order = 1, value = "@BIGQUERY_TARGET")
+  public static void deleteTempTargetBQTable() throws IOException, InterruptedException {
+        try {
+            BigQueryClient.dropBqQuery(tableName);
+            BeforeActions.scenario.write("BQ Target table - " + tableName + " deleted successfully");
+        } catch (BigQueryException e) {
+            if (e.getMessage().contains("Not found: Table")) {
+                BeforeActions.scenario.write("BQ Target Table does not exist");
+            } else {
+                Assert.fail(e.getMessage());
+            }
+        }
+    }
+
 }

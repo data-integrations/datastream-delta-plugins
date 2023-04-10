@@ -485,7 +485,7 @@
                 </goals>
                 <configuration>
                   <sources>
-                    <source>${testSourceLocation}</source>
+                    <source>${project.basedir}/${testSourceLocation}</source>
                   </sources>
                 </configuration>
               </execution>

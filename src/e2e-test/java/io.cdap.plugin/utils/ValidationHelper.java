@@ -23,11 +23,17 @@ import com.google.cloud.bigquery.TableResult;
 import io.cdap.e2e.utils.BigQueryClient;
 import io.cdap.e2e.utils.PluginPropertyUtils;
 import org.junit.Assert;
-import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+/**
+ * Contains validation method from oracle to bq used in e2e tests.
+ */
 public class ValidationHelper {
 
     public static List<Map<String, Object>> getBigQueryRecordsAsMap(String projectId, String database, String tableName)
@@ -47,7 +53,7 @@ public class ValidationHelper {
                 String columnName = columns.get(index).split("#")[0];
                 String dataType = columns.get(index).split("#")[1];
                 Object value;
-                if(dataType.equalsIgnoreCase("TIMESTAMP")){
+                if (dataType.equalsIgnoreCase("TIMESTAMP")) {
                     value = fieldValue.getTimestampValue();
                 } else {
                     value = fieldValue.getValue();
@@ -66,16 +72,16 @@ public class ValidationHelper {
 
         String uniqueField = PluginPropertyUtils.pluginProp("primaryKey");
         // Logic to maintain the order of both lists and validate records based on that order.
-        Map bqUniqueIdMap = (Map)targetBigQueryRecords.stream()
-                .filter(t -> t.get("_is_deleted")==null)
+        Map bqUniqueIdMap = (Map) targetBigQueryRecords.stream()
+                .filter(t -> t.get("_is_deleted") == null)
                 .collect(Collectors.toMap(
                         t -> t.get(uniqueField),
                         t -> t,
                         //This logic is to handle duplication scenario in bq target
-                        (x,y) -> {
+                        (x, y) -> {
                             Long xSeqNum = Long.parseLong(x.get("_sequence_num").toString());
                             Long ySeqNum = Long.parseLong(y.get("_sequence_num").toString());
-                            if(xSeqNum > ySeqNum){
+                            if (xSeqNum > ySeqNum) {
                                 return x;
                             }
                             return y;

@@ -18,7 +18,14 @@ package io.cdap.plugin.actions;
 
 import io.cdap.e2e.pages.actions.CdfPipelineRunAction;
 import io.cdap.e2e.pages.locators.CdfPipelineRunLocators;
-import io.cdap.e2e.utils.*;
+import io.cdap.e2e.utils.AssertionHelper;
+import io.cdap.e2e.utils.ConstantsUtil;
+import io.cdap.e2e.utils.ElementHelper;
+import io.cdap.e2e.utils.PageHelper;
+import io.cdap.e2e.utils.PluginPropertyUtils;
+import io.cdap.e2e.utils.SeleniumDriver;
+import io.cdap.e2e.utils.SeleniumHelper;
+import io.cdap.e2e.utils.WaitHelper;
 import io.cdap.plugin.locators.ReplicationLocators;
 import io.cdap.plugin.utils.BigQuery;
 import io.cdap.plugin.utils.OracleClient;
@@ -34,6 +41,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Replication oracle Actions.
+ */
 public class ReplicationActions {
     private static String parentWindow = StringUtils.EMPTY;
     private static final String projectId = PluginPropertyUtils.pluginProp("projectId");
@@ -60,7 +70,7 @@ public class ReplicationActions {
 
     public static void selectTable() {
         String table = schemaName + "." + tableName;
-        WaitHelper.waitForElementToBeDisplayed(ReplicationLocators.selectTable(table),300);
+        WaitHelper.waitForElementToBeDisplayed(ReplicationLocators.selectTable(table), 300);
         AssertionHelper.verifyElementDisplayed(ReplicationLocators.selectTable(table));
         ElementHelper.clickOnElement(ReplicationLocators.selectTable(table));
     }
@@ -120,7 +130,6 @@ public class ReplicationActions {
     }
 
     public static void closeTheLogsAndClickOnStopButton() {
-        //As the logs get opened in a new window in this plugin so after closing them we have to switch to parent window.
         SeleniumDriver.getDriver().switchTo().window(parentWindow);
         //Stopping the pipeline
         ElementHelper.clickOnElement(ReplicationLocators.stop);
@@ -133,7 +142,8 @@ public class ReplicationActions {
         Assert.assertFalse(ElementHelper.isElementDisplayed(ReplicationLocators.error));
 
         List<Map<String, Object>> sourceOracleRecords = OracleClient.getOracleRecordsAsMap(tableName, schemaName);
-        List<Map<String, Object>> targetBigQueryRecords = ValidationHelper.getBigQueryRecordsAsMap(projectId, database, tableName);
+        List<Map<String, Object>> targetBigQueryRecords =
+                ValidationHelper.getBigQueryRecordsAsMap(projectId, database, tableName);
         ValidationHelper.validateRecords(sourceOracleRecords, targetBigQueryRecords);
     }
 
@@ -151,7 +161,7 @@ public class ReplicationActions {
     }
 
     public static void updateRecordAndWait() throws SQLException, ClassNotFoundException, InterruptedException {
-        OracleClient.updateRow(tableName, schemaName, updateCondition, updatedValue );
+        OracleClient.updateRow(tableName, schemaName, updateCondition, updatedValue);
         OracleClient.forceFlushCDC();
         BigQuery.waitForFlush();
     }

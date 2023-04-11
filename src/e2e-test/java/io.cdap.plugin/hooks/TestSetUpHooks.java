@@ -39,10 +39,9 @@ public class TestSetUpHooks {
     public static List<Map<String, Object>> sourceOracleRecords = new ArrayList<>();
     public static String tableName = PluginPropertyUtils.pluginProp("sourceTable");
     public static String schemaName = PluginPropertyUtils.pluginProp("schema");
-    public static String primaryKey = PluginPropertyUtils.pluginProp("primaryKey");
     public static String datatypeColumns = PluginPropertyUtils.pluginProp("datatypeColumns");
     public static String row1 = PluginPropertyUtils.pluginProp("datatypeValuesRow1");
-    public static String row2= PluginPropertyUtils.pluginProp("datatypeValuesRow2");
+    public static String row2 = PluginPropertyUtils.pluginProp("datatypeValuesRow2");
 
     @Before(order = 1, value = "@ENV_VARIABLES")
     public static void overridePropertiesFromEnvVarsIfProvided() {
@@ -59,7 +58,7 @@ public class TestSetUpHooks {
             PluginPropertyUtils.addPluginProp("password", password);
         }
         String port = System.getenv("ORACLE_PORT");
-        if (port!= null && !port.isEmpty()) {
+        if (port != null && !port.isEmpty()) {
             PluginPropertyUtils.addPluginProp("port", port);
         }
         String oracleHost = System.getenv("ORACLE_HOST");
@@ -75,7 +74,7 @@ public class TestSetUpHooks {
 
     @Before(order = 2, value = "@ORACLE_SOURCE")
     public static void createTable() throws SQLException, ClassNotFoundException {
-        OracleClient.createTable(tableName, schemaName, datatypeColumns, primaryKey);
+        OracleClient.createTable(tableName, schemaName, datatypeColumns);
     }
 
     @Before(order = 3, value = "@ORACLE_SOURCE")
@@ -97,16 +96,6 @@ public class TestSetUpHooks {
 
   @After(order = 1, value = "@BIGQUERY_DELETE")
   public static void deleteTempTargetBQTable() throws IOException, InterruptedException {
-        try {
-            BigQueryClient.dropBqQuery(tableName);
-            BeforeActions.scenario.write("BQ Target table - " + tableName + " deleted successfully");
-        } catch (BigQueryException e) {
-            if (e.getMessage().contains("Not found: Table")) {
-                BeforeActions.scenario.write("BQ Target Table does not exist");
-            } else {
-                Assert.fail(e.getMessage());
-            }
-        }
+        BigQuery.deleteTable(tableName);
     }
-
 }

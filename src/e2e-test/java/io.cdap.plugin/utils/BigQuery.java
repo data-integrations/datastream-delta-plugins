@@ -24,7 +24,9 @@ import stepsdesign.BeforeActions;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-
+/**
+ * Contains bq helper methods used in e2e tests.
+ */
 public class BigQuery {
     public static void waitForFlush() throws InterruptedException {
         int flushInterval = Integer.parseInt(PluginPropertyUtils.pluginProp("loadInterval"));
@@ -32,7 +34,7 @@ public class BigQuery {
         time.sleep(2 * flushInterval + 60);
     }
 
-    public static void deleteTable(String tableName) throws IOException, InterruptedException{
+    public static void deleteTable(String tableName) throws IOException, InterruptedException {
         try {
             BigQueryClient.dropBqQuery(tableName);
             BeforeActions.scenario.write("BQ Target table - " + tableName + " deleted successfully");

@@ -26,7 +26,9 @@ import io.cucumber.java.en.Then;
 
 import java.io.IOException;
 import java.sql.SQLException;
-
+/**
+ * Contains Oracle replication test scenarios step definitions.
+ */
 public class StepDefinition implements CdfHelper {
     @Given("Open DataFusion Project with replication to configure pipeline")
     public void openDataFusionProjectWithReplicationToConfigurePipeline() throws IOException, InterruptedException {
@@ -92,7 +94,8 @@ public class StepDefinition implements CdfHelper {
         ReplicationActions.updateRecordAndWait(); //JCoException,
     }
     @Then("Verify expected Oracle records in target BigQuery table")
-    public void verifyExpectedOracleRecordsInTargetBigQueryTable() throws IOException, InterruptedException, SQLException, ClassNotFoundException {
+    public void verifyExpectedOracleRecordsInTargetBigQueryTable() throws
+            IOException, InterruptedException, SQLException, ClassNotFoundException {
         ReplicationActions.verifyTargetBigQueryRecordMatchesExpectedOracleRecord();
     }
 

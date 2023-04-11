@@ -21,11 +21,13 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
 import org.openqa.selenium.support.How;
-
+/**
+ * Oracle Plugin Locators.
+ */
 public class ReplicationLocators {
     @FindBy(how = How.XPATH, using = "//*[contains(text(),'Next')]")
     public static WebElement next;
-    @FindBy(how = How.XPATH, using ="//div[contains(text(),'Oracle')]")
+    @FindBy(how = How.XPATH, using = "//div[contains(text(),'Oracle')]")
     public static WebElement oraclePlugin;
     public static WebElement selectTable(String tableName) {
         return SeleniumDriver.getDriver().findElement(By.xpath("//div[contains(text(),'" + tableName + "')]" +

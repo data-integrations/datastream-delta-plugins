@@ -13,5 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-
+/**
+ * contains CDF Oracle Replicator plugin locators.
+ */
 package io.cdap.plugin.locators;

@@ -44,7 +44,7 @@ public class StepDefinition implements CdfHelper {
     }
 
     @Then("Validate Source table is available and select it")
-    public void selectTable1() {
+    public void selectTable() {
         ReplicationActions.selectTable();
     }
     @Then("Deploy the replication pipeline")

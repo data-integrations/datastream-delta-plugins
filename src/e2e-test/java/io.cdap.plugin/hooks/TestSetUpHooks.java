@@ -18,6 +18,7 @@ package io.cdap.plugin.hooks;
 import com.google.cloud.bigquery.BigQueryException;
 import io.cdap.e2e.utils.BigQueryClient;
 import io.cdap.e2e.utils.PluginPropertyUtils;
+import io.cdap.plugin.utils.BigQuery;
 import io.cdap.plugin.utils.OracleClient;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
@@ -43,7 +44,7 @@ public class TestSetUpHooks {
     public static String row1 = PluginPropertyUtils.pluginProp("datatypeValuesRow1");
     public static String row2= PluginPropertyUtils.pluginProp("datatypeValuesRow2");
 
-    @Before(order = 1, value = "@ORACLE_SOURCE")
+    @Before(order = 1, value = "@ENV_VARIABLES")
     public static void overridePropertiesFromEnvVarsIfProvided() {
         String projectId = System.getenv("PROJECT_ID");
         if (projectId != null && !projectId.isEmpty()) {
@@ -89,12 +90,12 @@ public class TestSetUpHooks {
         BeforeActions.scenario.write("Expected Oracle records : " + sourceOracleRecords);
     }
 
-  @After(order = 1, value = "@ORACLE_SOURCE")
+  @After(order = 1, value = "@ORACLE_DELETE")
   public static void dropTables() throws SQLException, ClassNotFoundException {
         OracleClient.deleteTables(schemaName, tableName);
   }
 
-  @After(order = 1, value = "@BIGQUERY_TARGET")
+  @After(order = 1, value = "@BIGQUERY_DELETE")
   public static void deleteTempTargetBQTable() throws IOException, InterruptedException {
         try {
             BigQueryClient.dropBqQuery(tableName);

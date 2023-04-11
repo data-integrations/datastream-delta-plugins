@@ -66,7 +66,7 @@ public class ValidationHelper {
 
         String uniqueField = PluginPropertyUtils.pluginProp("primaryKey");
         // Logic to maintain the order of both lists and validate records based on that order.
-        Map BqUniqueIdMap = (Map)targetBigQueryRecords.stream()
+        Map bqUniqueIdMap = (Map)targetBigQueryRecords.stream()
                 .filter(t -> t.get("_is_deleted")==null)
                 .collect(Collectors.toMap(
                         t -> t.get(uniqueField),
@@ -84,11 +84,10 @@ public class ValidationHelper {
         for (int record = 0; record < sourceOracleRecords.size(); record++) {
             Map<String, Object> oracleRecord = sourceOracleRecords.get(record);
             Object uniqueId = oracleRecord.get(uniqueField);
-            Map<String, Object> bqRow = (Map<String, Object>) BqUniqueIdMap.get(uniqueId);
+            Map<String, Object> bqRow = (Map<String, Object>) bqUniqueIdMap.get(uniqueId);
             if (bqRow != null) {
                 bqRow.remove("_is_deleted");
                 bqRow.remove("_sequence_num");
-                bqRow.forEach((key, value) -> System.out.println("Bq record" + key + ":" + value));
             }
             compareRecords(bqRow, oracleRecord);
         }
@@ -104,12 +103,6 @@ public class ValidationHelper {
                             oracleFieldValue, bigQueryFieldValue),
                     oracleFieldValue, bigQueryFieldValue);
         }
-    }
-
-    public static void waitForFlush() throws InterruptedException {
-        int flushInterval = Integer.parseInt(PluginPropertyUtils.pluginProp("loadInterval"));
-        TimeUnit time = TimeUnit.SECONDS;
-        time.sleep(2 * flushInterval);
     }
 
 }

@@ -15,7 +15,7 @@
 #
 
 Feature: Oracle - Verify Oracle source data transfer to Big Query
-  @ORACLE_SOURCE @BIGQUERY_TARGET
+  @ENV_VARIABLES #@ORACLE_SOURCE @ORACLE_DELETE @BIGQUERY_DELETE
   Scenario: To verify replication of snapshot and cdc data from Oracle to Big Query successfully with Sanity test
     Given Open DataFusion Project with replication to configure pipeline
     When Enter input plugin property: "name" with value: "pipelineName"

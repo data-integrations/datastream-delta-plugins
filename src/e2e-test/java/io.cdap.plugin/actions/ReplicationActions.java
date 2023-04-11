@@ -20,6 +20,7 @@ import io.cdap.e2e.pages.actions.CdfPipelineRunAction;
 import io.cdap.e2e.pages.locators.CdfPipelineRunLocators;
 import io.cdap.e2e.utils.*;
 import io.cdap.plugin.locators.ReplicationLocators;
+import io.cdap.plugin.utils.BigQuery;
 import io.cdap.plugin.utils.OracleClient;
 import io.cdap.plugin.utils.ValidationHelper;
 import org.apache.commons.lang.StringUtils;
@@ -59,7 +60,7 @@ public class ReplicationActions {
 
     public static void selectTable() {
         String table = schemaName + "." + tableName;
-        WaitHelper.waitForElementToBeDisplayed(ReplicationLocators.selectTable(table));
+        WaitHelper.waitForElementToBeDisplayed(ReplicationLocators.selectTable(table),300);
         AssertionHelper.verifyElementDisplayed(ReplicationLocators.selectTable(table));
         ElementHelper.clickOnElement(ReplicationLocators.selectTable(table));
     }
@@ -113,7 +114,7 @@ public class ReplicationActions {
         int defaultTimeout = Integer.parseInt(PluginPropertyUtils.pluginProp("pipeline-initialization"));
         TimeUnit time = TimeUnit.SECONDS;
         time.sleep(defaultTimeout);
-        ValidationHelper.waitForFlush();
+        BigQuery.waitForFlush();
         // Checking if an error message is displayed.
         Assert.assertFalse(ElementHelper.isElementDisplayed(ReplicationLocators.error));
     }
@@ -140,18 +141,18 @@ public class ReplicationActions {
             throws InterruptedException, SQLException, ClassNotFoundException {
         OracleClient.insertRow(tableName, schemaName, datatypeValues);
         OracleClient.forceFlushCDC();
-        ValidationHelper.waitForFlush();
+        BigQuery.waitForFlush();
     }
 
     public static void deleteRecordAndWait() throws SQLException, ClassNotFoundException, InterruptedException {
         OracleClient.deleteRow(tableName, schemaName, deleteCondition);
         OracleClient.forceFlushCDC();
-        ValidationHelper.waitForFlush();
+        BigQuery.waitForFlush();
     }
 
     public static void updateRecordAndWait() throws SQLException, ClassNotFoundException, InterruptedException {
         OracleClient.updateRow(tableName, schemaName, updateCondition, updatedValue );
         OracleClient.forceFlushCDC();
-        ValidationHelper.waitForFlush();
+        BigQuery.waitForFlush();
     }
 }

@@ -15,14 +15,12 @@
  */
 
 package io.cdap.plugin.hooks;
-import com.google.cloud.bigquery.BigQueryException;
-import io.cdap.e2e.utils.BigQueryClient;
+
 import io.cdap.e2e.utils.PluginPropertyUtils;
 import io.cdap.plugin.utils.BigQuery;
 import io.cdap.plugin.utils.OracleClient;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
-import org.junit.Assert;
 import stepsdesign.BeforeActions;
 
 import java.io.IOException;
@@ -95,7 +93,7 @@ public class TestSetUpHooks {
   }
 
   @After(order = 1, value = "@BIGQUERY_DELETE")
-  public static void deleteTempTargetBQTable() throws IOException, InterruptedException {
+  public static void deleteTargetBQTable() throws IOException, InterruptedException {
         BigQuery.deleteTable(tableName);
     }
 }

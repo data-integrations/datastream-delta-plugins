@@ -151,12 +151,6 @@
       <version>${avro.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-engine</artifactId>
-      <version>5.4.0</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-netty-shaded</artifactId>
       <scope>compile</scope>
@@ -191,6 +185,15 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.1</version>
+        <configuration>
+          <source>1.8</source>
+          <target>1.8</target>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>2.17</version>
         <executions>
@@ -218,17 +221,6 @@
           </dependency>
         </dependencies>
       </plugin>
-
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.1</version>
-        <configuration>
-          <source>1.8</source>
-          <target>1.8</target>
-        </configuration>
-      </plugin>
-
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
@@ -246,7 +238,6 @@
           </excludes>
         </configuration>
       </plugin>
-
       <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
@@ -302,54 +293,79 @@
           </execution>
         </executions>
       </plugin>
-      <plugin>
-        <groupId>org.apache.felix</groupId>
-        <artifactId>maven-bundle-plugin</artifactId>
-        <version>3.5.1</version>
-        <extensions>true</extensions>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>bundle</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <instructions>
-            <_exportcontents>io.cdap.delta.datastream.*</_exportcontents>
-            <Embed-Dependency>*;inline=false;scope=compile</Embed-Dependency>
-            <Embed-Transitive>true</Embed-Transitive>
-            <Embed-Directory>lib</Embed-Directory>
-          </instructions>
-        </configuration>
-      </plugin>
-
-      <plugin>
-        <groupId>io.cdap</groupId>
-        <artifactId>cdap-maven-plugin</artifactId>
-        <version>1.1.0</version>
-        <configuration>
-          <cdapArtifacts>
-            <parent>system:delta-app[0.0.0,1.0.0-SNAPSHOT)</parent>
-          </cdapArtifacts>
-        </configuration>
-        <executions>
-          <execution>
-            <id>create-artifact-config</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>create-plugin-json</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
     </plugins>
   </build>
 
   <profiles>
     <profile>
+      <id>default</id>
+      <activation><activeByDefault>true</activeByDefault></activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.junit.jupiter</groupId>
+          <artifactId>junit-jupiter-engine</artifactId>
+          <version>5.9.1</version>
+          <scope>test</scope>
+        </dependency>
+      </dependencies>
+
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.felix</groupId>
+            <artifactId>maven-bundle-plugin</artifactId>
+            <version>3.5.1</version>
+            <extensions>true</extensions>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <goals>
+                  <goal>bundle</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <instructions>
+                <_exportcontents>io.cdap.delta.datastream.*</_exportcontents>
+                <Embed-Dependency>*;inline=false;scope=compile</Embed-Dependency>
+                <Embed-Transitive>true</Embed-Transitive>
+                <Embed-Directory>lib</Embed-Directory>
+              </instructions>
+            </configuration>
+          </plugin>
+
+          <plugin>
+            <groupId>io.cdap</groupId>
+            <artifactId>cdap-maven-plugin</artifactId>
+            <version>1.1.0</version>
+            <configuration>
+              <cdapArtifacts>
+                <parent>system:delta-app[0.0.0,1.0.0-SNAPSHOT)</parent>
+              </cdapArtifacts>
+            </configuration>
+            <executions>
+              <execution>
+                <id>create-artifact-config</id>
+                <phase>prepare-package</phase>
+                <goals>
+                  <goal>create-plugin-json</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
       <id>coverage</id>
+      <dependencies>
+        <dependency>
+          <groupId>org.junit.jupiter</groupId>
+          <artifactId>junit-jupiter-engine</artifactId>
+          <version>5.9.1</version>
+          <scope>test</scope>
+        </dependency>
+      </dependencies>
       <build>
         <plugins>
           <plugin>
@@ -389,7 +405,7 @@
       <id>e2e-tests</id>
       <properties>
         <testSourceLocation>src/e2e-test/java</testSourceLocation>
-        <TEST_RUNNER>TestRunner.java</TEST_RUNNER>
+        <TEST_RUNNER>${testSourceLocation}/io.cdap.plugin/tests/TestRunner.java</TEST_RUNNER>
       </properties>
       <build>
         <testResources>
@@ -398,6 +414,19 @@
           </testResource>
         </testResources>
         <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.1</version>
+            <configuration>
+              <source>1.8</source>
+              <target>1.8</target>
+              <testExcludes>
+                <testExclude>**/com/google/cloud/**/*.java</testExclude>
+                <testExclude>**/io/cdap/delta/**/*.java</testExclude>
+              </testExcludes>
+            </configuration>
+          </plugin>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
@@ -410,10 +439,10 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-failsafe-plugin</artifactId>
-            <version>3.0.0-M5</version>
+            <version>3.0.0</version>
             <configuration>
               <includes>
-                <include>${TEST_RUNNER}</include>
+                <include>**/TestRunner.java</include>
               </includes>
               <!--Start configuration to run TestRunners in parallel-->
               <parallel>classes</parallel> <!--Running TestRunner classes in parallel-->
@@ -522,6 +551,12 @@
           <artifactId>logback-classic</artifactId>
           <version>1.2.8</version>
           <scope>runtime</scope>
+        </dependency>
+        <dependency>
+          <groupId>junit</groupId>
+          <artifactId>junit</artifactId>
+          <version>4.13.2</version>
+          <scope>test</scope>
         </dependency>
       </dependencies>
 

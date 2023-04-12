@@ -14,6 +14,7 @@
 # the License.
 #
 
+@Oracle
 Feature: Oracle - Verify Oracle source data transfer to Big Query
   @ENV_VARIABLES @ORACLE_SOURCE @ORACLE_DELETE @BIGQUERY_DELETE
   Scenario: To verify replication of snapshot and cdc data from Oracle to Big Query successfully with Sanity test

@@ -131,8 +131,6 @@ public class ReplicationActions {
         SeleniumDriver.getDriver().switchTo().window(parentWindow);
         //Stopping the pipeline
         ElementHelper.clickOnElement(ReplicationLocators.stop);
-        SeleniumDriver.getDriver().navigate().refresh();
-        WaitHelper.waitForElementToBeDisplayed(ReplicationLocators.stopped);
     }
 
     public static void verifyTargetBigQueryRecordMatchesExpectedOracleRecord()

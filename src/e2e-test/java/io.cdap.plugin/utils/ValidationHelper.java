@@ -32,20 +32,16 @@ public class ValidationHelper {
 
         String uniqueField = PluginPropertyUtils.pluginProp("primaryKey");
         // Logic to maintain the order of both lists and validate records based on that order.
-        Map bqUniqueIdMap = (Map) targetBigQueryRecords.stream()
-                .filter(t -> t.get("_is_deleted") == null)
-                .collect(Collectors.toMap(
-                        t -> t.get(uniqueField),
-                        t -> t,
-                        //This logic is to handle duplication scenario in bq target
-                        (x, y) -> {
-                            Long xSeqNum = Long.parseLong(x.get("_sequence_num").toString());
-                            Long ySeqNum = Long.parseLong(y.get("_sequence_num").toString());
-                            if (xSeqNum > ySeqNum) {
-                                return x;
-                            }
-                            return y;
-                        }));
+        Map bqUniqueIdMap = null;
+        try {
+            bqUniqueIdMap = (Map) targetBigQueryRecords.stream()
+                    .filter(t -> t.get("_is_deleted") == null)
+                    .collect(Collectors.toMap(
+                            t -> t.get(uniqueField),
+                            t -> t));
+        } catch (IllegalStateException e) {
+            Assert.fail("Duplication found in Big Query target table");
+        }
 
         for (int record = 0; record < sourceOracleRecords.size(); record++) {
             Map<String, Object> oracleRecord = sourceOracleRecords.get(record);

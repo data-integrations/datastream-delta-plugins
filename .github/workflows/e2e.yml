@@ -79,7 +79,7 @@ jobs:
             ORACLE_USERNAME:cdapio-github-builds/ORACLE_NORMAL_USERNAME
             ORACLE_PASSWORD:cdapio-github-builds/ORACLE_NORMAL_PASSWORD
             ORACLE_PORT:cdapio-github-builds/ORACLE_PORT
-            PROJECT_ID:cdapio-github-builds/PROJECT_ID
+            PROJECT_ID:cdapio-github-builds/PROJECT_ID_FOR_REPL
       - name: Run required e2e tests
         if: github.event_name != 'workflow_dispatch' && github.event_name != 'push' && steps.filter.outputs.e2e-test == 'false'
         run: python3 e2e/src/main/scripts/run_e2e_test.py --testRunner TestRunnerRequired.java

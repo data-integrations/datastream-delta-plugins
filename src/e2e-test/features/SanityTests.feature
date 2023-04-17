@@ -31,6 +31,7 @@ Feature: Oracle - Verify Oracle source data transfer to Big Query
     Then Replace input plugin property: "sid" with value: "dataset" for Credentials and Authorization related fields
     Then Click on the Next button
     Then Replace input plugin property: "loadInterval" with value: "loadInterval"
+    Then Replace input plugin property: "project" with value: "projectId"
     Then Click on the Next button
     Then Validate Source table is available and select it
     And Click on the Next button

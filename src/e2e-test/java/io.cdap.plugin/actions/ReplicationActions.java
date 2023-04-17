@@ -96,7 +96,6 @@ public class ReplicationActions {
     }
 
     public static void captureRawLog() {
-        //Capturing raw logs.
         try {
             String rawLogs = getRawLogs();
             String logsSeparatorMessage = ConstantsUtil.LOGS_SEPARATOR_MESSAGE

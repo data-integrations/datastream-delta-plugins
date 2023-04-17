@@ -1,6 +1,6 @@
-Datastream Delta Plugin for CDAP Delta Application
+## Datastream Delta Plugin for CDAP Delta Application
 
-It invokes GCP Datastream service to generate change events of Oracle DB.
+The plugin uses GCP Datastream service to generate change events of Oracle DB.
 
 Tests require an actual connection to GCP. To run the tests, set the following system properties:  
   -Dproject.id=[GCP project id]  
@@ -15,14 +15,14 @@ Tests require an actual connection to GCP. To run the tests, set the following s
   -Doracle.tables=[List of tables to be replicated, separated by comma]  
   -Dstream.id =[Id of existing Datastream stream id]  
   
-The GCP project should already enabled Datastream API.
+The GCP project should have Datastream API enabled.
 
 The service account will need permission to :
   create/delete/get Datastream connection profiles
   create/delete/get Datastream streams
-  read from GCS Bucket
+  create/read from GCS Bucket
 
-The Oracle instance should be configured according to the requirement of Datastream:
+The Oracle instance should be configured according to the Datastream requirements - 
 https://cloud.google.com/datastream/docs/configure-your-source-database
 
 The GCS bucket should be in the same region as Datastream instance and Datastream Service Account

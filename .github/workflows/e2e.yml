@@ -16,9 +16,9 @@ name: Build e2e tests
 
 on:
   push:
-    branches: [ Final-Pr-e2e ]
+    branches: [ develop ]
   pull_request:
-    branches: [ Final-Pr-e2e ]
+    branches: [ develop ]
     types: [ opened, synchronize, reopened, labeled ]
   workflow_dispatch:
 

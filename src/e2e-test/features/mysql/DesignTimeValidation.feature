@@ -19,7 +19,7 @@ Feature: Mysql - Verify Mysql source plugin design time validation scenarios
 
   Scenario: To verify validation message when user provides invalid Host
     Given Open DataFusion Project with replication to configure pipeline
-    When Enter input plugin property: "name" with value: "pipelineName"
+    When Enter input plugin property: "name" with pipelineName
     And Click on the button "Next"
     And Select Source plugin: "MySQL" from the replication plugins list
     Then Replace input plugin property: "host" with value: "mySqlInvalidHost" for Credentials and Authorization related fields
@@ -36,7 +36,7 @@ Feature: Mysql - Verify Mysql source plugin design time validation scenarios
 
   Scenario: To verify validation message when user provides invalid Port
     Given Open DataFusion Project with replication to configure pipeline
-    When Enter input plugin property: "name" with value: "pipelineName"
+    When Enter input plugin property: "name" with pipelineName
     And Click on the button "Next"
     And Select Source plugin: "MySQL" from the replication plugins list
     Then Replace input plugin property: "host" with value: "mysqlHost" for Credentials and Authorization related fields
@@ -53,7 +53,7 @@ Feature: Mysql - Verify Mysql source plugin design time validation scenarios
 
   Scenario: To verify validation message when user provides invalid Database Name
     Given Open DataFusion Project with replication to configure pipeline
-    When Enter input plugin property: "name" with value: "pipelineName"
+    When Enter input plugin property: "name" with pipelineName
     And Click on the button "Next"
     And Select Source plugin: "MySQL" from the replication plugins list
     Then Replace input plugin property: "host" with value: "mysqlHost" for Credentials and Authorization related fields
@@ -70,7 +70,7 @@ Feature: Mysql - Verify Mysql source plugin design time validation scenarios
 
   Scenario: To verify validation message when user provides invalid user
     Given Open DataFusion Project with replication to configure pipeline
-    When Enter input plugin property: "name" with value: "pipelineName"
+    When Enter input plugin property: "name" with pipelineName
     And Click on the button "Next"
     And Select Source plugin: "MySQL" from the replication plugins list
     Then Replace input plugin property: "host" with value: "mysqlHost" for Credentials and Authorization related fields
@@ -87,7 +87,7 @@ Feature: Mysql - Verify Mysql source plugin design time validation scenarios
 
   Scenario: To verify validation message when user provides invalid password
     Given Open DataFusion Project with replication to configure pipeline
-    When Enter input plugin property: "name" with value: "pipelineName"
+    When Enter input plugin property: "name" with pipelineName
     And Click on the button "Next"
     And Select Source plugin: "MySQL" from the replication plugins list
     Then Replace input plugin property: "host" with value: "mysqlHost" for Credentials and Authorization related fields

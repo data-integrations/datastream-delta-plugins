@@ -15,11 +15,11 @@
 #
 
 @Mssql
-Feature: Mssql - Verify SqlServer source plugin design time validation scenarios
+Feature: Mssql - Verify Mssql source plugin design time validation scenarios
 
   Scenario: To verify validation message when user provides invalid Host
     Given Open DataFusion Project with replication to configure pipeline
-    When Enter input plugin property: "name" with value: "pipelineName"
+    When Enter input plugin property: "name" with pipelineName
     And Click on the button "Next"
     And Select Source plugin: "Microsoft SQLServer" from the replication plugins list
     Then Replace input plugin property: "host" with value: "mssqlInvalidHost" for Credentials and Authorization related fields
@@ -32,11 +32,11 @@ Feature: Mssql - Verify SqlServer source plugin design time validation scenarios
     Then Replace input plugin property: "project" with value: "projectId"
     Then Enter input plugin property: "datasetName" with value: "dataset"
     And Click on the button "Next"
-    Then Verify that the Plugin is displaying an error message: "errorMessageInvalidHost"
+    Then Verify that the Plugin is displaying an error message: "errorMessageInvalidMssqlHost"
 
   Scenario: To verify validation message when user provides invalid Port
     Given Open DataFusion Project with replication to configure pipeline
-    When Enter input plugin property: "name" with value: "pipelineName"
+    When Enter input plugin property: "name" with pipelineName
     And Click on the button "Next"
     And Select Source plugin: "Microsoft SQLServer" from the replication plugins list
     Then Replace input plugin property: "host" with value: "mssqlHost" for Credentials and Authorization related fields
@@ -49,11 +49,11 @@ Feature: Mssql - Verify SqlServer source plugin design time validation scenarios
     Then Replace input plugin property: "project" with value: "projectId"
     Then Enter input plugin property: "datasetName" with value: "dataset"
     And Click on the button "Next"
-    Then Verify that the Plugin is displaying an error message: "errorMessageInvalidPort"
+    Then Verify that the Plugin is displaying an error message: "errorMessageInvalidMssqlPort"
 
   Scenario: To verify validation message when user provides invalid Database Name
     Given Open DataFusion Project with replication to configure pipeline
-    When Enter input plugin property: "name" with value: "pipelineName"
+    When Enter input plugin property: "name" with pipelineName
     And Click on the button "Next"
     And Select Source plugin: "Microsoft SQLServer" from the replication plugins list
     Then Replace input plugin property: "host" with value: "mssqlHost" for Credentials and Authorization related fields
@@ -66,11 +66,11 @@ Feature: Mssql - Verify SqlServer source plugin design time validation scenarios
     Then Replace input plugin property: "project" with value: "projectId"
     Then Enter input plugin property: "datasetName" with value: "dataset"
     And Click on the button "Next"
-    Then Verify that the Plugin is displaying an error message: "errorMessageInvalidDatabase"
+    Then Verify that the Plugin is displaying an error message: "errorMessageInvalidMssqlDatabase"
 
   Scenario: To verify validation message when user provides invalid user
     Given Open DataFusion Project with replication to configure pipeline
-    When Enter input plugin property: "name" with value: "pipelineName"
+    When Enter input plugin property: "name" with pipelineName
     And Click on the button "Next"
     And Select Source plugin: "Microsoft SQLServer" from the replication plugins list
     Then Replace input plugin property: "host" with value: "mssqlHost" for Credentials and Authorization related fields
@@ -83,11 +83,11 @@ Feature: Mssql - Verify SqlServer source plugin design time validation scenarios
     Then Replace input plugin property: "project" with value: "projectId"
     Then Enter input plugin property: "datasetName" with value: "dataset"
     And Click on the button "Next"
-    Then Verify that the Plugin is displaying an error message: "errorMessageInvalidUser"
+    Then Verify that the Plugin is displaying an error message: "errorMessageInvalidMssqlUser"
 
   Scenario: To verify validation message when user provides invalid password
     Given Open DataFusion Project with replication to configure pipeline
-    When Enter input plugin property: "name" with value: "pipelineName"
+    When Enter input plugin property: "name" with pipelineName
     And Click on the button "Next"
     And Select Source plugin: "Microsoft SQLServer" from the replication plugins list
     Then Replace input plugin property: "host" with value: "mssqlHost" for Credentials and Authorization related fields
@@ -100,7 +100,7 @@ Feature: Mssql - Verify SqlServer source plugin design time validation scenarios
     Then Replace input plugin property: "project" with value: "projectId"
     Then Enter input plugin property: "datasetName" with value: "dataset"
     And Click on the button "Next"
-    Then Verify that the Plugin is displaying an error message: "errorMessageInvalidPassword"
+    Then Verify that the Plugin is displaying an error message: "errorMessageInvalidMssqlPassword"
 
   Scenario: To verify validation message when macro enabled for password field
     Given Open DataFusion Project with replication to configure pipeline

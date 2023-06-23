@@ -20,7 +20,7 @@ import io.cucumber.junit.CucumberOptions;
 import org.junit.runner.RunWith;
 
 /**
- * Test Runner to execute SQLServer plugin test cases.
+ * Test Runner to execute Mssql plugin test cases.
  */
 @RunWith(Cucumber.class)
 @CucumberOptions(

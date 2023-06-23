@@ -29,8 +29,8 @@ Feature: Mysql - Verify Mysql source plugin design time validation scenarios
     Then Replace input plugin property: "user" with value: "mysqlUsername" for Credentials and Authorization related fields
     Then Replace input plugin property: "password" with value: "mysqlPassword" for Credentials and Authorization related fields
     And Click on the button "Next"
-    Then Replace input plugin property: "project" with value: "bqProjectId"
-    Then Enter input plugin property: "datasetName" with value: "bqDataset"
+    Then Replace input plugin property: "project" with value: "projectId"
+    Then Enter input plugin property: "datasetName" with value: "dataset"
     And Click on the button "Next"
     Then Verify that the Plugin is displaying an error message: "errorMessageInvalidHost"
 
@@ -46,8 +46,8 @@ Feature: Mysql - Verify Mysql source plugin design time validation scenarios
     Then Replace input plugin property: "user" with value: "mysqlUsername" for Credentials and Authorization related fields
     Then Replace input plugin property: "password" with value: "mysqlPassword" for Credentials and Authorization related fields
     And Click on the button "Next"
-    Then Replace input plugin property: "project" with value: "bqProjectId"
-    Then Enter input plugin property: "datasetName" with value: "bqDataset"
+    Then Replace input plugin property: "project" with value: "projectId"
+    Then Enter input plugin property: "datasetName" with value: "dataset"
     And Click on the button "Next"
     Then Verify that the Plugin is displaying an error message: "errorMessageInvalidPort"
 
@@ -63,8 +63,8 @@ Feature: Mysql - Verify Mysql source plugin design time validation scenarios
     Then Replace input plugin property: "user" with value: "mysqlUsername" for Credentials and Authorization related fields
     Then Replace input plugin property: "password" with value: "mysqlPassword" for Credentials and Authorization related fields
     And Click on the button "Next"
-    Then Replace input plugin property: "project" with value: "bqProjectId"
-    Then Enter input plugin property: "datasetName" with value: "bqDataset"
+    Then Replace input plugin property: "project" with value: "projectId"
+    Then Enter input plugin property: "datasetName" with value: "dataset"
     And Click on the button "Next"
     Then Verify that the Plugin is displaying an error message: "errorMessageInvalidDatabase"
 
@@ -80,8 +80,8 @@ Feature: Mysql - Verify Mysql source plugin design time validation scenarios
     Then Replace input plugin property: "user" with value: "mySqlInvalidUser" for Credentials and Authorization related fields
     Then Replace input plugin property: "password" with value: "mysqlPassword" for Credentials and Authorization related fields
     And Click on the button "Next"
-    Then Replace input plugin property: "project" with value: "bqProjectId"
-    Then Enter input plugin property: "datasetName" with value: "bqDataset"
+    Then Replace input plugin property: "project" with value: "projectId"
+    Then Enter input plugin property: "datasetName" with value: "dataset"
     And Click on the button "Next"
     Then Verify that the Plugin is displaying an error message: "errorMessageInvalidUser"
 
@@ -97,8 +97,42 @@ Feature: Mysql - Verify Mysql source plugin design time validation scenarios
     Then Replace input plugin property: "user" with value: "mySqlInvalidUser" for Credentials and Authorization related fields
     Then Replace input plugin property: "password" with value: "mySqlInvalidPassword" for Credentials and Authorization related fields
     And Click on the button "Next"
-    Then Replace input plugin property: "project" with value: "bqProjectId"
-    Then Enter input plugin property: "datasetName" with value: "bqDataset"
+    Then Replace input plugin property: "project" with value: "projectId"
+    Then Enter input plugin property: "datasetName" with value: "dataset"
     And Click on the button "Next"
     Then Verify that the Plugin is displaying an error message: "errorMessageInvalidPassword"
 
+  Scenario: To verify validation message when macro enabled for password field
+    Given Open DataFusion Project with replication to configure pipeline
+    When Enter input plugin property: "name" with pipelineName
+    And Click on the button "Next"
+    And Select Source plugin: "MySQL" from the replication plugins list
+    Then Replace input plugin property: "host" with value: "mysqlHost" for Credentials and Authorization related fields
+    Then Replace input plugin property: "port" with value: "mysqlPort" for Credentials and Authorization related fields
+    Then Select dropdown plugin property: "select-jdbcPluginName" with option value: "mysqlDriverName"
+    Then Replace input plugin property: "database" with value: "mysqlDatabaseName"
+    Then Replace input plugin property: "user" with value: "mysqlUsername" for Credentials and Authorization related fields
+    Then Click on the Macro button of Property: "password" and set the value to: "Password"
+    And Click on the button "Next"
+    Then Replace input plugin property: "project" with value: "projectId"
+    Then Enter input plugin property: "datasetName" with value: "dataset"
+    And Click on the button "Next"
+    Then Verify that the Plugin is displaying an error message: "errorMessageMacroPassword"
+
+  Scenario: To verify validation message when macro enabled for service account key field
+    Given Open DataFusion Project with replication to configure pipeline
+    When Enter input plugin property: "name" with pipelineName
+    And Click on the button "Next"
+    And Select Source plugin: "MySQL" from the replication plugins list
+    Then Replace input plugin property: "host" with value: "mysqlHost" for Credentials and Authorization related fields
+    Then Replace input plugin property: "port" with value: "mysqlPort" for Credentials and Authorization related fields
+    Then Select dropdown plugin property: "select-jdbcPluginName" with option value: "mysqlDriverName"
+    Then Replace input plugin property: "database" with value: "mysqlDatabaseName"
+    Then Replace input plugin property: "user" with value: "mysqlUsername" for Credentials and Authorization related fields
+    Then Replace input plugin property: "password" with value: "mysqlPassword" for Credentials and Authorization related fields
+    And Click on the button "Next"
+    Then Replace input plugin property: "project" with value: "projectId"
+    Then Click on the Macro button of Property: "serviceAccountKey" and set the value to: "ServiceAccountKey"
+    Then Enter input plugin property: "datasetName" with value: "dataset"
+    And Click on the button "Next"
+    Then Verify that the Plugin is displaying an error message: "errorMessageMacroServiceAccountKey"

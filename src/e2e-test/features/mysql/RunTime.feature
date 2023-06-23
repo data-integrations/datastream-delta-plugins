@@ -17,10 +17,10 @@
 @Mysql
 Feature: Mysql - Verify Mysql source data transfer to Big Query
 
-  @MYSQL_SOURCE
-  Scenario: To verify replication of snapshot and cdc data from MySQL to Big Query successfully
+  @MYSQL_SOURCE @MYSQL_DELETE @BQ_SINK_TEST
+  Scenario: To verify replication of snapshot data from MySQL to Big Query successfully
     Given Open DataFusion Project with replication to configure pipeline
-    When Enter input plugin property: "name" with value: "pipelineName"
+    When Enter input plugin property: "name" with pipelineName
     And Click on the button "Next"
     And Select Source plugin: "MySQL" from the replication plugins list
     Then Replace input plugin property: "host" with value: "mysqlHost" for Credentials and Authorization related fields
@@ -30,21 +30,50 @@ Feature: Mysql - Verify Mysql source data transfer to Big Query
     Then Replace input plugin property: "user" with value: "mysqlUsername" for Credentials and Authorization related fields
     Then Replace input plugin property: "password" with value: "mysqlPassword" for Credentials and Authorization related fields
     And Click on the button "Next"
-    Then Replace input plugin property: "project" with value: "bqProjectId"
-    Then Enter input plugin property: "datasetName" with value: "bqDataset"
+    Then Replace input plugin property: "project" with value: "projectId"
+    Then Enter input plugin property: "datasetName" with value: "dataset"
     And Click on the button "Next"
-    Then Enter source table in search panel to select
-#    Then Validate MySQL Source table is available and select it
+    Then Validate Source table is available and select it
     And Click on the button "Next"
     And Click on the button "Next"
+    Then Wait till the Review Assessment page is loaded
     And Click on the button "Next"
     Then Deploy the replication pipeline
     And Run the replication Pipeline
-    Then Open the logs
+    Then Open the Advanced logs
     And Wait till pipeline is in running state and check if no errors occurred
-##    Then Verify expected MySQL records in target BigQuery table
-#    And Run insert, update and delete CDC events on source table
-#    And Wait till CDC events are reflected in BQ
-##    Then Verify expected Oracle records in target BigQuery table
-    And Capture raw logs
-    Then Close the pipeline logs and stop the pipeline
+#    Then Verify expected MySQL records in target BigQuery table
+    And Open and capture logs
+    Then Close the replication pipeline logs and stop the pipeline
+
+  @MYSQL_SOURCE @MYSQL_DELETE @BQ_SINK_TEST
+  Scenario: To verify replication of snapshot and cdc data from MySQL to Big Query successfully
+    Given Open DataFusion Project with replication to configure pipeline
+    When Enter input plugin property: "name" with pipelineName
+    And Click on the button "Next"
+    And Select Source plugin: "MySQL" from the replication plugins list
+    Then Replace input plugin property: "host" with value: "mysqlHost" for Credentials and Authorization related fields
+    Then Replace input plugin property: "port" with value: "mysqlPort" for Credentials and Authorization related fields
+    Then Select dropdown plugin property: "select-jdbcPluginName" with option value: "mysqlDriverName"
+    Then Replace input plugin property: "database" with value: "mysqlDatabaseName"
+    Then Replace input plugin property: "user" with value: "mysqlUsername" for Credentials and Authorization related fields
+    Then Replace input plugin property: "password" with value: "mysqlPassword" for Credentials and Authorization related fields
+    And Click on the button "Next"
+    Then Replace input plugin property: "project" with value: "projectId"
+    Then Enter input plugin property: "datasetName" with value: "dataset"
+    And Click on the button "Next"
+    Then Validate Source table is available and select it
+    And Click on the button "Next"
+    And Click on the button "Next"
+    Then Wait till the Review Assessment page is loaded
+    And Click on the button "Next"
+    Then Deploy the replication pipeline
+    And Run the replication Pipeline
+    Then Open the Advanced logs
+    And Wait till pipeline is in running state and check if no errors occurred
+#    Then Verify expected MySQL records in target BigQuery table
+    And Run insert, update and delete CDC events on source table
+    And Wait till CDC events are reflected in BQ
+#    Then Verify expected MySQL records in target BigQuery table
+    And Open and capture logs
+    Then Close the replication pipeline logs and stop the pipeline

@@ -19,7 +19,6 @@ package io.cdap.plugin.mysql.hooks;
 import com.google.cloud.bigquery.BigQueryException;
 import io.cdap.e2e.utils.BigQueryClient;
 import io.cdap.e2e.utils.PluginPropertyUtils;
-import io.cdap.plugin.mysql.actions.MysqlActions;
 import io.cdap.plugin.mysql.utils.MysqlClient;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
@@ -29,7 +28,6 @@ import stepsdesign.BeforeActions;
 
 import java.io.IOException;
 import java.sql.SQLException;
-
 
 /**
  * MySQL test hooks.
@@ -41,53 +39,17 @@ public class MysqlTestSetUpHooks {
     String randomString = RandomStringUtils.randomAlphabetic(10);
     String sourceTableName = String.format("SourceTable_%s", randomString);
     PluginPropertyUtils.addPluginProp("sourceMySqlTable", sourceTableName);
-    System.out.println("Inside" + PluginPropertyUtils.pluginProp("sourceMySqlTable"));
-}
-
-  @Before(order = 1)
-  public static void initializeDBProperties() {
-    String username = System.getenv("mysqlUsername");
-    if (username != null && !username.isEmpty()) {
-      PluginPropertyUtils.addPluginProp("mysqlUsername", username);
-    }
-    String password = System.getenv("mysqlPassword");
-    if (password != null && !password.isEmpty()) {
-      PluginPropertyUtils.addPluginProp("mysqlPassword", password);
-    }
-    MysqlTestSetUpHooks.setTableName();
   }
 
-//  public static void main(String[] args) throws SQLException, ClassNotFoundException {
-//    setTableName();
-////    initializeDBProperties();
-//    createTable();
-//  }
-
-    @Before(order = 1, value = "@MYSQL_SOURCE")
-    public static void createTable() throws SQLException, ClassNotFoundException {
-      System.out.println("Error messaage" + PluginPropertyUtils.pluginProp("sourceMySqlTable"));
-        MysqlClient.createTable(PluginPropertyUtils.pluginProp("sourceMySqlTable"),
-                                PluginPropertyUtils.pluginProp("mysqlDatatypeColumns"));
-      System.out.println(PluginPropertyUtils.pluginProp("sourceMySqlTable"));
-//      MysqlClient.insertRow(PluginPropertyUtils.pluginProp("sourceMySqlTable"),
-//                            PluginPropertyUtils.pluginProp("mysqlDatatypeValuesRow1"));
-//      MysqlClient.insertRow(PluginPropertyUtils.pluginProp("sourceMySqlTable"),
-//                            PluginPropertyUtils.pluginProp("mysqlDatatypeValuesRow2"));
-//      MysqlActions.selectTable(PluginPropertyUtils.pluginProp("sourceMySqlTable"));
-    }
-
-    @Before(order = 2, value = "@MYSQL_SOURCE2")
-    public static void insertRow() throws SQLException, ClassNotFoundException {
-      System.out.println("Error messaage2" + PluginPropertyUtils.pluginProp("sourceMySqlTable"));
-        MysqlClient.insertRow(PluginPropertyUtils.pluginProp("sourceMySqlTable"),
-                              PluginPropertyUtils.pluginProp("mysqlDatatypeValuesRow1"));
-        MysqlClient.insertRow(PluginPropertyUtils.pluginProp("sourceMySqlTable"),
-                              PluginPropertyUtils.pluginProp("mysqlDatatypeValuesRow2"));
-    }
+  @Before(order = 2, value = "@MYSQL_SOURCE")
+  public static void createTable() throws SQLException, ClassNotFoundException {
+    MysqlClient.createTable(PluginPropertyUtils.pluginProp("sourceMySqlTable"),
+                            PluginPropertyUtils.pluginProp("mysqlDatatypeColumns"));
+  }
 
   @After(order = 1, value = "@MYSQL_DELETE")
   public static void dropTable() throws SQLException, ClassNotFoundException {
-        MysqlClient.deleteTable(new String[] {PluginPropertyUtils.pluginProp("sourceMySqlTable")});
+    MysqlClient.deleteTable(new String[]{PluginPropertyUtils.pluginProp("sourceMySqlTable")});
   }
 
   @After(order = 1, value = "@BQ_SINK_TEST")

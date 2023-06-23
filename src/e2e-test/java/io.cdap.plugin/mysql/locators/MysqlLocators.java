@@ -27,46 +27,16 @@ import org.openqa.selenium.support.How;
  */
 public class MysqlLocators {
 
-    public static WebElement selectTable(String sourceTable) {
-        return SeleniumDriver.getDriver().findElement(By.xpath("//div[contains(text(),'" + sourceTable + "')]" +
+    public static WebElement selectTable(String tableName) {
+        return SeleniumDriver.getDriver().findElement(By.xpath("//div[contains(text(),'" + tableName + "')]" +
                 "/preceding-sibling::div/span"));
     }
-
-    @FindBy(how = How.XPATH, using = "//input[@type='text' and @placeholder='Search tables by name']")
-    public static WebElement searchTable;
-
-    @FindBy(how = How.XPATH, using = "//*[@class='text-danger']/span")
-    public static WebElement rowError;
-
-    public static WebElement locateSourcePluginNameInList(String pluginName) {
-        String xpath = "//div[contains(text(),'" + pluginName + "')]";
-        return SeleniumDriver.getDriver().findElement(By.xpath(xpath));
-    }
-
-    public static WebElement locateButton(String button) {
-        String xpath = "//*[contains(text(),'" + button + "')]";
-        return SeleniumDriver.getDriver().findElement(By.xpath(xpath));
-    }
-
-    @FindBy(how = How.XPATH, using = "//span[contains(text(),'Deploy Replication Job')]")
-    public static WebElement deployPipeline;
-
-    @FindBy(how = How.XPATH, using = "//*[contains(text(), 'Running')]")
-    public static WebElement running;
-
-    @FindBy(how = How.XPATH, using = "//*[contains(text(), 'Logs')]")
-    public static WebElement logs;
-
-    @FindBy(how = How.XPATH, using = "(//*[contains(text(), 'View')])[1]")
-    public static WebElement advancedLogs;
-
-    @FindBy(how = How.XPATH, using = "//*[contains(@class, 'icon-stop')]")
-    public static WebElement stop;
 
     @FindBy(how = How.XPATH, using = "//div[@data-cy='log-viewer-row']//div[contains(text(),'ERROR')]")
     public static WebElement error;
 
-    @FindBy(how = How.XPATH, using = "//*[contains(text(),'Stopped')]")
-    public static WebElement stopped;
-    public static By start = By.xpath("//*[contains(@class, 'icon-play ')]");
+    public static By reviewAssessment() {
+        return By.xpath("//h4[contains(text(), 'Review assessment')]");
+    }
+
 }

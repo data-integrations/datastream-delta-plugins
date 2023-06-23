@@ -35,8 +35,4 @@ public class MysqlLocators {
     @FindBy(how = How.XPATH, using = "//div[@data-cy='log-viewer-row']//div[contains(text(),'ERROR')]")
     public static WebElement error;
 
-    public static By reviewAssessment() {
-        return By.xpath("//h4[contains(text(), 'Review assessment')]");
-    }
-
 }

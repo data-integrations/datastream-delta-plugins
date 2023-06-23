@@ -16,30 +16,17 @@
 
 package io.cdap.plugin.mysql.actions;
 
-import io.cdap.e2e.pages.actions.CdfPipelineRunAction;
-import io.cdap.e2e.pages.locators.CdfPipelineRunLocators;
-import io.cdap.e2e.pages.locators.CdfPluginPropertiesLocators;
 import io.cdap.e2e.utils.AssertionHelper;
-import io.cdap.e2e.utils.ConstantsUtil;
 import io.cdap.e2e.utils.ElementHelper;
-import io.cdap.e2e.utils.PageHelper;
 import io.cdap.e2e.utils.PluginPropertyUtils;
-import io.cdap.e2e.utils.SeleniumDriver;
 import io.cdap.e2e.utils.SeleniumHelper;
 import io.cdap.e2e.utils.WaitHelper;
 import io.cdap.plugin.mysql.locators.MysqlLocators;
 import io.cdap.plugin.mysql.utils.BQClient;
 import io.cdap.plugin.mysql.utils.MysqlClient;
-import org.apache.commons.lang.StringUtils;
 import org.junit.Assert;
-import org.openqa.selenium.By;
-import stepsdesign.BeforeActions;
 
-import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -81,9 +68,5 @@ public class MysqlActions {
 
     public static void waitForReplication() throws InterruptedException {
         BQClient.waitForFlush();
-    }
-
-    public static void waitTillTheReviewAssessmentPageLoaded() {
-        WaitHelper.waitForElementToBeOptionallyDisplayed(MysqlLocators.reviewAssessment(),2000);
     }
 }

@@ -49,9 +49,4 @@ public class MysqlStepDefinition implements CdfHelper {
   public void waitForReplicationToFlushEvents() throws InterruptedException {
     MysqlActions.waitForReplication();
   }
-
-  @Then("Wait till the Review Assessment page is loaded")
-  public void waitTillTheReviewAssessmentPageIsLoaded() {
-    MysqlActions.waitTillTheReviewAssessmentPageLoaded();
-  }
 }

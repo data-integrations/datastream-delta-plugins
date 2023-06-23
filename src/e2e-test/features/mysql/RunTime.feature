@@ -36,7 +36,7 @@ Feature: Mysql - Verify Mysql source data transfer to Big Query
     Then Validate Source table is available and select it
     And Click on the button "Next"
     And Click on the button "Next"
-    Then Wait till the Review Assessment page is loaded
+    Then Wait till the Review Assessment page is loaded in replication
     And Click on the button "Next"
     Then Deploy the replication pipeline
     And Run the replication Pipeline
@@ -65,7 +65,7 @@ Feature: Mysql - Verify Mysql source data transfer to Big Query
     Then Validate Source table is available and select it
     And Click on the button "Next"
     And Click on the button "Next"
-    Then Wait till the Review Assessment page is loaded
+    Then Wait till the Review Assessment page is loaded in replication
     And Click on the button "Next"
     Then Deploy the replication pipeline
     And Run the replication Pipeline

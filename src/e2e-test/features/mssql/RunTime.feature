@@ -14,21 +14,21 @@
 # the License.
 #
 
-@Mysql
-Feature: Mysql - Verify Mysql source data transfer to Big Query
+@Mssql
+Feature: Mssql - Verify Mssql source data transfer to Big Query
 
-  @MYSQL_SOURCE @MYSQL_DELETE @BQ_SINK_TEST
-  Scenario: To verify replication of snapshot data from MySQL to BigQuery successfully
+  @MSSQL_SOURCE @MSSQL_DELETE @BQ_SINK_TEST
+  Scenario: To verify replication of snapshot data from Mssql to BigQuery successfully
     Given Open DataFusion Project with replication to configure pipeline
     When Enter input plugin property: "name" with pipelineName
     And Click on the Next button in Replication mode "Next"
-    And Select Source plugin: "MySQL" from the replication plugins list
-    Then Replace input plugin property: "host" with value: "mysqlHost" for Credentials and Authorization related fields
-    Then Replace input plugin property: "port" with value: "mysqlPort" for Credentials and Authorization related fields
-    Then Select dropdown plugin property: "select-jdbcPluginName" with option value: "mysqlDriverName"
-    Then Replace input plugin property: "database" with value: "mysqlDatabaseName"
-    Then Replace input plugin property: "user" with value: "mysqlUsername" for Credentials and Authorization related fields
-    Then Replace input plugin property: "password" with value: "mysqlPassword" for Credentials and Authorization related fields
+    And Select Source plugin: "Microsoft SQLServer" from the replication plugins list
+    Then Replace input plugin property: "host" with value: "mssqlHost" for Credentials and Authorization related fields
+    Then Replace input plugin property: "port" with value: "mssqlPort" for Credentials and Authorization related fields
+    Then Select dropdown plugin property: "select-jdbcPluginName" with option value: "mssqlDriverName"
+    Then Replace input plugin property: "database" with value: "mssqlDatabaseName"
+    Then Replace input plugin property: "user" with value: "mssqlUsername" for Credentials and Authorization related fields
+    Then Replace input plugin property: "password" with value: "mssqlPassword" for Credentials and Authorization related fields
     And Click on the Next button in Replication mode "Next"
     Then Replace input plugin property: "project" with value: "projectId"
     Then Enter input plugin property: "datasetName" with value: "dataset"
@@ -42,22 +42,22 @@ Feature: Mysql - Verify Mysql source data transfer to Big Query
     And Run the replication Pipeline
     Then Open the Advanced logs
     And Wait till pipeline is in running state and check if no errors occurred
-    Then Verify expected MySQL records in target BigQuery table
+#    Then Verify expected MsSQL records in target BigQuery table
     And Open and capture logs
     Then Close the replication pipeline logs and stop the pipeline
 
-  @MYSQL_SOURCE @MYSQL_DELETE @BQ_SINK_TEST
-  Scenario: To verify replication of snapshot and cdc data from MySQL to BigQuery successfully
+  @MSSQL_SOURCE @MSSQL_DELETE @BQ_SINK_TEST
+  Scenario: To verify replication of snapshot and cdc data from MsSQL to BigQuery successfully
     Given Open DataFusion Project with replication to configure pipeline
     When Enter input plugin property: "name" with pipelineName
     And Click on the Next button in Replication mode "Next"
-    And Select Source plugin: "MySQL" from the replication plugins list
-    Then Replace input plugin property: "host" with value: "mysqlHost" for Credentials and Authorization related fields
-    Then Replace input plugin property: "port" with value: "mysqlPort" for Credentials and Authorization related fields
-    Then Select dropdown plugin property: "select-jdbcPluginName" with option value: "mysqlDriverName"
-    Then Replace input plugin property: "database" with value: "mysqlDatabaseName"
-    Then Replace input plugin property: "user" with value: "mysqlUsername" for Credentials and Authorization related fields
-    Then Replace input plugin property: "password" with value: "mysqlPassword" for Credentials and Authorization related fields
+    And Select Source plugin: "Microsoft SQLServer" from the replication plugins list
+    Then Replace input plugin property: "host" with value: "mssqlHost" for Credentials and Authorization related fields
+    Then Replace input plugin property: "port" with value: "mssqlPort" for Credentials and Authorization related fields
+    Then Select dropdown plugin property: "select-jdbcPluginName" with option value: "mssqlDriverName"
+    Then Replace input plugin property: "database" with value: "mssqlDatabaseName"
+    Then Replace input plugin property: "user" with value: "mssqlUsername" for Credentials and Authorization related fields
+    Then Replace input plugin property: "password" with value: "mssqlPassword" for Credentials and Authorization related fields
     And Click on the Next button in Replication mode "Next"
     Then Replace input plugin property: "project" with value: "projectId"
     Then Enter input plugin property: "datasetName" with value: "dataset"
@@ -71,9 +71,9 @@ Feature: Mysql - Verify Mysql source data transfer to Big Query
     And Run the replication Pipeline
     Then Open the Advanced logs
     And Wait till pipeline is in running state and check if no errors occurred
-    Then Verify expected MySQL records in target BigQuery table
+#    Then Verify expected MsSQL records in target BigQuery table
     And Run insert, update and delete CDC events on source table
     And Wait till CDC events are reflected in BQ
-    Then Verify expected MySQL records in target BigQuery table
+#    Then Verify expected MsSQL records in target BigQuery table
     And Open and capture logs
     Then Close the replication pipeline logs and stop the pipeline

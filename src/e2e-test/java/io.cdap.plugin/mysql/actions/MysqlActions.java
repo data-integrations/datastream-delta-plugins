@@ -24,15 +24,22 @@ import io.cdap.e2e.utils.WaitHelper;
 import io.cdap.plugin.mysql.locators.MysqlLocators;
 import io.cdap.plugin.mysql.utils.BQClient;
 import io.cdap.plugin.mysql.utils.MysqlClient;
+import io.cdap.plugin.utils.BigQuery;
+import io.cdap.plugin.utils.ValidationHelper;
 import org.junit.Assert;
 
+import java.io.IOException;
 import java.sql.SQLException;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Replication MySQL Actions.
  */
 public class MysqlActions {
+    private static final String projectId = PluginPropertyUtils.pluginProp("projectId");
+    private static final String database = PluginPropertyUtils.pluginProp("dataset");
     public static String tableName = PluginPropertyUtils.pluginProp("sourceMySqlTable");
     public static String datatypeValues = PluginPropertyUtils.pluginProp("mysqlDatatypeValuesForInsertOperation");
     public static String deleteCondition = PluginPropertyUtils.pluginProp("deleteRowCondition");
@@ -69,4 +76,15 @@ public class MysqlActions {
     public static void waitForReplication() throws InterruptedException {
         BQClient.waitForFlush();
     }
+
+  public static void verifyTargetBigQueryRecordMatchesExpectedMysqlRecord() throws IOException, InterruptedException,
+    SQLException, ClassNotFoundException {
+      // Checking if an error message is displayed.
+      Assert.assertFalse(ElementHelper.isElementDisplayed(MysqlLocators.error));
+
+      List<Map<String, Object>> sourceMysqlRecords = MysqlClient.getMysqlRecordsAsMap(tableName);
+      List<Map<String, Object>> targetBigQueryRecords =
+        BigQuery.getBigQueryRecordsAsMap(projectId, database, tableName);
+      ValidationHelper.validateRecords(sourceMysqlRecords, targetBigQueryRecords);
+  }
 }

@@ -22,6 +22,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
+import java.util.Map;
 
 /**
  *  MySQL client.
@@ -87,4 +89,8 @@ public class MysqlClient {
             }
         }
     }
+
+//    public static List<Map<String, Object>> getMysqlRecordsAsMap(String tableName) {
+//        return MysqlRecords;
+//    }
 }

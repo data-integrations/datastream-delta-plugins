@@ -17,8 +17,8 @@
 package io.cdap.plugin.hooks;
 
 import io.cdap.e2e.utils.PluginPropertyUtils;
-import io.cdap.plugin.utils.BigQuery;
-import io.cdap.plugin.utils.OracleClient;
+import io.cdap.plugin.mysql.utils.BQClient;
+import io.cdap.plugin.mysql.utils.MysqlClient;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
 import stepsdesign.BeforeActions;
@@ -72,28 +72,28 @@ public class TestSetUpHooks {
 
     @Before(order = 2, value = "@ORACLE_SOURCE")
     public static void createTable() throws SQLException, ClassNotFoundException {
-        OracleClient.createTable(tableName, schemaName, datatypeColumns);
+        MysqlClient.createTable(tableName, schemaName, datatypeColumns);
     }
 
     @Before(order = 3, value = "@ORACLE_SOURCE")
     public static void insertRow() throws SQLException, ClassNotFoundException {
-        OracleClient.insertRow(tableName, schemaName, row1);
-        OracleClient.insertRow(tableName, schemaName, row2);
+        MysqlClient.insertRow(tableName, schemaName, row1);
+        MysqlClient.insertRow(tableName, schemaName, row2);
     }
 
     @Before(order = 4, value = "@ORACLE_SOURCE")
     public static void getOracleRecordsAsMap() throws SQLException, ClassNotFoundException {
-        sourceOracleRecords = OracleClient.getOracleRecordsAsMap(tableName, schemaName);
+        sourceOracleRecords = MysqlClient.getOracleRecordsAsMap(tableName, schemaName);
         BeforeActions.scenario.write("Expected Oracle records : " + sourceOracleRecords);
     }
 
   @After(order = 1, value = "@ORACLE_DELETE")
   public static void dropTable() throws SQLException, ClassNotFoundException {
-        OracleClient.deleteTable(schemaName, tableName);
+        MysqlClient.deleteTable(schemaName, tableName);
   }
 
   @After(order = 1, value = "@BIGQUERY_DELETE")
   public static void deleteTargetBQTable() throws IOException, InterruptedException {
-        BigQuery.deleteTable(tableName);
+        BQClient.deleteTable(tableName);
     }
 }

@@ -22,7 +22,7 @@ import io.cdap.e2e.utils.PluginPropertyUtils;
 import io.cdap.e2e.utils.SeleniumHelper;
 import io.cdap.e2e.utils.WaitHelper;
 import io.cdap.plugin.mssql.locators.MssqlLocators;
-import io.cdap.plugin.mssql.utils.BQClient;
+import io.cdap.plugin.utils.BigQuery;
 import io.cdap.plugin.mssql.utils.MssqlClient;
 import org.junit.Assert;
 
@@ -55,7 +55,7 @@ public class MssqlActions {
         //wait for datastream to startup
         int defaultTimeout = Integer.parseInt(PluginPropertyUtils.pluginProp("pipeline-initialization"));
         TimeUnit.SECONDS.sleep(defaultTimeout);
-        BQClient.waitForFlush();
+        BigQuery.waitForFlush();
         // Checking if an error message is displayed.
         Assert.assertFalse(ElementHelper.isElementDisplayed(MssqlLocators.error));
     }
@@ -68,6 +68,6 @@ public class MssqlActions {
     }
 
     public static void waitForReplication() throws InterruptedException {
-        BQClient.waitForFlush();
+        BigQuery.waitForFlush();
     }
 }

@@ -22,7 +22,6 @@ import io.cdap.e2e.utils.PluginPropertyUtils;
 import io.cdap.e2e.utils.SeleniumHelper;
 import io.cdap.e2e.utils.WaitHelper;
 import io.cdap.plugin.mysql.locators.MysqlLocators;
-import io.cdap.plugin.mysql.utils.BQClient;
 import io.cdap.plugin.mysql.utils.MysqlClient;
 import io.cdap.plugin.utils.BigQuery;
 import io.cdap.plugin.utils.ValidationHelper;
@@ -61,7 +60,7 @@ public class MysqlActions {
         //wait for datastream to startup
         int defaultTimeout = Integer.parseInt(PluginPropertyUtils.pluginProp("pipeline-initialization"));
         TimeUnit.SECONDS.sleep(defaultTimeout);
-        BQClient.waitForFlush();
+        BigQuery.waitForFlush();
         // Checking if an error message is displayed.
         Assert.assertFalse(ElementHelper.isElementDisplayed(MysqlLocators.error));
     }
@@ -74,17 +73,6 @@ public class MysqlActions {
     }
 
     public static void waitForReplication() throws InterruptedException {
-        BQClient.waitForFlush();
+        BigQuery.waitForFlush();
     }
-
-  public static void verifyTargetBigQueryRecordMatchesExpectedMysqlRecord() throws IOException, InterruptedException,
-    SQLException, ClassNotFoundException {
-      // Checking if an error message is displayed.
-      Assert.assertFalse(ElementHelper.isElementDisplayed(MysqlLocators.error));
-
-      List<Map<String, Object>> sourceMysqlRecords = MysqlClient.getMysqlRecordsAsMap(tableName);
-      List<Map<String, Object>> targetBigQueryRecords =
-        BigQuery.getBigQueryRecordsAsMap(projectId, database, tableName);
-      ValidationHelper.validateRecords(sourceMysqlRecords, targetBigQueryRecords);
-  }
 }

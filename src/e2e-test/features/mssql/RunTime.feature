@@ -15,7 +15,7 @@
 #
 
 @Mssql
-Feature: Mssql - Verify Mssql source data transfer to Big Query
+Feature: Mssql - Verify Mssql source data transfer to BigQuery
 
   @MSSQL_SOURCE @MSSQL_DELETE @BQ_SINK_TEST
   Scenario: To verify replication of snapshot data from Mssql to BigQuery successfully
@@ -42,7 +42,7 @@ Feature: Mssql - Verify Mssql source data transfer to Big Query
     And Run the replication Pipeline
     Then Open the Advanced logs
     And Wait till pipeline is in running state and check if no errors occurred
-#    Then Verify expected MsSQL records in target BigQuery table
+    Then Verify expected MsSQL records in target BigQuery table
     And Open and capture logs
     Then Close the replication pipeline logs and stop the pipeline
 
@@ -71,9 +71,9 @@ Feature: Mssql - Verify Mssql source data transfer to Big Query
     And Run the replication Pipeline
     Then Open the Advanced logs
     And Wait till pipeline is in running state and check if no errors occurred
-#    Then Verify expected MsSQL records in target BigQuery table
+    Then Verify expected MsSQL records in target BigQuery table
     And Run insert, update and delete CDC events on source table
     And Wait till CDC events are reflected in BQ
-#    Then Verify expected MsSQL records in target BigQuery table
+    Then Verify expected MsSQL records in target BigQuery table
     And Open and capture logs
     Then Close the replication pipeline logs and stop the pipeline

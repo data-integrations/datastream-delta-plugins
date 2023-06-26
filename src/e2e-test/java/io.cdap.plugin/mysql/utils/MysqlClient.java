@@ -89,8 +89,4 @@ public class MysqlClient {
             }
         }
     }
-
-//    public static List<Map<String, Object>> getMysqlRecordsAsMap(String tableName) {
-//        return MysqlRecords;
-//    }
 }

@@ -23,7 +23,7 @@ import io.cdap.e2e.utils.SeleniumHelper;
 import io.cdap.e2e.utils.WaitHelper;
 import io.cdap.plugin.oracle.locators.OracleLocators;
 import io.cdap.plugin.utils.BigQuery;
-import io.cdap.plugin.utils.OracleClient;
+import io.cdap.plugin.oracle.utils.OracleClient;
 import io.cdap.plugin.utils.ValidationHelper;
 import org.junit.Assert;
 
@@ -39,9 +39,9 @@ import java.util.concurrent.TimeUnit;
 public class OracleActions {
     private static final String projectId = PluginPropertyUtils.pluginProp("projectId");
     private static final String database = PluginPropertyUtils.pluginProp("dataset");
-    public static String tableName = PluginPropertyUtils.pluginProp("sourceTable");
-    public static String schemaName = PluginPropertyUtils.pluginProp("schema");
-    public static String datatypeValues = PluginPropertyUtils.pluginProp("datatypeValuesForInsertOperation");
+    public static String tableName = PluginPropertyUtils.pluginProp("oracleSourceTable");
+    public static String schemaName = PluginPropertyUtils.pluginProp("oracleSchema");
+    public static String datatypeValues = PluginPropertyUtils.pluginProp("oracleDatatypeValuesForInsertOperation");
     public static String deleteCondition = PluginPropertyUtils.pluginProp("deleteRowCondition");
     public static String updateCondition = PluginPropertyUtils.pluginProp("updateRowCondition");
     public static String updatedValue = PluginPropertyUtils.pluginProp("updatedRow");

@@ -15,7 +15,7 @@
 #
 
 @Mysql
-Feature: Mysql - Verify Mysql source data transfer to Big Query
+Feature: Mysql - Verify Mysql source data transfer to BigQuery
 
   @MYSQL_SOURCE @MYSQL_DELETE @BQ_SINK_TEST
   Scenario: To verify replication of snapshot data from MySQL to BigQuery successfully

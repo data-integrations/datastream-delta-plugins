@@ -13,8 +13,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-
 /**
- * Package contains the runners for Oracle features.
+ * Contains helper methods used in e2e tests.
  */
-package io.cdap.plugin.tests;
+package io.cdap.plugin.oracle.utils;

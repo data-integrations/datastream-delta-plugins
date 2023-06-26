@@ -14,7 +14,7 @@
  * the License.
  */
 
-package io.cdap.plugin.utils;
+package io.cdap.plugin.oracle.utils;
 
 import io.cdap.e2e.utils.PluginPropertyUtils;
 
@@ -52,12 +52,21 @@ public class OracleClient {
                 username, password);
     }
 
-
     public static void createTable(String table, String schema, String datatypeColumns)
             throws SQLException, ClassNotFoundException {
         try (Connection connect = getOracleConnection(); Statement statement = connect.createStatement()) {
             String createTableQuery = "CREATE TABLE " + schema + "." + table + datatypeColumns;
             statement.executeUpdate(createTableQuery);
+            // Insert row1 data.
+            String datatypesValues = PluginPropertyUtils.pluginProp("oracleDatatypeValuesRow1");
+            String datatypesColumnsList = PluginPropertyUtils.pluginProp("oracleDatatypesColumnsList");
+            statement.executeUpdate("INSERT INTO " + schema + "." + table + " " + datatypesColumnsList + " " +
+                                      datatypesValues);
+            // Insert row2 data.
+            String datatypesValues2 = PluginPropertyUtils.pluginProp("oracleDatatypeValuesRow2");
+            String datatypesColumnsList2 = PluginPropertyUtils.pluginProp("oracleDatatypesColumnsList");
+            statement.executeUpdate("INSERT INTO " + schema + "." + table + " " + datatypesColumnsList2 + " " +
+                                      datatypesValues2);
         }
     }
 
@@ -71,15 +80,12 @@ public class OracleClient {
         }
     }
 
-
-
     public static void insertRow (String table, String schema, String datatypeValues) throws
             SQLException, ClassNotFoundException {
         try (Connection connect = getOracleConnection(); Statement statement = connect.createStatement()) {
             // Insert dummy data.
             statement.executeUpdate("INSERT INTO " + schema + "." + table + " " +
                     " VALUES " + datatypeValues);
-
         }
     }
     public static void deleteRow(String table, String schema, String deleteCondition) throws SQLException,

@@ -21,6 +21,7 @@ import io.cdap.plugin.mssql.actions.MssqlActions;
 import io.cucumber.java.en.And;
 import io.cucumber.java.en.Then;
 
+import java.io.IOException;
 import java.sql.SQLException;
 
 /**
@@ -46,5 +47,11 @@ public class MssqlStepDefinition implements CdfHelper {
   @And("Wait till CDC events are reflected in BQ")
   public void waitForReplicationToFlushEvents() throws InterruptedException {
     MssqlActions.waitForReplication();
+  }
+
+  @Then("Verify expected MsSQL records in target BigQuery table")
+  public void verifyExpectedMsSQLRecordsInTargetBigQueryTable() throws
+    IOException, InterruptedException, SQLException, ClassNotFoundException {
+//    MysqlActions.verifyTargetBigQueryRecordMatchesExpectedMssqlRecord();
   }
 }

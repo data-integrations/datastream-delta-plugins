@@ -24,10 +24,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 /**
- * Contains validation method from oracle to bq used in e2e tests.
+ * Contains validation method from Database to bq used in e2e tests.
  */
 public class ValidationHelper {
-    public static void validateRecords(List<Map<String, Object>> sourceOracleRecords,
+    public static void validateRecords(List<Map<String, Object>> sourceDBRecords,
                                        List<Map<String, Object>> targetBigQueryRecords) {
 
         String uniqueField = PluginPropertyUtils.pluginProp("primaryKey");
@@ -43,27 +43,27 @@ public class ValidationHelper {
             Assert.fail("Duplication found in Big Query target table");
         }
 
-        for (int record = 0; record < sourceOracleRecords.size(); record++) {
-            Map<String, Object> oracleRecord = sourceOracleRecords.get(record);
-            Object uniqueId = oracleRecord.get(uniqueField);
+        for (int record = 0; record < sourceDBRecords.size(); record++) {
+            Map<String, Object> databaseRecord = sourceDBRecords.get(record);
+            Object uniqueId = databaseRecord.get(uniqueField);
             Map<String, Object> bqRow = (Map<String, Object>) bqUniqueIdMap.get(uniqueId);
             if (bqRow != null) {
                 bqRow.remove("_is_deleted");
                 bqRow.remove("_sequence_num");
             }
-            compareRecords(bqRow, oracleRecord);
+            compareRecords(bqRow, databaseRecord);
         }
     }
 
     public static void compareRecords(Map<String, Object> targetBigQueryRecords,
-                                      Map<String, Object> sourceOracleRecord) {
+                                      Map<String, Object> sourceDBRecord) {
         Set<String> bigQueryKeySet = targetBigQueryRecords.keySet();
         for (String field : bigQueryKeySet) {
             Object bigQueryFieldValue = targetBigQueryRecords.get(field);
-            Object oracleFieldValue = sourceOracleRecord.get(field);
+            Object dBFieldValue = sourceDBRecord.get(field);
             Assert.assertEquals(String.format("Field %s is not equal: expected %s but got %s", field,
-                            oracleFieldValue, bigQueryFieldValue),
-                    oracleFieldValue, bigQueryFieldValue);
+                    dBFieldValue, bigQueryFieldValue),
+                    dBFieldValue, bigQueryFieldValue);
         }
     }
 

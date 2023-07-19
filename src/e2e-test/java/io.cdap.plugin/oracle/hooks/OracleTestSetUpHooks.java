@@ -16,15 +16,12 @@
 
 package io.cdap.plugin.oracle.hooks;
 
-import com.google.cloud.bigquery.BigQueryException;
-import io.cdap.e2e.utils.BigQueryClient;
 import io.cdap.e2e.utils.PluginPropertyUtils;
 import io.cdap.plugin.oracle.utils.OracleClient;
 import io.cdap.plugin.utils.BigQuery;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.junit.Assert;
 import stepsdesign.BeforeActions;
 
 import java.io.IOException;
@@ -37,12 +34,9 @@ import java.util.Map;
  * Oracle test hooks.
  */
 public class OracleTestSetUpHooks {
-    public static List<Map<String, Object>> sourceOracleRecords = new ArrayList<>();
     public static String tableName = PluginPropertyUtils.pluginProp("oracleSourceTable");
     public static String schemaName = PluginPropertyUtils.pluginProp("oracleSchema");
     public static String datatypeColumns = PluginPropertyUtils.pluginProp("oracleDatatypeColumns");
-    public static String row1 = PluginPropertyUtils.pluginProp("oracleDatatypeValuesRow1");
-    public static String row2 = PluginPropertyUtils.pluginProp("oracleDatatypeValuesRow2");
 
     @Before(order = 1)
     public static void setTableName() {
@@ -54,11 +48,13 @@ public class OracleTestSetUpHooks {
     @Before(order = 2, value = "@ORACLE_SOURCE")
     public static void createTable() throws SQLException, ClassNotFoundException {
         OracleClient.createTable(tableName, schemaName, datatypeColumns);
+        BeforeActions.scenario.write("Oracle Source Table - " + tableName + " created successfully");
     }
 
   @After(order = 1, value = "@ORACLE_DELETE")
   public static void dropTable() throws SQLException, ClassNotFoundException {
         OracleClient.deleteTable(schemaName, tableName);
+        BeforeActions.scenario.write("Oracle Source Table - " + tableName + " deleted successfully");
   }
 
     @After(order = 1, value = "@BIGQUERY_DELETE")

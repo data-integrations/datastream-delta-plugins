@@ -53,6 +53,6 @@ public class MysqlStepDefinition implements CdfHelper {
   @Then("Verify expected MySQL records in target BigQuery table")
   public void verifyExpectedMySQLRecordsInTargetBigQueryTable() throws
     IOException, InterruptedException, SQLException, ClassNotFoundException {
-//    MysqlActions.verifyTargetBigQueryRecordMatchesExpectedMysqlRecord();
+    MysqlActions.verifyTargetBigQueryRecordMatchesExpectedMysqlRecord();
   }
 }

@@ -22,12 +22,16 @@ import com.google.cloud.bigquery.FieldValue;
 import com.google.cloud.bigquery.FieldValueList;
 import com.google.cloud.bigquery.TableResult;
 import io.cdap.e2e.utils.BigQueryClient;
+import org.apache.http.ParseException;
 import io.cdap.e2e.utils.PluginPropertyUtils;
 import org.junit.Assert;
 import stepsdesign.BeforeActions;
 
 import java.io.IOException;
+import java.sql.Time;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +43,7 @@ public class BigQuery {
 
     public static List<Map<String, Object>> getBigQueryRecordsAsMap(String projectId, String database, String tableName)
             throws IOException, InterruptedException {
-        String query = "SELECT * EXCEPT ( _row_id, _source_timestamp, _sort) FROM `" + projectId
+        String query = "SELECT TO_JSON(t) EXCEPT ( _row_id, _source_timestamp, _sort) FROM `" + projectId
                 + "." + database + "." + tableName + "`";
         List<Map<String, Object>> bqRecords = new ArrayList<>();
         TableResult results = BigQueryClient.getQueryResult(query);
@@ -54,11 +58,35 @@ public class BigQuery {
                 String columnName = columns.get(index).split("#")[0];
                 String dataType = columns.get(index).split("#")[1];
                 Object value;
-                if (dataType.equalsIgnoreCase("TIMESTAMP")) {
-                    value = fieldValue.getTimestampValue();
-                } else {
-                    value = fieldValue.getValue();
-                    value = value != null ? value.toString() : null;
+                switch (dataType) {
+                    case "TIMESTAMP":
+                        value = fieldValue.getTimestampValue();
+                        break;
+                    case "BOOLEAN":
+                        value = fieldValue.getBooleanValue();
+                        break;
+                    case "INTEGER":
+                        value = fieldValue.getLongValue();
+                        break;
+                    case "FLOAT":
+                        value = fieldValue.getDoubleValue();
+                        break;
+                    case "BLOB":
+                        value = fieldValue.getBytesValue();
+                        break;
+                    case "DATE":
+                        value = parseDate(fieldValue.getStringValue(), "yyyy-MM-dd");
+                        break;
+                    case "DATETIME":
+                        value = parseDate(fieldValue.getStringValue(), "yyyy-MM-dd HH:mm:ss");
+                        break;
+                    case "TIME":
+                        value = parseTime(fieldValue.getStringValue(), "HH:mm:ss");
+                        break;
+                    default:
+                        value = fieldValue.getValue();
+                        value = value != null ? value.toString() : null;
+                        break;
                 }
                 record.put(columnName, value);
                 index++;
@@ -67,6 +95,27 @@ public class BigQuery {
         }
         return bqRecords;
     }
+
+    private static Date parseDate(String dateString, String format) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
+        try {
+            return dateFormat.parse(dateString);
+        } catch (ParseException | java.text.ParseException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+    private static Time parseTime(String timeString, String format) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
+        try {
+            Date parsedDate = dateFormat.parse(timeString);
+            return new Time(parsedDate.getTime());
+        } catch (ParseException | java.text.ParseException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
     public static void waitForFlush() throws InterruptedException {
         int flushInterval = Integer.parseInt(PluginPropertyUtils.pluginProp("loadInterval"));
         TimeUnit time = TimeUnit.SECONDS;

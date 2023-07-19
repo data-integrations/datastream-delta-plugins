@@ -35,14 +35,15 @@ Feature: Mssql - Verify Mssql source data transfer to BigQuery
     And Click on the Next button in Replication mode "Next"
     Then Validate Source table is available and select it
     And Click on the Next button in Replication mode "Next"
+    Then Wait till Next button is loaded
     And Click on the Next button in Replication mode "Next"
-    Then Wait till the Review Assessment page is loaded in replication
+    Then Wait till Next button is loaded
     And Click on the Next button in Replication mode "Next"
     Then Deploy the replication pipeline
     And Run the replication Pipeline
     Then Open the Advanced logs
     And Wait till pipeline is in running state and check if no errors occurred
-    Then Verify expected MsSQL records in target BigQuery table
+#    Then Verify expected MsSQL records in target BigQuery table
     And Open and capture logs
     Then Close the replication pipeline logs and stop the pipeline
 
@@ -64,16 +65,17 @@ Feature: Mssql - Verify Mssql source data transfer to BigQuery
     And Click on the Next button in Replication mode "Next"
     Then Validate Source table is available and select it
     And Click on the Next button in Replication mode "Next"
+    Then Wait till Next button is loaded
     And Click on the Next button in Replication mode "Next"
-    Then Wait till the Review Assessment page is loaded in replication
+    Then Wait till Next button is loaded
     And Click on the Next button in Replication mode "Next"
     Then Deploy the replication pipeline
     And Run the replication Pipeline
     Then Open the Advanced logs
     And Wait till pipeline is in running state and check if no errors occurred
-    Then Verify expected MsSQL records in target BigQuery table
+#    Then Verify expected MsSQL records in target BigQuery table
     And Run insert, update and delete CDC events on source table
     And Wait till CDC events are reflected in BQ
-    Then Verify expected MsSQL records in target BigQuery table
+#    Then Verify expected MsSQL records in target BigQuery table
     And Open and capture logs
     Then Close the replication pipeline logs and stop the pipeline

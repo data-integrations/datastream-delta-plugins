@@ -45,11 +45,15 @@ public class MysqlTestSetUpHooks {
   public static void createTable() throws SQLException, ClassNotFoundException {
     MysqlClient.createTable(PluginPropertyUtils.pluginProp("sourceMySqlTable"),
                             PluginPropertyUtils.pluginProp("mysqlDatatypeColumns"));
+    BeforeActions.scenario.write("Mysql Source Table - " + PluginPropertyUtils.pluginProp("sourceMySqlTable")
+            + " created successfully");
   }
 
   @After(order = 1, value = "@MYSQL_DELETE")
   public static void dropTable() throws SQLException, ClassNotFoundException {
-    MysqlClient.deleteTable(new String[]{PluginPropertyUtils.pluginProp("sourceMySqlTable")});
+    MysqlClient.deleteTable(PluginPropertyUtils.pluginProp("sourceMySqlTable"));
+    BeforeActions.scenario.write("Mysql Source Table - " + PluginPropertyUtils.pluginProp("sourceMySqlTable")
+            + " deleted successfully");
   }
 
   @After(order = 1, value = "@BQ_SINK_TEST")

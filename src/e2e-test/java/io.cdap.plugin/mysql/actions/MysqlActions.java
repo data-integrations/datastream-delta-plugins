@@ -75,4 +75,15 @@ public class MysqlActions {
     public static void waitForReplication() throws InterruptedException {
         BigQuery.waitForFlush();
     }
+
+    public static void verifyTargetBigQueryRecordMatchesExpectedMysqlRecord() throws IOException, InterruptedException,
+            SQLException, ClassNotFoundException {
+        // Checking if an error message is displayed.
+        Assert.assertFalse(ElementHelper.isElementDisplayed(MysqlLocators.error));
+
+        List<Map<String, Object>> sourceMysqlRecords = MysqlClient.getMySqlRecordsAsMap(tableName);
+        List<Map<String, Object>> targetBigQueryRecords =
+                BigQuery.getBigQueryRecordsAsMap(projectId, database, tableName);
+        ValidationHelper.validateRecords(sourceMysqlRecords, targetBigQueryRecords);
+    }
 }

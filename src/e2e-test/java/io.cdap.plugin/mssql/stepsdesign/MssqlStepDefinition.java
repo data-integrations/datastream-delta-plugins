@@ -34,6 +34,11 @@ public class MssqlStepDefinition implements CdfHelper {
     MssqlActions.selectTable();
   }
 
+  @Then("Wait till Next button is loaded")
+  public void waitTillNextButtonIsLoaded() throws InterruptedException {
+    MssqlActions.waitTillNextButtonIsLoaded();
+  }
+
   @Then("Wait till pipeline is in running state and check if no errors occurred")
   public void waitTillPipelineIsInRunningState() throws InterruptedException {
     MssqlActions.waitTillPipelineIsRunningAndCheckForErrors();
@@ -52,6 +57,6 @@ public class MssqlStepDefinition implements CdfHelper {
   @Then("Verify expected MsSQL records in target BigQuery table")
   public void verifyExpectedMsSQLRecordsInTargetBigQueryTable() throws
     IOException, InterruptedException, SQLException, ClassNotFoundException {
-//    MysqlActions.verifyTargetBigQueryRecordMatchesExpectedMssqlRecord();
+//    MssqlActions.verifyTargetBigQueryRecordMatchesExpectedMssqlRecord();
   }
 }

@@ -45,10 +45,16 @@ public class MssqlActions {
     }
 
     public static void selectTable() {
-        String table = tableName;
+        String table = schemaName + "." + tableName;
         WaitHelper.waitForElementToBeDisplayed(MssqlLocators.selectTable(table), 300);
         AssertionHelper.verifyElementDisplayed(MssqlLocators.selectTable(table));
         ElementHelper.clickOnElement(MssqlLocators.selectTable(table));
+    }
+
+    public static void waitTillNextButtonIsLoaded() throws InterruptedException {
+        //wait for Next button to get loaded
+        int defaultTimeout = Integer.parseInt(PluginPropertyUtils.pluginProp("next-button-load"));
+        TimeUnit.SECONDS.sleep(defaultTimeout);
     }
 
     public static void waitTillPipelineIsRunningAndCheckForErrors() throws InterruptedException {

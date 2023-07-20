@@ -35,9 +35,9 @@ Feature: Mssql - Verify Mssql source data transfer to BigQuery
     And Click on the Next button in Replication mode "Next"
     Then Validate Source table is available and select it
     And Click on the Next button in Replication mode "Next"
-    Then Wait till Next button is loaded
+    Then Wait till the Configure Advanced Properties page is loaded in replication
     And Click on the Next button in Replication mode "Next"
-    Then Wait till Next button is loaded
+    Then Wait till the Review Assessment page is loaded in replication
     And Click on the Next button in Replication mode "Next"
     Then Deploy the replication pipeline
     And Run the replication Pipeline
@@ -65,9 +65,9 @@ Feature: Mssql - Verify Mssql source data transfer to BigQuery
     And Click on the Next button in Replication mode "Next"
     Then Validate Source table is available and select it
     And Click on the Next button in Replication mode "Next"
-    Then Wait till Next button is loaded
+    Then Wait till the Configure Advanced Properties page is loaded in replication
     And Click on the Next button in Replication mode "Next"
-    Then Wait till Next button is loaded
+    Then Wait till the Review Assessment page is loaded in replication
     And Click on the Next button in Replication mode "Next"
     Then Deploy the replication pipeline
     And Run the replication Pipeline

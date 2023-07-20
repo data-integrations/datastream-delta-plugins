@@ -51,12 +51,6 @@ public class MssqlActions {
         ElementHelper.clickOnElement(MssqlLocators.selectTable(table));
     }
 
-    public static void waitTillNextButtonIsLoaded() throws InterruptedException {
-        //wait for Next button to get loaded
-        int defaultTimeout = Integer.parseInt(PluginPropertyUtils.pluginProp("next-button-load"));
-        TimeUnit.SECONDS.sleep(defaultTimeout);
-    }
-
     public static void waitTillPipelineIsRunningAndCheckForErrors() throws InterruptedException {
         //wait for datastream to startup
         int defaultTimeout = Integer.parseInt(PluginPropertyUtils.pluginProp("pipeline-initialization"));

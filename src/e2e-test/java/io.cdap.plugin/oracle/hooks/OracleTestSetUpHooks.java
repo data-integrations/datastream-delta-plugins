@@ -51,7 +51,7 @@ public class OracleTestSetUpHooks {
         BeforeActions.scenario.write("Oracle Source Table - " + tableName + " created successfully");
     }
 
-  @After(order = 1, value = "@ORACLE_DELETE")
+  @After(order = 2, value = "@ORACLE_DELETE")
   public static void dropTable() throws SQLException, ClassNotFoundException {
         OracleClient.deleteTable(schemaName, tableName);
         BeforeActions.scenario.write("Oracle Source Table - " + tableName + " deleted successfully");

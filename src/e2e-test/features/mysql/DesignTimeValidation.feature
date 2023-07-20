@@ -59,7 +59,7 @@ Feature: Mysql - Verify Mysql source plugin design time validation scenarios
     Then Replace input plugin property: "host" with value: "mysqlHost" for Credentials and Authorization related fields
     Then Replace input plugin property: "port" with value: "mysqlPort" for Credentials and Authorization related fields
     Then Select dropdown plugin property: "select-jdbcPluginName" with option value: "mysqlDriverName"
-    Then Replace input plugin property: "database" with value: "mySqlInvalidDatabaseName"
+    Then Replace input plugin property: "database" with value: "mySqlInvalidDatabase"
     Then Replace input plugin property: "user" with value: "mysqlUsername" for Credentials and Authorization related fields
     Then Replace input plugin property: "password" with value: "mysqlPassword" for Credentials and Authorization related fields
     And Click on the Next button in Replication mode "Next"

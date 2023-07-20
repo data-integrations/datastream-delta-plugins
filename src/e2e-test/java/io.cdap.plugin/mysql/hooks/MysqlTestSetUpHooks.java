@@ -49,7 +49,7 @@ public class MysqlTestSetUpHooks {
             + " created successfully");
   }
 
-  @After(order = 1, value = "@MYSQL_DELETE")
+  @After(order = 2, value = "@MYSQL_DELETE")
   public static void dropTable() throws SQLException, ClassNotFoundException {
     MysqlClient.deleteTable(PluginPropertyUtils.pluginProp("sourceMySqlTable"));
     BeforeActions.scenario.write("Mysql Source Table - " + PluginPropertyUtils.pluginProp("sourceMySqlTable")

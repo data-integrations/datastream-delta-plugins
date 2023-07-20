@@ -34,11 +34,6 @@ public class MssqlStepDefinition implements CdfHelper {
     MssqlActions.selectTable();
   }
 
-  @Then("Wait till Next button is loaded")
-  public void waitTillNextButtonIsLoaded() throws InterruptedException {
-    MssqlActions.waitTillNextButtonIsLoaded();
-  }
-
   @Then("Wait till pipeline is in running state and check if no errors occurred")
   public void waitTillPipelineIsInRunningState() throws InterruptedException {
     MssqlActions.waitTillPipelineIsRunningAndCheckForErrors();

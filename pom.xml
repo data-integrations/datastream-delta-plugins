@@ -54,7 +54,7 @@
   </scm>
 
   <properties>
-    <delta.version>0.8.0-SNAPSHOT</delta.version>
+    <delta.version>0.9.0-SNAPSHOT</delta.version>
     <slf4j.version>1.7.25</slf4j.version>
     <avro.version>1.8.2</avro.version>
     <gcp.version>26.1.1</gcp.version>

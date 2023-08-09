@@ -21,6 +21,7 @@ import io.cdap.plugin.utils.BigQuery;
 import io.cdap.plugin.utils.OracleClient;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
+import org.apache.commons.lang3.RandomStringUtils;
 import stepsdesign.BeforeActions;
 
 import java.io.IOException;
@@ -87,13 +88,36 @@ public class TestSetUpHooks {
         BeforeActions.scenario.write("Expected Oracle records : " + sourceOracleRecords);
     }
 
-  @After(order = 1, value = "@ORACLE_DELETE")
-  public static void dropTable() throws SQLException, ClassNotFoundException {
+    @After(order = 1, value = "@ORACLE_DELETE")
+    public static void dropTable() throws SQLException, ClassNotFoundException {
         OracleClient.deleteTable(schemaName, tableName);
-  }
+    }
 
-  @After(order = 1, value = "@BIGQUERY_DELETE")
-  public static void deleteTargetBQTable() throws IOException, InterruptedException {
-        BigQuery.deleteTable(tableName);
+    @After(order = 1, value = "@BIGQUERY_DELETE")
+    public static void deleteTargetBQTable() throws IOException, InterruptedException {
+        BigQuery.deleteTable();
+    }
+
+    @Before(order = 1)
+    public static void setTableName() {
+        String randomString = RandomStringUtils.randomAlphabetic(10).toUpperCase();
+        String sourceTableName = String.format("SOURCETABLE_%s", randomString);
+        PluginPropertyUtils.addPluginProp("sourceTable", sourceTableName);
+    }
+
+    @Before(order = 2, value = "@ORACLE_SOURCE_TEST")
+    public static void createSourceTable() throws SQLException, ClassNotFoundException {
+        OracleClient.createTable(PluginPropertyUtils.pluginProp("sourceTable"),
+                PluginPropertyUtils.pluginProp("schema"), datatypeColumns);
+        BeforeActions.scenario.write("Oracle Source Table - " +
+                PluginPropertyUtils.pluginProp("sourceTable") + " created successfully");
+    }
+
+    @After(order = 2, value = "@ORACLE_DELETE_TEST")
+    public static void dropSourceTable() throws SQLException, ClassNotFoundException {
+        OracleClient.deleteTable(PluginPropertyUtils.pluginProp("schema"),
+                PluginPropertyUtils.pluginProp("sourceTable"));
+        BeforeActions.scenario.write("Oracle Source Table - " +
+                PluginPropertyUtils.pluginProp("sourceTable") + " deleted successfully");
     }
 }

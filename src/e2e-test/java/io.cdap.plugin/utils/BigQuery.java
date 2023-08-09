@@ -73,7 +73,8 @@ public class BigQuery {
         time.sleep(2 * flushInterval + 60);
     }
 
-    public static void deleteTable(String tableName) throws IOException, InterruptedException {
+    public static void deleteTable() throws IOException, InterruptedException {
+        String tableName = PluginPropertyUtils.pluginProp("sourceTable");
         try {
             BigQueryClient.dropBqQuery(tableName);
             BeforeActions.scenario.write("BQ Target table - " + tableName + " deleted successfully");

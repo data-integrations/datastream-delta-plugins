@@ -41,23 +41,23 @@ public class OracleClient {
         TimeZone timezone = TimeZone.getTimeZone("UTC");
         TimeZone.setDefault(timezone);
         Class.forName("oracle.jdbc.driver.OracleDriver");
-        String databaseName = PluginPropertyUtils.pluginProp("dataset");
-        String host = PluginPropertyUtils.pluginProp("host");
-        String port = PluginPropertyUtils.pluginProp("port");
-        String username = PluginPropertyUtils.pluginProp("username");
-        String password = PluginPropertyUtils.pluginProp("password");
-
-        return DriverManager.getConnection("jdbc:oracle:thin:@//" + host
-                        + ":" + port + "/" + databaseName,
-                username, password);
+        String databaseName = PluginPropertyUtils.pluginProp("oracleDatabaseName");
+        return DriverManager.getConnection("jdbc:oracle:thin:@//" + System.getenv("ORACLE_REPLICATION_HOST")
+                        + ":" + System.getenv("ORACLE_PORT") + "/" + databaseName,
+                System.getenv("ORACLE_REPLICATION_USERNAME"), System.getenv("ORACLE_REPLICATION_PASSWORD"));
     }
-
 
     public static void createTable(String table, String schema, String datatypeColumns)
             throws SQLException, ClassNotFoundException {
         try (Connection connect = getOracleConnection(); Statement statement = connect.createStatement()) {
             String createTableQuery = "CREATE TABLE " + schema + "." + table + datatypeColumns;
             statement.executeUpdate(createTableQuery);
+
+            // Insert dummy data.
+            String datatypeValues = PluginPropertyUtils.pluginProp("datatypeValuesRow");
+            String datatypeColumnsList = PluginPropertyUtils.pluginProp("datatypeColumnsList");
+            statement.executeUpdate("INSERT INTO " + schema + "." + table + " " + datatypeColumnsList + " " +
+                    datatypeValues);
         }
     }
 
@@ -70,8 +70,6 @@ public class OracleClient {
             statement.executeUpdate("ALTER SYSTEM SWITCH LOGFILE");
         }
     }
-
-
 
     public static void insertRow (String table, String schema, String datatypeValues) throws
             SQLException, ClassNotFoundException {

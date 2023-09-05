@@ -30,53 +30,15 @@ import java.sql.SQLException;
  * Contains Oracle replication test scenarios step definitions.
  */
 public class StepDefinition implements CdfHelper {
-    @Given("Open DataFusion Project with replication to configure pipeline")
-    public void openDataFusionProjectWithReplicationToConfigurePipeline() throws IOException, InterruptedException {
-        openCdf();
-        SeleniumDriver.getDriver().get(SeleniumDriver.getDriver().getCurrentUrl().replace(
-                PluginPropertyUtils.pluginProp("cdfUrl"), PluginPropertyUtils.pluginProp("replication.url")));
-    }
-    @And("Click on the Next button")
-    public void clickOnTheNextButton() throws InterruptedException {
-        ReplicationActions.clickNextButton();
-    }
-    @And("Select Oracle as Source")
-    public void selectSourceAsOracle() {
-        ReplicationActions.clickOnOraclePlugin();
-    }
 
     @Then("Validate Source table is available and select it")
     public void selectTable() {
         ReplicationActions.selectTable();
     }
-    @Then("Deploy the replication pipeline")
-    public void deployPipeline() {
-        ReplicationActions.deployPipeline();
-    }
-
-    @Then("Run the replication Pipeline")
-    public void runPipelineInRuntime() {
-        ReplicationActions.runThePipeline();
-    }
-
-    @Then("Open the logs")
-    public void openLogsOfSltPipeline() {
-        ReplicationActions.openAdvanceLogs();
-    }
 
     @Then("Wait till pipeline is in running state and check if no errors occurred")
     public void waitTillSltPipelineIsInRunningState() throws InterruptedException {
         ReplicationActions.waitTillPipelineIsRunningAndCheckForErrors();
-    }
-
-    @Then("Close the pipeline logs and stop the pipeline")
-    public void closeLogsAndStopThePipeline() {
-        ReplicationActions.closeTheLogsAndClickOnStopButton();
-    }
-
-    @And("Capture raw logs")
-    public void captureRawLogs() {
-        ReplicationActions.captureRawLog();
     }
 
     @And("Run insert, update and delete CDC events on source table")

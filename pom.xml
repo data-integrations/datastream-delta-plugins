@@ -58,6 +58,8 @@
     <slf4j.version>1.7.25</slf4j.version>
     <avro.version>1.8.2</avro.version>
     <gcp.version>26.1.1</gcp.version>
+    <jackson.version>2.23.0</jackson.version>
+    <protobuf.version>3.25.5</protobuf.version>
     <failsafe.version>2.3.3</failsafe.version>
     <jacoco.version>0.8.8</jacoco.version>
     <!-- Need default value when coverage is not collected -->
@@ -80,6 +82,24 @@
 
   <dependencyManagement>
     <dependencies>
+      <!--
+        Imported before libraries-bom so they win over its older versions (jackson 2.13.x,
+        protobuf 3.21.4). Remove the protobuf floor once libraries-bom brings 3.25.5 or newer.
+      -->
+      <dependency>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-bom</artifactId>
+        <version>${protobuf.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>

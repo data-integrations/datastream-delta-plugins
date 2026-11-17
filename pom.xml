@@ -140,17 +140,41 @@
       <artifactId>grpc-netty-shaded</artifactId>
       <scope>compile</scope>
     </dependency>
+    <!--
+      The plugin jar embeds only compile-scope dependencies. gax-grpc declares these gRPC modules at
+      runtime scope, so declare them at compile scope to keep them in the plugin jar (grpc-all used to
+      pull them in at compile scope). Versions come from libraries-bom.
+    -->
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-auth</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-grpclb</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-services</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-xds</artifactId>
+      <!-- Not managed by libraries-bom; same version as its grpc-bom (1.48.0). -->
+      <version>1.48.0</version>
+    </dependency>
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-all</artifactId>
       <version>1.49.0</version>
       <exclusions>
         <exclusion>
-          <artifactId>io.grpc</artifactId>
-          <groupId>grpc-netty</groupId>
+          <groupId>io.grpc</groupId>
+          <artifactId>grpc-netty</artifactId>
         </exclusion>
       </exclusions>
-      <scope>compile</scope>
+      <!-- Only tests use io.grpc directly; the runtime transport is grpc-netty-shaded. -->
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.perfmark</groupId>

@@ -22,7 +22,7 @@
 
   <groupId>io.cdap.delta</groupId>
   <artifactId>datastream-delta-plugins</artifactId>
-  <version>0.8.0</version>
+  <version>0.8.1-SNAPSHOT</version>
   <name>Datastream Delta plugins</name>
   <packaging>jar</packaging>
   <description>Datastream Delta plugins</description>
@@ -58,6 +58,7 @@
     <slf4j.version>1.7.25</slf4j.version>
     <avro.version>1.8.2</avro.version>
     <gcp.version>26.1.1</gcp.version>
+    <guava.version>33.8.0-jre</guava.version>
     <failsafe.version>2.3.3</failsafe.version>
     <jacoco.version>0.8.8</jacoco.version>
     <!-- Need default value when coverage is not collected -->
@@ -80,6 +81,11 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>${guava.version}</version>
+      </dependency>
       <dependency>
         <groupId>com.google.cloud</groupId>
         <artifactId>libraries-bom</artifactId>
@@ -564,7 +570,7 @@
           <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>31.1-jre</version>
+            <version>${guava.version}</version>
           </dependency>
         </dependencies>
       </dependencyManagement>

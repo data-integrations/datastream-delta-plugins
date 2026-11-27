@@ -56,9 +56,11 @@
   <properties>
     <delta.version>0.9.0</delta.version>
     <slf4j.version>1.7.25</slf4j.version>
-    <avro.version>1.8.2</avro.version>
+    <avro.version>1.11.5</avro.version>
     <gcp.version>26.1.1</gcp.version>
     <guava.version>33.8.0-jre</guava.version>
+    <jackson.version>2.23.0</jackson.version>
+    <protobuf.version>3.25.5</protobuf.version>
     <failsafe.version>2.3.3</failsafe.version>
     <jacoco.version>0.8.8</jacoco.version>
     <!-- Need default value when coverage is not collected -->
@@ -81,6 +83,24 @@
 
   <dependencyManagement>
     <dependencies>
+      <!--
+        Imported before libraries-bom so they win over its older versions (jackson 2.13.x,
+        protobuf 3.21.4). Remove the protobuf floor once libraries-bom brings 3.25.5 or newer.
+      -->
+      <dependency>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-bom</artifactId>
+        <version>${protobuf.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
@@ -92,6 +112,12 @@
         <version>${gcp.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <!-- commons-compress 1.26.2 (from avro 1.11.5) pulls commons-lang3 3.14.0; use the fixed 3.22.0. -->
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>3.22.0</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -135,6 +161,20 @@
       <artifactId>avro</artifactId>
       <version>${avro.version}</version>
     </dependency>
+    <!--
+      Optional in avro 1.9+, but avro 1.8.2 brought them in, so Datastream Avro files written with the
+      snappy or xz codec stay readable.
+    -->
+    <dependency>
+      <groupId>org.xerial.snappy</groupId>
+      <artifactId>snappy-java</artifactId>
+      <version>1.1.10.12</version>
+    </dependency>
+    <dependency>
+      <groupId>org.tukaani</groupId>
+      <artifactId>xz</artifactId>
+      <version>1.12</version>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-engine</artifactId>
@@ -146,17 +186,41 @@
       <artifactId>grpc-netty-shaded</artifactId>
       <scope>compile</scope>
     </dependency>
+    <!--
+      The plugin jar embeds only compile-scope dependencies. gax-grpc declares these gRPC modules at
+      runtime scope, so declare them at compile scope to keep them in the plugin jar (grpc-all used to
+      pull them in at compile scope). Versions come from libraries-bom.
+    -->
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-auth</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-grpclb</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-services</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-xds</artifactId>
+      <!-- Not managed by libraries-bom; same version as its grpc-bom (1.48.0). -->
+      <version>1.48.0</version>
+    </dependency>
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-all</artifactId>
       <version>1.49.0</version>
       <exclusions>
         <exclusion>
-          <artifactId>io.grpc</artifactId>
-          <groupId>grpc-netty</groupId>
+          <groupId>io.grpc</groupId>
+          <artifactId>grpc-netty</artifactId>
         </exclusion>
       </exclusions>
-      <scope>compile</scope>
+      <!-- Only tests use io.grpc directly; the runtime transport is grpc-netty-shaded. -->
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.perfmark</groupId>
